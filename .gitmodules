@@ -1,0 +1,3 @@
+[submodule "fds"]
+	path = fds
+	url = https://github.com/firemodels/fds.git
