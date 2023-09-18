@@ -1,0 +1,4398 @@
+!!! AM 15092023 
+!!! no need to change for coupling - uniteresting outputs written
+!!!
+
+!> \brief Open and initialize all files that are not tied to a particular mesh
+
+SUBROUTINE INITIALIZE_GLOBAL_DUMPS(T,DT)
+
+USE COMP_FUNCTIONS, ONLY: CURRENT_TIME,GET_FILE_NUMBER,APPEND_FILE
+USE PHYSICAL_FUNCTIONS, ONLY: GET_MASS_FRACTION_ALL,GET_MOLECULAR_WEIGHT
+USE HVAC_ROUTINES, ONLY: N_DUCT_QUANTITY,N_NODE_QUANTITY
+USE CONTROL_VARIABLES
+REAL(EB) :: TNOW
+REAL(EB), INTENT(IN) :: T,DT
+INTEGER :: NN,I,N,N_OUT,N_ZONE_TMP,LU,J, N_NODE_OUT, N_DUCT_OUT
+INTEGER, ALLOCATABLE, DIMENSION(:) :: DUCT_CELL
+CHARACTER(80) :: FN
+CHARACTER(LABEL_LENGTH) :: LAB,UNITS
+CHARACTER(LABEL_LENGTH+7), DIMENSION(42) :: LABEL='null'
+
+TNOW=CURRENT_TIME()
+
+CALL INITIALIZE_DIAGNOSTIC_FILE(DT)
+
+! Initialize device output file (CHID_devc.csv)
+
+IF (N_DEVC_TIME>0) THEN
+
+   ALLOCATE(TIME_DEVC_LABEL(N_DEVC_TIME))
+   ALLOCATE(TIME_DEVC_UNITS(N_DEVC_TIME))
+   ALLOCATE(TIME_DEVC_VALUE(N_DEVC_TIME))
+
+   NN = 0
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      IF (DV%LINE==0 .AND. DV%OUTPUT) THEN
+         NN = NN + 1
+         TIME_DEVC_LABEL(NN) = DV%ID
+         TIME_DEVC_UNITS(NN) = DV%UNITS
+      ENDIF
+   ENDDO
+
+   DO I = 1,N_DEVC_FILES
+      IF (APPEND) THEN
+         OPEN(LU_DEVC(I),FILE=FN_DEVC(I),FORM='FORMATTED',STATUS='OLD')
+         CALL APPEND_FILE(LU_DEVC(I),2,T_BEGIN+(T-T_BEGIN)*TIME_SHRINK_FACTOR)
+      ELSE
+         N_OUT = MIN(DEVC_COLUMN_LIMIT , N_DEVC_TIME-DEVC_COLUMN_LIMIT*(I-1))
+         OPEN(LU_DEVC(I),FILE=FN_DEVC(I),FORM='FORMATTED',STATUS='REPLACE')
+         WRITE(TCFORM,'(A,I0,A)') "(",N_OUT,"(A,','),A)"
+         WRITE(LU_DEVC(I),TCFORM) 's',(TRIM(TIME_DEVC_UNITS(N)),N=DEVC_COLUMN_LIMIT*(I-1)+1,MIN(N_DEVC_TIME,I*DEVC_COLUMN_LIMIT))
+         WRITE(TCFORM,'(A,I0,A)') "(A,",N_OUT,"(',',3A))"
+         WRITE(LU_DEVC(I),TCFORM) 'Time',('"',TRIM(TIME_DEVC_LABEL(N)),'"', &
+                                  N=DEVC_COLUMN_LIMIT * (I - 1) + 1,MIN(N_DEVC_TIME, I * DEVC_COLUMN_LIMIT))
+      ENDIF
+   ENDDO
+
+ENDIF
+
+! Define labels for histogram output
+
+IF (N_HISTOGRAM>0) THEN
+
+   ALLOCATE(HISTOGRAM_LABEL(N_HISTOGRAM))
+   ALLOCATE(HISTOGRAM_UNITS(N_HISTOGRAM))
+   ALLOCATE(HISTOGRAM_VALUE(N_HISTOGRAM,MAX_HISTOGRAM_NBINS))
+
+   NN = 0
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      PY => PROPERTY(DV%PROP_INDEX)
+      IF (.NOT.PY%HISTOGRAM) CYCLE
+      NN = NN+1
+      IF (DV%QUANTITY(1)/='PDPA') THEN
+         LAB = DV%QUANTITY(1)
+         UNITS = DV%UNITS
+      ELSE
+         SELECT CASE(PY%QUANTITY)
+            CASE('U-VELOCITY','V-VELOCITY','W-VELOCITY','VELOCITY')
+               LAB="vel_"//TRIM(DV%ID)
+               UNITS="m/s"
+            CASE('TEMPERATURE')
+               LAB="T_"//TRIM(DV%ID)
+               UNITS="C"
+            CASE('ENTHALPY')
+               LAB="h_"//TRIM(DV%ID)
+               UNITS="kJ"
+            CASE DEFAULT
+               LAB="D_"//TRIM(DV%ID)
+               UNITS="mu-m"
+         END SELECT
+      ENDIF
+      IF (PY%HISTOGRAM_NORMALIZE) THEN
+         IF (DV%HIDE_COORDINATES) THEN
+            IF (PY%HISTOGRAM_CUMULATIVE) THEN
+               HISTOGRAM_LABEL(NN) = 'CDF_'//TRIM(DV%ID)
+               HISTOGRAM_UNITS(NN) = '--'
+            ELSE
+               HISTOGRAM_LABEL(NN) = 'PDF_'//TRIM(DV%ID)
+               HISTOGRAM_UNITS(NN) = '1/'//TRIM(UNITS)
+            ENDIF
+         ELSE
+            IF (PY%HISTOGRAM_CUMULATIVE) THEN
+               HISTOGRAM_LABEL(NN) = TRIM(LAB)//',CDF_'//TRIM(DV%ID)
+               HISTOGRAM_UNITS(NN) = TRIM(UNITS)//',--'
+            ELSE
+               HISTOGRAM_LABEL(NN) = TRIM(LAB)//',PDF_'//TRIM(DV%ID)
+               HISTOGRAM_UNITS(NN) = TRIM(UNITS)//',1/'//TRIM(UNITS)
+            ENDIF
+         ENDIF
+      ELSE
+         IF (DV%HIDE_COORDINATES) THEN
+            HISTOGRAM_LABEL(NN) = 'Counts_'//TRIM(DV%ID)
+            HISTOGRAM_UNITS(NN) = '#'
+         ELSE
+            HISTOGRAM_LABEL(NN) = TRIM(LAB)//','//TRIM(DV%ID)
+            HISTOGRAM_UNITS(NN) = TRIM(UNITS)//',#'
+         ENDIF
+      ENDIF
+   ENDDO
+ENDIF
+
+! Define labels for line devices
+
+IF (N_DEVC_LINE>0) THEN
+
+   ALLOCATE(LINE_DEVC_LABEL(N_DEVC_LINE))
+   ALLOCATE(LINE_DEVC_UNITS(N_DEVC_LINE))
+   ALLOCATE(LINE_DEVC_VALUE(N_DEVC_LINE,MAX_DEVC_LINE_POINTS))
+
+   NN = 0
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      IF (DV%LINE>0 .AND. DV%POINT==1) THEN
+         NN = NN+1
+         SELECT CASE(DV%LINE_COORD_CODE)
+            CASE(0)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%UNITS)
+            CASE(1)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%X_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(2)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%Y_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(3)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%Z_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(4)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%R_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(5)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%D_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(12)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%X_ID)//','//TRIM(DV%Y_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(13)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%X_ID)//','//TRIM(DV%Z_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(23)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%Y_ID)//','//TRIM(DV%Z_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+            CASE(123)
+               LINE_DEVC_LABEL(NN) = TRIM(DV%X_ID)//','//TRIM(DV%Y_ID)//','//TRIM(DV%Z_ID)//','//TRIM(DV%ID)
+               LINE_DEVC_UNITS(NN) = TRIM(DV%XYZ_UNITS)//','//TRIM(DV%XYZ_UNITS)//','//TRIM(DV%XYZ_UNITS)//','//TRIM(DV%UNITS)
+         END SELECT
+      ENDIF
+   ENDDO
+
+ENDIF
+
+! Initialize control output file (CHID_ctrl.csv)
+
+IF (N_CTRL>0) THEN
+   DO I = 1,N_CTRL_FILES
+      IF (APPEND) THEN
+         OPEN(LU_CTRL(I),FILE=FN_CTRL(I),FORM='FORMATTED',STATUS='OLD')
+         CALL APPEND_FILE(LU_CTRL(I),2,T_BEGIN+(T-T_BEGIN)*TIME_SHRINK_FACTOR)
+      ELSE
+         OPEN(LU_CTRL(I),FILE=FN_CTRL(I),FORM='FORMATTED',STATUS='REPLACE')
+         N_OUT = MIN(CTRL_COLUMN_LIMIT, N_CTRL - CTRL_COLUMN_LIMIT * (I - 1))
+         WRITE(TCFORM,'(A,I0,A)') "(",N_OUT,"(A,','),A)"
+         WRITE(LU_CTRL(I),TCFORM) 's',('status',N=CTRL_COLUMN_LIMIT * (I - 1) + 1,MIN(N_CTRL, I * CTRL_COLUMN_LIMIT))
+         WRITE(TCFORM,'(A,I0,A)') "(A,",N_OUT,"(',',3A))"
+         WRITE(LU_CTRL(I),TCFORM) 'Time',('"',TRIM(CONTROL(N)%ID),'"', &
+                                   N=CTRL_COLUMN_LIMIT * (I - 1) + 1,MIN(N_CTRL, I * CTRL_COLUMN_LIMIT))
+      ENDIF
+   ENDDO
+ENDIF
+
+! Open HVAC file (CHID.hvac)
+
+IF (HVAC_SOLVE .AND. (N_DUCT_QUANTITY>0 .OR. N_NODE_QUANTITY>0)) THEN
+   IF (APPEND) THEN
+      OPEN(LU_HVAC,FILE=FN_HVAC,FORM='UNFORMATTED',STATUS='OLD')
+   ELSE
+      OPEN(LU_HVAC,FILE=FN_HVAC,FORM='UNFORMATTED',STATUS='REPLACE')
+
+      N_NODE_OUT = 0
+      DO N=1,N_DUCTNODES
+         IF (DUCTNODE(N)%LEAKAGE) CYCLE
+         N_NODE_OUT = N_NODE_OUT + 1
+      ENDDO
+
+      N_DUCT_OUT = 0
+      DO N=1,N_DUCTS
+         IF (DUCT(N)%LEAKAGE) CYCLE
+         N_DUCT_OUT = N_DUCT_OUT + 1
+      ENDDO
+      WRITE(LU_HVAC) N_NODE_OUT, N_NODE_QUANTITY, N_DUCT_OUT, N_DUCT_QUANTITY
+      IF (N_DUCT_QUANTITY > 0) THEN
+         ALLOCATE(DUCT_CELL(N_DUCT_OUT))
+         N_DUCT_OUT = 0
+         DO N=1,N_DUCTS
+            IF (DUCT(N)%LEAKAGE) CYCLE
+            N_DUCT_OUT = N_DUCT_OUT + 1
+            DUCT_CELL(N_DUCT_OUT) = MAX(1,DUCT(N)%N_CELLS)
+         ENDDO
+         WRITE(LU_HVAC) DUCT_CELL
+         DEALLOCATE(DUCT_CELL)
+      ENDIF
+   ENDIF
+ENDIF
+
+! Open heat release rate file (CHID_hrr.csv)
+
+N_ZONE_TMP = 0
+IF (N_ZONE>0) THEN
+   DO N=1,N_ZONE
+      N_ZONE_TMP = N_ZONE_TMP + 1
+      IF (P_ZONE(N)%ID=='null') WRITE(P_ZONE(N)%ID,'(A,I0)') 'ZONE_',N
+   ENDDO
+ENDIF
+
+IF (APPEND) THEN
+   OPEN(LU_HRR,FILE=FN_HRR,FORM='FORMATTED',STATUS='OLD')
+   CALL APPEND_FILE(LU_HRR,2,T_BEGIN+(T-T_BEGIN)*TIME_SHRINK_FACTOR)
+ELSE
+   OPEN(LU_HRR,FILE=FN_HRR,FORM='FORMATTED',STATUS='REPLACE')
+   WRITE(TCFORM,'(A,I0,A)') "(",9+N_TRACKED_SPECIES+N_ZONE_TMP,"(A,','),A)"
+   WRITE(LU_HRR,TCFORM) 's','kW','kW','kW','kW','kW','kW','kW','kW','kW',('kg/s',N=1,N_TRACKED_SPECIES),('Pa',N=1,N_ZONE_TMP)
+   IF (N_ZONE_TMP>0) THEN
+      WRITE(LU_HRR,TCFORM) 'Time','HRR','Q_RADI','Q_CONV','Q_COND','Q_DIFF','Q_PRES','Q_PART','Q_ENTH','Q_TOTAL',&
+                           ('MLR_'//TRIM(SPECIES_MIXTURE(N)%ID),N=1,N_TRACKED_SPECIES),(TRIM(P_ZONE(N)%ID),N=1,N_ZONE_TMP)
+   ELSE
+      WRITE(LU_HRR,TCFORM) 'Time','HRR','Q_RADI','Q_CONV','Q_COND','Q_DIFF','Q_PRES','Q_PART','Q_ENTH','Q_TOTAL',&
+                           ('MLR_'//TRIM(SPECIES_MIXTURE(N)%ID),N=1,N_TRACKED_SPECIES)
+   ENDIF
+ENDIF
+
+! Open runtime diagnostics CSV file
+
+IF (APPEND) THEN
+   INQUIRE(FILE=FN_STEPS,EXIST=EX)
+   IF (EX) OPEN(LU_STEPS,FILE=FN_STEPS,FORM='FORMATTED',STATUS='OLD',POSITION='APPEND')
+ELSE
+   OPEN(LU_STEPS,FILE=FN_STEPS,FORM='FORMATTED',STATUS='REPLACE')
+   WRITE(LU_STEPS,'(A,",",A,",",A,",",A,",",A)') '','','s','s','s'
+   WRITE(LU_STEPS,'(A,",",A,",",A,",",A,",",A)') 'Time Step','Wall Time','Step Size','Simulation Time','CPU Time'
+ENDIF
+
+! Open species mass file
+
+IF (MASS_FILE) THEN
+   IF (APPEND) THEN
+      OPEN(LU_MASS,FILE=FN_MASS,FORM='FORMATTED',STATUS='OLD')
+      CALL APPEND_FILE(LU_MASS,2,T_BEGIN+(T-T_BEGIN)*TIME_SHRINK_FACTOR)
+   ELSE
+      OPEN(LU_MASS,FILE=FN_MASS,FORM='FORMATTED',STATUS='REPLACE')
+      LABEL(1) = 'Time'
+      LABEL(2) = 'Total'
+      LABEL(3:3+N_SPECIES-1) = SPECIES(1:N_SPECIES)%ID
+      LABEL(3+N_SPECIES:3+N_SPECIES+N_TRACKED_SPECIES-1) = 'LUMPED '//SPECIES_MIXTURE(1:N_TRACKED_SPECIES)%ID
+      WRITE(TCFORM,'(A,I0,A)') "(",N_SPECIES+N_TRACKED_SPECIES+1,"(A,','),A)"
+      WRITE(LU_MASS,TCFORM) 's',('kg',N=1,N_SPECIES+N_TRACKED_SPECIES+1)
+      WRITE(LU_MASS,TCFORM) (TRIM(LABEL(N)),N=1,N_SPECIES+N_TRACKED_SPECIES+2)
+   ENDIF
+ENDIF
+
+! Special output for pressure iteration scheme
+
+IF (VELOCITY_ERROR_FILE) THEN
+   OPEN(UNIT=LU_VELOCITY_ERROR,FILE=FN_VELOCITY_ERROR,FORM='FORMATTED',STATUS='UNKNOWN',POSITION='REWIND')
+   WRITE(LU_VELOCITY_ERROR,'(A)') 'Time,Time Step,Iteration,Total,Mesh,I,J,K,Velocity Error,Mesh,I,J,K,Pressure Error'
+ENDIF
+
+! Special output for detailed CFL info
+
+IF (CFL_FILE) THEN
+   OPEN(UNIT=LU_CFL,FILE=FN_CFL,FORM='FORMATTED',STATUS='UNKNOWN',POSITION='REWIND')
+   WRITE(LU_CFL,'(A)') 'Cycle,t,dt,CFL,Mesh,i,j,k,u_i-1,u_i,v_j-1,v_j,w_k-1,w_k,div,mu,HRRPUV,tau,VN,Mesh,i,j,k'
+ENDIF
+
+! Check particle sample distribution
+
+PART_DIST_LOOP: DO I=1,N_LAGRANGIAN_CLASSES
+   LPC=>LAGRANGIAN_PARTICLE_CLASS(I)
+   IF (.NOT.LPC%CHECK_DISTRIBUTION .OR. LPC%MONODISPERSE .OR. LPC%DIAMETER<TWO_EPSILON_EB) CYCLE PART_DIST_LOOP
+   LU = GET_FILE_NUMBER()
+   WRITE(FN,'(A,A,A,A)') TRIM(CHID),'_',TRIM(LPC%ID),'_cdf.csv'
+   OPEN (LU,FILE=FN,FORM='FORMATTED',STATUS='REPLACE')
+   WRITE(LU,'(A)') 'd (mu-m),CNF,CVF'
+   DO J=0,NDC
+      WRITE(LU,'(E16.9,A,E16.9,A,E16.9)') 2.E6_EB*LPC%R_CNF(J),',',LPC%CNF(J),',',LPC%CVF(J)
+   ENDDO
+   CLOSE(LU)
+ENDDO PART_DIST_LOOP
+
+! Open DEVC and CTRL log file
+IF (WRITE_DEVC_CTRL) THEN
+   IF (APPEND) THEN
+      OPEN(LU_DEVC_CTRL,FILE=FN_DEVC_CTRL,FORM='FORMATTED',STATUS='OLD',POSITION='APPEND')
+      CALL APPEND_FILE(LU_DEVC_CTRL,1,T_BEGIN+(T-T_BEGIN)*TIME_SHRINK_FACTOR)
+   ELSE
+      OPEN(LU_DEVC_CTRL,FILE=FN_DEVC_CTRL,FORM='FORMATTED',STATUS='REPLACE')
+      WRITE(LU_DEVC_CTRL,'(A,",",A,",",A,",",A,",",A,",",A)') 'Time (s)','Type','ID','State','Value','Units'
+   ENDIF
+ENDIF
+
+T_USED(7) = T_USED(7) + CURRENT_TIME() - TNOW
+END SUBROUTINE INITIALIZE_GLOBAL_DUMPS
+
+
+
+!> \brief Write information into the Smokeview (.smv) file
+
+SUBROUTINE WRITE_SMOKEVIEW_FILE
+
+USE MATH_FUNCTIONS, ONLY: CROSS_PRODUCT
+USE MEMORY_FUNCTIONS, ONLY : CHKMEMERR
+USE COMP_FUNCTIONS, ONLY: SHUTDOWN,GET_FILE_NUMBER
+USE GEOMETRY_FUNCTIONS, ONLY: INTERIOR
+USE HVAC_ROUTINES, ONLY: N_DUCT_QUANTITY,N_NODE_QUANTITY, DUCT_QUANTITY_ARRAY,NODE_QUANTITY_ARRAY
+USE TRAN, ONLY: TRAN_TYPE,TRANS
+INTEGER :: N,NN,I,J,K,NM,NX,NY,NZ,NIN,NXL,NYL,NZL,NDV,NDVDIM,COLOR_INDEX,IZERO,STATE_INDEX,SURF_INDEX,&
+           TYPE_INDEX,HI1,HI2,VI1,VI2,FACE_INDEX,VRGB(3),N_CVENT
+INTEGER, ALLOCATABLE, DIMENSION(:) :: IDV1,IDV2,JDV1,JDV2,KDV1,KDV2,DUMMY_VENT_INDEX
+INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: VENT_INDICES
+REAL(EB) :: X1,Y1,Z1,X2,Y2,Z2,XX,YY,ZZ,PERT1(4),PERT2(4),XMIN,YMIN,ZMIN,XA,YA,ZA
+TYPE SEGMENT_TYPE
+REAL(EB) :: X1,X2,Y1,Y2,Z1,Z2
+END TYPE SEGMENT_TYPE
+TYPE (SEGMENT_TYPE), ALLOCATABLE, TARGET, DIMENSION(:) :: SEGMENT
+TYPE (SEGMENT_TYPE), POINTER :: SEG=>NULL()
+INTEGER :: N_SEGMENTS_MAX
+TYPE (MESH_TYPE), POINTER :: MX=>NULL(),MY=>NULL(),MZ=>NULL()
+TYPE (TRAN_TYPE), POINTER :: T=>NULL()
+REAL(EB), ALLOCATABLE, DIMENSION(:) :: XLEVEL,YLEVEL,ZLEVEL
+CHARACTER(80) PROCESS_FN_SMV
+LOGICAL :: EX, FOUND_GEOM
+CHARACTER(MESSAGE_LENGTH) :: MESSAGE
+INTEGER :: TYPE_INDICATOR
+TYPE(GEOMETRY_TYPE), POINTER :: G=>NULL()
+INTEGER :: IG, IS_TERRAIN_INT
+INTEGER :: II, JJ
+INTEGER :: N_NODE_OUT, N_DUCT_OUT
+CHARACTER(LABEL_LENGTH) :: DEV_QUAN, HVAC_LABEL, OBST_LABEL
+
+! If this is a RESTART case but an old .smv file does not exist, shutdown with an ERROR.
+
+INQUIRE(FILE=FN_SMV,EXIST=EX)
+IF (.NOT.EX .AND. APPEND) THEN
+   WRITE(MESSAGE,'(A,A,A)') "ERROR: The file, ",TRIM(FN_SMV),", does not exist. Set RESTART=.FALSE."
+   CALL SHUTDOWN(MESSAGE) ; RETURN
+ENDIF
+
+! If this is a RESTART case, there is no need to open the .smv file except for Process 0.
+
+IF (MY_RANK>0 .AND. APPEND) RETURN
+
+! In cases where the MPI processes write to their own .smv file, give each .smv file for the MPI processes
+! greater than 0 a unique name.
+
+IF (MY_RANK>0 .AND.      SHARED_FILE_SYSTEM) OPEN(LU_SMV,FILE=FN_SMV,FORM='FORMATTED', STATUS='OLD',POSITION='APPEND')
+
+IF (MY_RANK>0 .AND. .NOT.SHARED_FILE_SYSTEM) THEN
+   WRITE(PROCESS_FN_SMV,'(A,A,I6.6,A)') TRIM(CHID),'_',MY_RANK,'.smv'
+   OPEN(LU_SMV,FILE=PROCESS_FN_SMV,FORM='FORMATTED', STATUS='REPLACE')
+ENDIF
+
+! Do the following printouts only for MPI Process 0.
+
+MASTER_NODE_IF: IF (MY_RANK==0) THEN
+
+IF (SETUP_ONLY) CALL WRITE_GEOM_ALL ! write out all geometry frames if this only a setup run
+
+! initialize the slice info file
+
+OPEN(UNIT=LU_INFO,FILE=TRIM(CHID)//'.sinfo',FORM='FORMATTED',STATUS='REPLACE')
+WRITE(LU_INFO,'(A)') ' '
+CLOSE(LU_INFO)
+
+! initialize the boundary info file
+
+OPEN(UNIT=LU_INFO,FILE=TRIM(CHID)//'.binfo',FORM='FORMATTED',STATUS='REPLACE')
+WRITE(LU_INFO,'(A)') ' '
+CLOSE(LU_INFO)
+
+! Open up the Smokeview ".smv" file
+
+IF (APPEND) THEN
+   OPEN(LU_SMV,FILE=FN_SMV,FORM='FORMATTED', STATUS='OLD',POSITION='APPEND')
+   RETURN
+ENDIF
+
+OPEN(LU_SMV,FILE=FN_SMV,FORM='FORMATTED',STATUS='REPLACE')
+
+! Write out TITLE
+
+WRITE(LU_SMV,'(A)') 'TITLE'
+WRITE(LU_SMV,'(1X,A)')  TRIM(TITLE)
+
+! output terrain file name for geom cases
+
+IF ( N_TERRAIN_IMAGES > 0 ) THEN
+   WRITE(LU_SMV,'(/A,1X,I3)') 'TERRAINIMAGE', N_TERRAIN_IMAGES
+   DO I = 1, N_TERRAIN_IMAGES
+      WRITE(LU_SMV,'(1X,A)') TRIM(TERRAIN_IMAGE(I))
+   END DO
+ENDIF
+
+! Record the version and endian-ness in .smv file
+
+WRITE(LU_SMV,'(/A)') 'FDSVERSION'
+WRITE(LU_SMV,'(A)') TRIM(GITHASH_PP)
+
+! Write out the GIT number and revision date to a file
+
+OPEN(LU_GIT,FILE=FN_GIT,FORM='FORMATTED',STATUS='REPLACE')
+WRITE(LU_GIT,'(A)') TRIM(GITHASH_PP)
+CLOSE(LU_GIT)
+
+! Write out the name of the input file
+
+WRITE(LU_SMV,'(/A)') 'INPF'
+WRITE(LU_SMV,'(1X,A)') TRIM(FN_INPUT)
+
+! Write out git revision number
+
+WRITE(LU_SMV,'(/A)') 'REVISION'
+WRITE(LU_SMV,'(A)') REVISION
+
+! Write out the CHID
+
+WRITE(LU_SMV,'(/A)') 'CHID'
+WRITE(LU_SMV,'(1X,A)') TRIM(CHID)
+
+! Write out the names of the spreadsheet files
+
+WRITE(LU_SMV,'(/A)') 'CSVF'
+WRITE(LU_SMV,'(1X,A)') 'hrr'
+WRITE(LU_SMV,'(1X,A)') TRIM(FN_HRR)
+
+WRITE(LU_SMV,'(/A)') 'CSVF'
+WRITE(LU_SMV,'(1X,A)') 'steps'
+WRITE(LU_SMV,'(1X,A)') TRIM(FN_STEPS)
+
+DO I=1,N_DEVC_FILES
+   WRITE(LU_SMV,'(/A)') 'CSVF'
+   WRITE(LU_SMV,'(1X,A)') 'devc'
+   WRITE(LU_SMV,'(1X,A)') TRIM(FN_DEVC(I))
+ENDDO
+
+DO I=1,N_CTRL_FILES
+   WRITE(LU_SMV,'(/A)') 'CSVF'
+   WRITE(LU_SMV,'(1X,A)') 'ctrl'
+   WRITE(LU_SMV,'(1X,A)') TRIM(FN_CTRL(I))
+ENDDO
+
+IF (MASS_FILE) THEN
+   WRITE(LU_SMV,'(/A)') 'CSVF'
+   WRITE(LU_SMV,'(1X,A)') 'mass'
+   WRITE(LU_SMV,'(1X,A)') TRIM(FN_MASS)
+ENDIF
+
+! Number of meshes
+
+WRITE(LU_SMV,'(/A)') 'NMESHES'
+WRITE(LU_SMV,'(I3)') NMESHES
+
+!  beginning and ending simulation time
+WRITE(LU_SMV,'(/A)') 'TIMES'
+WRITE(LU_SMV,'(2F15.3)') T_BEGIN, T_END
+
+! Information used for touring in Smokeview
+
+WRITE(LU_SMV,'(/A)') 'VIEWTIMES'
+WRITE(LU_SMV,'(2F15.2,I6)') 0.0_EB,MAX(0.01_EB,T_END),MAX(2,NFRAMES)
+
+! Auxilliary CAD geometry via dxf2fds
+
+IF (RENDER_FILE/='null') THEN
+   WRITE(LU_SMV,'(/A)') 'CADGEOM'
+   WRITE(LU_SMV,'(1X,A)') TRIM(RENDER_FILE)
+ENDIF
+
+! Write out smoke albedo
+
+WRITE(LU_SMV,'(/A)') 'ALBEDO'
+WRITE(LU_SMV,'(F13.5)') SMOKE_ALBEDO
+
+! Write out smokeview IBLANK parameter
+
+WRITE(LU_SMV,'(/A)') 'IBLANK'
+IF (IBLANK_SMV) THEN
+   WRITE(LU_SMV,'(1X,I1)') 1
+ELSE
+   WRITE(LU_SMV,'(1X,I1)') 0
+ENDIF
+
+! Write out GVEC
+
+WRITE(LU_SMV,'(/A)') 'GVEC'
+WRITE(LU_SMV,'(3F13.5)') GVEC(1),GVEC(2),GVEC(3)
+
+! Write out info about surfaces
+
+WRITE(LU_SMV,'(/A)') 'SURFDEF'
+WRITE(LU_SMV,'(1X,A)') SURFACE(DEFAULT_SURF_INDEX)%ID
+
+DO N=0,N_SURF
+   SF => SURFACE(N)
+   WRITE(LU_SMV,'(/A)') 'SURFACE'
+   WRITE(LU_SMV,'(1X,A)') SURFACE(N)%ID
+   IF (SF%THERMAL_BC_INDEX==THERMALLY_THICK) THEN
+      ML => MATERIAL(SF%LAYER_MATL_INDEX(1,1))
+      WRITE(LU_SMV,'(2F8.2)') TMPM,ML%EMISSIVITY
+   ELSE
+      WRITE(LU_SMV,'(2F8.2)') 5000.,1.0
+   ENDIF
+   WRITE(LU_SMV,'(I2,6F13.5)') SF%SURF_TYPE,SF%TEXTURE_WIDTH,SF%TEXTURE_HEIGHT,REAL(SF%RGB,FB)/255._FB,SF%TRANSPARENCY
+   WRITE(LU_SMV,'(1X,A)') SF%TEXTURE_MAP
+ENDDO
+
+! Write out immersed file info
+
+IF (N_GEOMETRY>0) THEN
+   WRITE(LU_SMV,'(/A,1X,I6)') 'GEOM',N_GEOMETRY
+   WRITE(LU_SMV,'(1X,A)') FN_GEOM(1)
+   DO I = 1, N_GEOMETRY
+      G=>GEOMETRY(I)
+      IS_TERRAIN_INT = 0
+      IF (G%IS_TERRAIN) IS_TERRAIN_INT = 1
+      IF (TRIM(G%SURF_ID(1))=='null') THEN
+         WRITE(LU_SMV,'(1X,A,1X,3(E13.6,1X),I2,1X,A,1X,3(I3,1X),1X,E13.6)') TRIM(G%TEXTURE_MAPPING), G%TEXTURE_ORIGIN, &
+                                                    IS_TERRAIN_INT, '!', G%RGB, G%TRANSPARENCY
+      ELSE
+         WRITE(LU_SMV,'(1X,A,1X,3(E13.6,1X),I2,1X,A,1X,A,1X,A,1X,3(I3,1X),1X,E13.6)') TRIM(G%TEXTURE_MAPPING), G%TEXTURE_ORIGIN, &
+                                                    IS_TERRAIN_INT, '%',TRIM(G%SURF_ID(1)), '!', G%RGB, G%TRANSPARENCY
+      ENDIF
+   ENDDO
+   WRITE(LU_SMV,'(/A,1X,I6)') 'BOXGEOM',N_GEOMETRY
+   DO I = 1, N_GEOMETRY
+      G=>GEOMETRY(I)
+
+      WRITE(LU_SMV,'(1X,6(E13.6,1X))') ((G%GEOM_BOX(II, JJ), II=1, 2), JJ=1, 3)
+   ENDDO
+ENDIF
+
+! Write out info about particle types
+
+DO N=1,N_LAGRANGIAN_CLASSES
+   LPC => LAGRANGIAN_PARTICLE_CLASS(N)
+   WRITE(LU_SMV,'(/A)') 'CLASS_OF_PARTICLES'
+   IF (LPC%PROP_ID=='null') THEN
+      WRITE(LU_SMV,'(1X,A)')     LPC%ID
+   ELSE
+      WRITE(LU_SMV,'(1X,A,A,A)') LPC%ID,' % % ',TRIM(LPC%PROP_ID)
+   ENDIF
+   WRITE(LU_SMV,'(3F13.5)') REAL(LPC%RGB,FB)/255._FB
+   WRITE(LU_SMV,'(I3)') LPC%N_QUANTITIES
+   DO NN=1,LPC%N_QUANTITIES
+      WRITE(LU_SMV,'(1X,A)') LPC%SMOKEVIEW_LABEL(NN)
+      WRITE(LU_SMV,'(1X,A)') LPC%SMOKEVIEW_BAR_LABEL(NN)
+      WRITE(LU_SMV,'(1X,A)') OUTPUT_QUANTITY(LPC%QUANTITIES_INDEX(NN))%UNITS
+   ENDDO
+ENDDO
+
+! Figure out the outline for multiblock cases
+
+PERT1(1) = 0.0001_EB
+PERT2(1) = 0.0001_EB
+PERT1(2) = -.0001_EB
+PERT2(2) = 0.0001_EB
+PERT1(3) = -.0001_EB
+PERT2(3) = -.0001_EB
+PERT1(4) = 0.0001_EB
+PERT2(4) = -.0001_EB
+
+ALLOCATE(XLEVEL(0:2*NMESHES))
+XLEVEL = -100000._EB
+ALLOCATE(YLEVEL(0:2*NMESHES))
+YLEVEL = -100000._EB
+ALLOCATE(ZLEVEL(0:2*NMESHES))
+ZLEVEL = -100000._EB
+
+NXL = 0
+NYL = 0
+NZL = 0
+DO NM=1,2*NMESHES
+   XMIN = 100000._EB
+   YMIN = 100000._EB
+   ZMIN = 100000._EB
+   DO N=1,2*NMESHES
+      M => MESHES(INT((N+1)/2))
+      IF (MOD(N,2)/=0) XX = M%XS
+      IF (MOD(N,2)==0) XX = M%XF
+      IF (MOD(N,2)/=0) YY = M%YS
+      IF (MOD(N,2)==0) YY = M%YF
+      IF (MOD(N,2)/=0) ZZ = M%ZS
+      IF (MOD(N,2)==0) ZZ = M%ZF
+      IF (XX>XLEVEL(NXL)) XMIN = MIN(XX,XMIN)
+      IF (YY>YLEVEL(NYL)) YMIN = MIN(YY,YMIN)
+      IF (ZZ>ZLEVEL(NZL)) ZMIN = MIN(ZZ,ZMIN)
+   ENDDO
+   IF (XMIN>XLEVEL(NXL)) THEN
+      NXL = NXL + 1
+      XLEVEL(NXL) = XMIN
+   ENDIF
+   IF (YMIN>YLEVEL(NYL)) THEN
+      NYL = NYL + 1
+      YLEVEL(NYL) = YMIN
+   ENDIF
+   IF (ZMIN>ZLEVEL(NZL)) THEN
+      NZL = NZL + 1
+      ZLEVEL(NZL) = ZMIN
+   ENDIF
+ENDDO
+
+N_SEGMENTS_MAX = 100
+ALLOCATE(SEGMENT(1:N_SEGMENTS_MAX),STAT=IZERO)
+CALL ChkMemErr('DUMP','SEGMENT',IZERO)
+
+N = 0
+
+XLOOP1: DO NX=1,2*NMESHES
+   MX => MESHES(INT((NX+1)/2))
+   IF (MOD(NX,2)/=0) XX = MX%XS
+   IF (MOD(NX,2)==0) XX = MX%XF
+   YLOOP1: DO NY=1,2*NMESHES
+      MY => MESHES(INT((NY+1)/2))
+      IF (MOD(NY,2)/=0) YY = MY%YS
+      IF (MOD(NY,2)==0) YY = MY%YF
+      IF ((XX<MY%XS .OR. XX>MY%XF) .OR. (YY<MX%YS .OR. YY>MX%YF)) CYCLE YLOOP1
+      Z1 = MAX(MX%ZS,MY%ZS)
+      Z2 = MIN(MX%ZF,MY%ZF)
+      IF (Z1>=Z2) CYCLE YLOOP1
+      ZLOOP1: DO NZ=1,NZL
+         ZZ = ZLEVEL(NZ)
+         IF (ZZ<=Z1) CYCLE ZLOOP1
+         IF (ZZ>Z2) CYCLE YLOOP1
+         ZA = (Z1+ZZ)/2._EB
+         NIN = 0
+         DO I=1,4
+            IF (INTERIOR(XX+PERT1(I),YY+PERT2(I),ZA)) NIN = NIN+1
+         ENDDO
+         IF (NIN/=1 .AND. NIN/=3) THEN
+            Z1 = ZZ
+            CYCLE ZLOOP1
+            ENDIF
+         DO I=1,N
+            SEG=>SEGMENT(I)
+            IF (ABS(XX-SEG%X1)<=SPACING(SEG%X1) .AND. ABS(XX-SEG%X2)<=SPACING(SEG%X2) .AND. &
+                ABS(YY-SEG%Y1)<=SPACING(SEG%Y1) .AND. ABS(YY-SEG%Y2)<=SPACING(SEG%Y2) .AND. &
+                ABS(Z1-SEG%Z1)<=SPACING(SEG%Z1) .AND. ABS(ZZ-SEG%Z2)<=SPACING(SEG%Z2)) THEN
+               Z1 = ZZ
+               CYCLE ZLOOP1
+            ENDIF
+         ENDDO
+         IF (N+1>N_SEGMENTS_MAX) CALL RE_ALLOCATE_SEGMENTS
+         N = N+1
+         SEG=>SEGMENT(N)
+         SEG%X1 = XX
+         SEG%X2 = XX
+         SEG%Y1 = YY
+         SEG%Y2 = YY
+         SEG%Z1 = Z1
+         SEG%Z2 = ZZ
+         Z1 = ZZ
+      ENDDO ZLOOP1
+   ENDDO YLOOP1
+ENDDO XLOOP1
+
+XLOOP2: DO NX=1,2*NMESHES
+   MX => MESHES(INT((NX+1)/2))
+   IF (MOD(NX,2)/=0) XX = MX%XS
+   IF (MOD(NX,2)==0) XX = MX%XF
+   ZLOOP2: DO NZ=1,2*NMESHES
+      MZ => MESHES(INT((NZ+1)/2))
+      IF (MOD(NZ,2)/=0) ZZ = MZ%ZS
+      IF (MOD(NZ,2)==0) ZZ = MZ%ZF
+      IF ((XX<MZ%XS .OR. XX>MZ%XF) .OR. (ZZ<MX%ZS .OR. ZZ>MX%ZF)) CYCLE ZLOOP2
+      Y1 = MAX(MX%YS,MZ%YS)
+      Y2 = MIN(MX%YF,MZ%YF)
+      IF (Y1>=Y2) CYCLE ZLOOP2
+      YLOOP2: DO NY=1,NYL
+         YY = YLEVEL(NY)
+         IF (YY<=Y1) CYCLE YLOOP2
+         IF (YY>Y2) CYCLE ZLOOP2
+         YA = (Y1+YY)/2._EB
+         NIN = 0
+         DO I=1,4
+            IF (INTERIOR(XX+PERT1(I),YA,ZZ+PERT2(I))) NIN = NIN+1
+         ENDDO
+         IF (NIN/=1 .AND. NIN/=3) THEN
+            Y1 = YY
+            CYCLE YLOOP2
+            ENDIF
+         DO I=1,N
+            SEG=>SEGMENT(I)
+            IF (ABS(XX-SEG%X1)<=SPACING(SEG%X1) .AND. ABS(XX-SEG%X2)<=SPACING(SEG%X2) .AND. &
+                ABS(Y1-SEG%Y1)<=SPACING(SEG%Y1) .AND. ABS(YY-SEG%Y2)<=SPACING(SEG%Y2) .AND. &
+                ABS(ZZ-SEG%Z1)<=SPACING(SEG%Z1) .AND. ABS(ZZ-SEG%Z2)<=SPACING(SEG%Z2)) THEN
+               Y1 = YY
+               CYCLE YLOOP2
+            ENDIF
+         ENDDO
+         IF (N+1>N_SEGMENTS_MAX) CALL RE_ALLOCATE_SEGMENTS
+         N = N+1
+         SEG=>SEGMENT(N)
+         SEG%X1 = XX
+         SEG%X2 = XX
+         SEG%Y1 = Y1
+         SEG%Y2 = YY
+         SEG%Z1 = ZZ
+         SEG%Z2 = ZZ
+         Y1 = YY
+      ENDDO YLOOP2
+   ENDDO ZLOOP2
+ENDDO XLOOP2
+
+ZLOOP3: DO NZ=1,2*NMESHES
+   MZ => MESHES(INT((NZ+1)/2))
+   IF (MOD(NZ,2)/=0) ZZ = MZ%ZS
+   IF (MOD(NZ,2)==0) ZZ = MZ%ZF
+   YLOOP3: DO NY=1,2*NMESHES
+      MY => MESHES(INT((NY+1)/2))
+      IF (MOD(NY,2)/=0) YY = MY%YS
+      IF (MOD(NY,2)==0) YY = MY%YF
+      IF ((ZZ<MY%ZS .OR. ZZ>MY%ZF) .OR. (YY<MZ%YS .OR. YY>MZ%YF)) CYCLE YLOOP3
+      X1 = MAX(MZ%XS,MY%XS)
+      X2 = MIN(MZ%XF,MY%XF)
+      IF (X1>=X2) CYCLE YLOOP3
+      XLOOP3: DO NX=1,NXL
+         XX = XLEVEL(NX)
+         IF (XX<=X1) CYCLE XLOOP3
+         IF (XX>X2) CYCLE YLOOP3
+         XA = (X1+XX)/2._EB
+         NIN = 0
+         DO I=1,4
+            IF (INTERIOR(XA,YY+PERT1(I),ZZ+PERT2(I))) NIN = NIN+1
+         ENDDO
+         IF (NIN/=1 .AND. NIN/=3) THEN
+            X1 = XX
+            CYCLE XLOOP3
+            ENDIF
+         DO I=1,N
+            SEG=>SEGMENT(I)
+            IF (ABS(X1-SEG%X1)<=SPACING(SEG%X1) .AND. ABS(XX-SEG%X2)<=SPACING(SEG%X2) .AND. &
+                ABS(YY-SEG%Y1)<=SPACING(SEG%Y1) .AND. ABS(YY-SEG%Y2)<=SPACING(SEG%Y2) .AND. &
+                ABS(ZZ-SEG%Z1)<=SPACING(SEG%Z1) .AND. ABS(ZZ-SEG%Z2)<=SPACING(SEG%Z2)) THEN
+               X1 = XX
+               CYCLE XLOOP3
+            ENDIF
+         ENDDO
+         IF (N+1>N_SEGMENTS_MAX) CALL RE_ALLOCATE_SEGMENTS
+         N = N+1
+         SEG=>SEGMENT(N)
+         SEG%X1 = X1
+         SEG%X2 = XX
+         SEG%Y1 = YY
+         SEG%Y2 = YY
+         SEG%Z1 = ZZ
+         SEG%Z2 = ZZ
+         X1 = XX
+      ENDDO XLOOP3
+   ENDDO YLOOP3
+ENDDO ZLOOP3
+
+WRITE(LU_SMV,'(/A)') 'OUTLINE'
+WRITE(LU_SMV,'(I4)') N
+DO I=1,N
+   SEG=>SEGMENT(I)
+   WRITE(LU_SMV,'(6F14.4)') SEG%X1,SEG%Y1,SEG%Z1,SEG%X2,SEG%Y2,SEG%Z2
+ENDDO
+
+DEALLOCATE(SEGMENT)
+
+! Spatial offset for texture maps
+
+WRITE(LU_SMV,'(/A)') 'TOFFSET'
+WRITE(LU_SMV,'(3F13.5)') (TEX_ORI(I),I=1,3)
+
+! Write out threshold value for HRRPUV
+
+WRITE(LU_SMV,'(/A)') 'HRRPUVCUT'
+WRITE(LU_SMV,'(I6)') INTEGER_ONE
+WRITE(LU_SMV,'(F13.5)') MIN(200._EB,20._EB/CHARACTERISTIC_CELL_SIZE)
+
+! Write out heat of combustion
+
+IF (N_REACTIONS>0) THEN
+   WRITE(LU_SMV,'(/A)') 'HoC'
+   WRITE(LU_SMV,'(1X,I0)') INTEGER_ONE
+   WRITE(LU_SMV,'(1X,F13.5)') REACTION(1)%HOC_COMPLETE/1000._EB
+   WRITE(LU_SMV,'(/A)') 'FUEL'
+   WRITE(LU_SMV,'(1X,I0)') INTEGER_ONE
+   WRITE(LU_SMV,'(1X,A)') TRIM(REACTION(1)%FUEL)
+ENDIF
+
+! Write out PROPerty info to .smv file
+
+DO N=0,N_PROP
+   PY => PROPERTY(N)
+   WRITE(LU_SMV,'(/A)') 'PROP'
+   WRITE(LU_SMV,'(1X,A)') TRIM(PY%ID)
+   WRITE(LU_SMV,'(I3)') PY%N_SMOKEVIEW_IDS
+   DO NN=1,PY%N_SMOKEVIEW_IDS
+      WRITE(LU_SMV,'(1X,A)') TRIM(PY%SMOKEVIEW_ID(NN))
+   ENDDO
+   WRITE(LU_SMV,'(I3)') PY%N_SMOKEVIEW_PARAMETERS
+   DO NN=1,PY%N_SMOKEVIEW_PARAMETERS
+      WRITE(LU_SMV,'(1X,A)') PY%SMOKEVIEW_PARAMETERS(NN)
+   ENDDO
+ENDDO
+
+! Write out DEVICE info to .smv file
+
+DO N=1,N_DEVC
+   DV => DEVICE(N)
+   PY => PROPERTY(DV%PROP_INDEX)
+   IF ( TRIM(DV%QUANTITY(1)) == "VOLUME FRACTION" .AND. TRIM(DV%SPEC_ID) .NE. 'null' ) THEN
+      DEV_QUAN = TRIM(DV%SPEC_ID)
+   ELSE
+      DEV_QUAN = TRIM(DV%QUANTITY(1))
+   ENDIF
+   WRITE(LU_SMV,'(/A)') 'DEVICE'
+   WRITE(LU_SMV,'(1X,A,1X,A,1X,A)') TRIM(DV%ID),'%',DEV_QUAN
+   STATE_INDEX = 0
+   IF (DV%INITIAL_STATE) STATE_INDEX = 1
+   IF (DV%X1>-900000.0) THEN
+      WRITE(LU_SMV,'(6F12.5,2I3,A,6F12.5,A,A)') DV%X,DV%Y,DV%Z,ORIENTATION_VECTOR(1,DV%ORIENTATION_INDEX),&
+            ORIENTATION_VECTOR(2,DV%ORIENTATION_INDEX),ORIENTATION_VECTOR(3,DV%ORIENTATION_INDEX),STATE_INDEX,0,&
+            ' # ',DV%X1,DV%Y1,DV%Z1,DV%X2,DV%Y2,DV%Z2,&
+            ' % ',TRIM(PY%ID)
+   ELSE
+      WRITE(LU_SMV,'(6F12.5,2I3,A,A)') DV%X,DV%Y,DV%Z,ORIENTATION_VECTOR(1,DV%ORIENTATION_INDEX),&
+            ORIENTATION_VECTOR(2,DV%ORIENTATION_INDEX),ORIENTATION_VECTOR(3,DV%ORIENTATION_INDEX),STATE_INDEX,0,' % ',TRIM(PY%ID)
+   ENDIF
+ENDDO
+
+! Write out original vent information
+
+WRITE(LU_SMV,'(/A)') 'VENTORIG'
+WRITE(LU_SMV,'(1X,I0)') SIZE(ORIGINAL_VENTS)
+DO N=1,SIZE(ORIGINAL_VENTS)
+   WRITE(LU_SMV,'(1X,6F12.5,A,A)') ORIGINAL_VENTS(N)%X1,ORIGINAL_VENTS(N)%X2,&
+                                   ORIGINAL_VENTS(N)%Y1,ORIGINAL_VENTS(N)%Y2,&
+                                   ORIGINAL_VENTS(N)%Z1,ORIGINAL_VENTS(N)%Z2,' ! ',TRIM(ORIGINAL_VENTS(N)%ID)
+ENDDO
+
+! Write out HVAC information
+
+IF (HVAC_SOLVE) THEN
+   N_NODE_OUT = 0
+   N_DUCT_OUT = 0
+   DO N=1,N_DUCTNODES
+      IF (DUCTNODE(N)%LEAKAGE) CYCLE
+      N_NODE_OUT = N_NODE_OUT + 1
+   ENDDO
+   DO N=1,N_DUCTS
+      IF (DUCT(N)%LEAKAGE) CYCLE
+      N_DUCT_OUT = N_DUCT_OUT + 1
+   ENDDO
+
+   WRITE(LU_SMV,'(/A)') 'HVAC'
+   WRITE(LU_SMV,'(1X,A)') 'NODES'
+   WRITE(LU_SMV,'(1X,I0)') N_NODE_OUT
+   DO N=1,N_DUCTNODES
+      IF (DUCTNODE(N)%LEAKAGE) CYCLE
+      WRITE(LU_SMV,'(1X,I0,A,A,A,A,A,I0)') N,' % ',TRIM(DUCTNODE(N)%ID),' % ',TRIM(DUCTNODE(N)%NETWORK_ID), &
+         ' % ', DUCTNODE(N)%CONNECTIVITY_INDEX
+      IF (DUCTNODE(N)%FILTER_INDEX > 0) THEN
+         WRITE(LU_SMV,'(1X,3E13.6,1X,A,A,A)') DUCTNODE(N)%XYZ, '% FILTER',' % ',DUCTNODE(N)%VENT_ID
+      ELSE
+         WRITE(LU_SMV,'(1X,3E13.6,1X,A,A,A)') DUCTNODE(N)%XYZ, '% NO FILTER',' % ',DUCTNODE(N)%VENT_ID
+      ENDIF
+   ENDDO
+   WRITE(LU_SMV,'(1X,A)') 'DUCTS'
+   WRITE(LU_SMV,'(1X,I0)') N_DUCT_OUT
+   DO N=1,N_DUCTS
+      IF (DUCT(N)%LEAKAGE) CYCLE
+      WRITE(LU_SMV,'(1X,3(I0,1X),A,A,A,A,A,I0)') N,DUCT(N)%NODE_INDEX,' % ',TRIM(DUCT(N)%ID),' % ',TRIM(DUCT(N)%NETWORK_ID), &
+         ' % ', DUCT(N)%CONNECTIVITY_INDEX
+      IF (DUCT(N)%FAN_INDEX > 0) THEN
+         HVAC_LABEL = 'FAN'
+      ELSEIF (DUCT(N)%AIRCOIL_INDEX > 0) THEN
+         HVAC_LABEL = 'AIRCOIL'
+      ELSEIF (DUCT(N)%DAMPER) THEN
+         HVAC_LABEL = 'DAMPER'
+      ELSE
+         HVAC_LABEL = '-'
+      ENDIF
+      WRITE(LU_SMV,'(1X,A)') 'MT_CELLS '
+      WRITE(LU_SMV,'(1X,I0,A,A)') MAX(1,DUCT(N)%N_CELLS),' % ',TRIM(HVAC_LABEL)
+     ! IF (ALLOCATED(DUCT(N)%HT_INDEX) THEN
+         !WRITE(LU_SMV,'(1X,A,I0)') 'HT_CELLS ',LENGTH(DUCT(N)%HT_INDEX)
+         !WRITE(LU_SMV,'(1X,3F12.5)')
+      !ELSE
+         !WRITE(LU_SMV,'(1X,A,I0)') 'HT_CELLS ',0
+      !ENDIF
+      WRITE(LU_SMV,'(1X,A)') 'WAYPOINTS '
+      WRITE(LU_SMV,'(1X,I0)') DUCT(N)%N_WAYPOINTS
+      IF (DUCT(N)%N_WAYPOINTS > 0) WRITE(LU_SMV,'(1X,3F12.5)') (DUCT(N)%WAYPOINT_XYZ(NN,1),DUCT(N)%WAYPOINT_XYZ(NN,2),&
+                                                                 DUCT(N)%WAYPOINT_XYZ(NN,3),NN=1,DUCT(N)%N_WAYPOINTS)
+   ENDDO
+
+   IF (N_NODE_QUANTITY>0 .OR. N_DUCT_QUANTITY>0) THEN
+      WRITE(LU_SMV,'(/A)') 'HVACVALS'
+      WRITE(LU_SMV,'(1X,A)')  FN_HVAC
+      WRITE(LU_SMV,'(1X,I0)') N_NODE_QUANTITY  ! number of node variables output
+      IF (N_NODE_QUANTITY > 0) THEN
+         DO N=1,N_NODE_QUANTITY
+            WRITE(LU_SMV,'(1X,A)') TRIM(NODE_QUANTITY_ARRAY(N)%SMOKEVIEW_LABEL)
+            WRITE(LU_SMV,'(1X,A)') TRIM(NODE_QUANTITY_ARRAY(N)%SMOKEVIEW_BAR_LABEL)
+            WRITE(LU_SMV,'(1X,A)') TRIM(NODE_QUANTITY_ARRAY(N)%UNITS)
+         ENDDO
+      ENDIF
+      WRITE(LU_SMV,'(1X,I0)') N_DUCT_QUANTITY
+      IF (N_DUCT_QUANTITY > 0) THEN
+         DO N=1,N_DUCT_QUANTITY
+            WRITE(LU_SMV,'(1X,A)') TRIM(DUCT_QUANTITY_ARRAY(N)%SMOKEVIEW_LABEL)
+            WRITE(LU_SMV,'(1X,A)') TRIM(DUCT_QUANTITY_ARRAY(N)%SMOKEVIEW_BAR_LABEL)
+            WRITE(LU_SMV,'(1X,A)') TRIM(DUCT_QUANTITY_ARRAY(N)%UNITS)
+         ENDDO
+      ENDIF
+   ENDIF
+ENDIF
+
+ENDIF MASTER_NODE_IF
+
+! Write out FN_BNDG to .smv file:
+
+IF (CC_IBM) THEN
+   DO N = 1, N_BNDF
+      BF => BOUNDARY_FILE(N)
+      DO I = LOWER_MESH_INDEX,UPPER_MESH_INDEX
+         ! Test if mesh overlaps with any bounding boxes of &GEOMS.
+         FOUND_GEOM=.FALSE.
+         DO IG=1,N_GEOMETRY
+            G=>GEOMETRY(IG)
+            IF(G%GEOM_BOX( LOW_IND,IAXIS) > MESHES(I)%XF) CYCLE
+            IF(G%GEOM_BOX(HIGH_IND,IAXIS) < MESHES(I)%XS) CYCLE
+            IF(G%GEOM_BOX( LOW_IND,JAXIS) > MESHES(I)%YF) CYCLE
+            IF(G%GEOM_BOX(HIGH_IND,JAXIS) < MESHES(I)%YS) CYCLE
+            IF(G%GEOM_BOX( LOW_IND,KAXIS) > MESHES(I)%ZF) CYCLE
+            IF(G%GEOM_BOX(HIGH_IND,KAXIS) < MESHES(I)%ZS) CYCLE
+            FOUND_GEOM=.TRUE.
+         ENDDO
+         IF (FOUND_GEOM) THEN
+            WRITE(LU_SMV,'(/A,2I6)') 'BNDE',I,1
+            WRITE(LU_SMV,'(1X,A)') FN_BNDG(N,I)
+            WRITE(LU_SMV,'(1X,A)') ' '
+            WRITE(LU_SMV,'(1X,A)') TRIM(BF%SMOKEVIEW_LABEL(1:30))
+            WRITE(LU_SMV,'(1X,A)') TRIM(BF%SMOKEVIEW_BAR_LABEL(1:30))
+            WRITE(LU_SMV,'(1X,A)') TRIM(OUTPUT_QUANTITY(BF%INDEX)%UNITS(1:30))
+         ENDIF
+      ENDDO
+   ENDDO
+   DO I = LOWER_MESH_INDEX,UPPER_MESH_INDEX
+      WRITE(LU_SMV,'(/A)') 'CGEOM 0'
+      WRITE(LU_SMV,'(1X,A)') FN_CFACE_GEOM(I)
+   ENDDO
+ENDIF
+
+! Write grid info for each block
+
+MESH_LOOP: DO NM=1,NMESHES
+
+   IF (PROCESS(NM)/=MY_RANK) CYCLE
+
+   M => MESHES(NM)
+   T => TRANS(NM)
+
+   WRITE(LU_SMV,'(/A)') 'OFFSET'
+   WRITE(LU_SMV,'(3F13.5)') 0.,0.,0.
+
+   WRITE(LU_SMV,'(/A,3X,A)') 'GRID',TRIM(MESH_NAME(NM))
+   WRITE(LU_SMV,'(4I5)') M%IBAR,M%JBAR,M%KBAR,0
+
+   WRITE(LU_SMV,'(/A)') 'PDIM'
+   WRITE(LU_SMV,'(9F14.5)') M%XS,M%XF,M%YS,M%YF,M%ZS,M%ZF,(REAL(M%RGB(I),FB)/255._FB,I = 1,3)
+
+   WRITE(LU_SMV,'(/A)') 'TRNX'
+   WRITE(LU_SMV,'(I5)') T%NOC(1)
+   DO N=1,T%NOC(1)
+      WRITE(LU_SMV,'(I5,2F14.5)') T%IDERIVSTORE(N,1),T%CCSTORE(N,1),T%PCSTORE(N,1)
+   ENDDO
+   DO I=0,M%IBAR
+      WRITE(LU_SMV,'(I5,F14.5)') I,M%X(I)
+   ENDDO
+
+   WRITE(LU_SMV,'(/A)') 'TRNY'
+   WRITE(LU_SMV,'(I5)') T%NOC(2)
+   DO N=1,T%NOC(2)
+      WRITE(LU_SMV,'(I5,2F14.5)') T%IDERIVSTORE(N,2),T%CCSTORE(N,2),T%PCSTORE(N,2)
+   ENDDO
+   DO J=0,M%JBAR
+      WRITE(LU_SMV,'(I5,F14.5)') J,M%Y(J)
+   ENDDO
+
+   WRITE(LU_SMV,'(/A)') 'TRNZ'
+   WRITE(LU_SMV,'(I5)') T%NOC(3)
+   DO N=1,T%NOC(3)
+      WRITE(LU_SMV,'(I5,2F14.5)') T%IDERIVSTORE(N,3),T%CCSTORE(N,3),T%PCSTORE(N,3)
+   ENDDO
+   DO K=0,M%KBAR
+      WRITE(LU_SMV,'(I5,F14.5)') K,M%Z(K)
+   ENDDO
+
+   ! Write obstacle info to .smv file
+
+   WRITE(LU_SMV,'(/A)') 'OBST'
+   WRITE(LU_SMV,*) M%N_OBST
+   DO N=1,M%N_OBST
+      OB=>M%OBSTRUCTION(N)
+      IF (OB%ID == 'null') THEN
+         WRITE(OBST_LABEL,'(A,I0,A,I0)')"OB_",NM,"_",N
+      ELSE
+         OBST_LABEL = OB%ID
+      ENDIF
+      IF (OB%TEXTURE(1)<=-998._EB) THEN
+         WRITE(LU_SMV,'(6F14.5,I7,6I4,1X,A,A)') OB%X1,OB%X2,OB%Y1,OB%Y2,OB%Z1,OB%Z2,OB%ORDINAL, &
+            OB%SURF_INDEX(-1),OB%SURF_INDEX(1),OB%SURF_INDEX(-2),OB%SURF_INDEX(2),OB%SURF_INDEX(-3),OB%SURF_INDEX(3), &
+            ' ! ',TRIM(OBST_LABEL)
+      ELSE
+         WRITE(LU_SMV,'(6F14.5,I7,6I4,3F14.5,1X,A,A)') OB%X1,OB%X2,OB%Y1,OB%Y2,OB%Z1,OB%Z2,OB%ORDINAL, &
+            OB%SURF_INDEX(-1),OB%SURF_INDEX(1),OB%SURF_INDEX(-2),OB%SURF_INDEX(2),OB%SURF_INDEX(-3),OB%SURF_INDEX(3), &
+            OB%TEXTURE(1),OB%TEXTURE(2),OB%TEXTURE(3), &
+            ' ! ',TRIM(OBST_LABEL)
+      ENDIF
+   ENDDO
+   DO N=1,M%N_OBST
+      OB=>M%OBSTRUCTION(N)
+      TYPE_INDICATOR=OB%TYPE_INDICATOR
+      IF (OB%COLOR_INDICATOR/=-3) THEN
+         WRITE(LU_SMV,'(8I5)')        OB%I1,OB%I2,OB%J1,OB%J2,OB%K1,OB%K2,OB%COLOR_INDICATOR,TYPE_INDICATOR
+      ELSE
+         WRITE(LU_SMV,'(8I5,4F13.5)') OB%I1,OB%I2,OB%J1,OB%J2,OB%K1,OB%K2,OB%COLOR_INDICATOR,TYPE_INDICATOR, &
+                                      REAL(OB%RGB,FB)/255._FB, OB%TRANSPARENCY
+      ENDIF
+   ENDDO
+
+   ! Count circular vents
+
+   N_CVENT=0
+   DO N=1,M%N_VENT
+      VT=>M%VENTS(N)
+      IF (VT%RADIUS>0._EB) N_CVENT=N_CVENT+1
+   ENDDO
+
+   ! Replace vents on exterior mesh boundary with "dummy" vents to avoid overlap conflict in Smokeview
+
+   NDV = 0
+   NDVDIM = 10*(6+N_VENT_TOTAL)
+   ALLOCATE(DUMMY_VENT_INDEX(NDVDIM))
+   ALLOCATE(IDV1(NDVDIM))
+   ALLOCATE(IDV2(NDVDIM))
+   ALLOCATE(JDV1(NDVDIM))
+   ALLOCATE(JDV2(NDVDIM))
+   ALLOCATE(KDV1(NDVDIM))
+   ALLOCATE(KDV2(NDVDIM))
+   ALLOCATE(VENT_INDICES(MAX(M%IBAR,M%JBAR),MAX(M%JBAR,M%KBAR),6))
+
+   VENT_INDICES = 0
+
+   VENT_LOOP: DO N=1,M%N_VENT
+
+      VT=>M%VENTS(N)
+
+      IF (VT%RADIUS>0._EB) CYCLE VENT_LOOP
+
+      FACE_INDEX = 0
+      IF (VT%I1==0      .AND. VT%I2==0     ) FACE_INDEX = 1
+      IF (VT%I1==M%IBAR .AND. VT%I2==M%IBAR) FACE_INDEX = 2
+      IF (VT%J1==0      .AND. VT%J2==0     ) FACE_INDEX = 3
+      IF (VT%J1==M%JBAR .AND. VT%J2==M%JBAR) FACE_INDEX = 4
+      IF (VT%K1==0      .AND. VT%K2==0     ) FACE_INDEX = 5
+      IF (VT%K1==M%KBAR .AND. VT%K2==M%KBAR) FACE_INDEX = 6
+
+      SELECT CASE(FACE_INDEX)  ! Get vent cell indices
+         CASE(0)
+            CYCLE VENT_LOOP
+         CASE(1:2)
+            HI1 = MAX(1,VT%J1+1)
+            HI2 = MIN(M%JBAR,VT%J2)
+            VI1 = MAX(1,VT%K1+1)
+            VI2 = MIN(M%KBAR,VT%K2)
+         CASE(3:4)
+            HI1 = MAX(1,VT%I1+1)
+            HI2 = MIN(M%IBAR,VT%I2)
+            VI1 = MAX(1,VT%K1+1)
+            VI2 = MIN(M%KBAR,VT%K2)
+         CASE(5:6)
+            HI1 = MAX(1,VT%I1+1)
+            HI2 = MIN(M%IBAR,VT%I2)
+            VI1 = MAX(1,VT%J1+1)
+            VI2 = MIN(M%JBAR,VT%J2)
+      END SELECT
+
+      IF (VT%BOUNDARY_TYPE==MIRROR_BOUNDARY   .OR. &
+          VT%BOUNDARY_TYPE==OPEN_BOUNDARY     .OR. &
+          VT%BOUNDARY_TYPE==PERIODIC_BOUNDARY .OR. &
+          VT%TYPE_INDICATOR==2) THEN
+         WHERE (VENT_INDICES(HI1:HI2,VI1:VI2,FACE_INDEX)==0) VENT_INDICES(HI1:HI2,VI1:VI2,FACE_INDEX) = -1
+      ELSE  ! Make solid color vents invisible (they will be replaced by dummy vents)
+         WHERE (VENT_INDICES(HI1:HI2,VI1:VI2,FACE_INDEX)==0) VENT_INDICES(HI1:HI2,VI1:VI2,FACE_INDEX) = N
+         VT%COLOR_INDICATOR =  8
+         VT%TYPE_INDICATOR  = -2
+         VT%TRANSPARENCY    =  0._EB
+      ENDIF
+
+   ENDDO VENT_LOOP
+
+   ! Look for interpolated meshes and ensure that dummy vents are not drawn there
+
+   DO K=1,M%KBAR
+      J_LOOP1: DO J=1,M%JBAR
+         YY = 0.5_EB*(M%Y(J)+M%Y(J-1))
+         ZZ = 0.5_EB*(M%Z(K)+M%Z(K-1))
+         XX = M%X(0) - 0.001_EB*M%DX(0)
+         IF (INTERIOR(XX,YY,ZZ) .AND. &
+            (.NOT.M%CELL(M%CELL_INDEX(0,J,K))%SOLID  .OR. VENT_INDICES(J,K,1)<1)) VENT_INDICES(J,K,1)=-1
+         XX = M%X(M%IBAR) + 0.001_EB*M%DX(M%IBAR)
+         IF (INTERIOR(XX,YY,ZZ) .AND. &
+            (.NOT.M%CELL(M%CELL_INDEX(M%IBAR+1,J,K))%SOLID .OR. VENT_INDICES(J,K,2)<1)) VENT_INDICES(J,K,2)=-1
+      ENDDO J_LOOP1
+   ENDDO
+
+   DO K=1,M%KBAR
+      I_LOOP1: DO I=1,M%IBAR
+         XX = 0.5_EB*(M%X(I)+M%X(I-1))
+         ZZ = 0.5_EB*(M%Z(K)+M%Z(K-1))
+         YY = M%Y(0) - 0.001_EB*M%DY(0)
+         IF (INTERIOR(XX,YY,ZZ) .AND. &
+            (.NOT.M%CELL(M%CELL_INDEX(I,0,K))%SOLID  .OR. VENT_INDICES(I,K,3)<1)) VENT_INDICES(I,K,3)=-1
+         YY = M%Y(M%JBAR) + 0.001_EB*M%DY(M%JBAR)
+         IF (INTERIOR(XX,YY,ZZ) .AND. &
+            (.NOT.M%CELL(M%CELL_INDEX(I,M%JBAR+1,K))%SOLID .OR. VENT_INDICES(I,K,4)<1)) VENT_INDICES(I,K,4)=-1
+      ENDDO I_LOOP1
+   ENDDO
+
+   DO J=1,M%JBAR
+      I_LOOP2: DO I=1,M%IBAR
+         XX = 0.5_EB*(M%X(I)+M%X(I-1))
+         YY = 0.5_EB*(M%Y(J)+M%Y(J-1))
+         ZZ = M%Z(0) - 0.001_EB*M%DZ(0)
+         IF (INTERIOR(XX,YY,ZZ) .AND. &
+            (.NOT.M%CELL(M%CELL_INDEX(I,J,0))%SOLID   .OR. VENT_INDICES(I,J,5)<1)) VENT_INDICES(I,J,5)=-1
+         ZZ = M%Z(M%KBAR) + 0.001_EB*M%DZ(M%KBAR)
+         IF (INTERIOR(XX,YY,ZZ) .AND. &
+            (.NOT.M%CELL(M%CELL_INDEX(I,J,M%KBAR+1))%SOLID .OR. VENT_INDICES(I,J,6)<1)) VENT_INDICES(I,J,6)=-1
+      ENDDO I_LOOP2
+   ENDDO
+
+   ! Create dummy vents to fill in areas around actual specified vents
+
+   CALL DUMMY_VENTS(1,M%JBAR,M%KBAR,JDV1,JDV2,KDV1,KDV2,0     ,IDV1,IDV2)
+   CALL DUMMY_VENTS(2,M%JBAR,M%KBAR,JDV1,JDV2,KDV1,KDV2,M%IBAR,IDV1,IDV2)
+   CALL DUMMY_VENTS(3,M%IBAR,M%KBAR,IDV1,IDV2,KDV1,KDV2,0     ,JDV1,JDV2)
+   CALL DUMMY_VENTS(4,M%IBAR,M%KBAR,IDV1,IDV2,KDV1,KDV2,M%JBAR,JDV1,JDV2)
+   CALL DUMMY_VENTS(5,M%IBAR,M%JBAR,IDV1,IDV2,JDV1,JDV2,0     ,KDV1,KDV2)
+   CALL DUMMY_VENTS(6,M%IBAR,M%JBAR,IDV1,IDV2,JDV1,JDV2,M%KBAR,KDV1,KDV2)
+
+   DEALLOCATE(VENT_INDICES)
+
+   ! Write out information about vents to Smokeview file
+
+   WRITE(LU_SMV,'(/A)') 'VENT'
+   WRITE(LU_SMV,'(2I5)') M%N_VENT-N_CVENT+NDV,NDV
+
+   DO N=1,M%N_VENT
+      VT=>M%VENTS(N)
+      IF (VT%RADIUS>0._EB) CYCLE
+      WRITE(LU_SMV,'(6F14.5,I6,I4,3F14.5)') VT%X1,VT%X2,VT%Y1,VT%Y2,VT%Z1,VT%Z2,VT%ORDINAL,VT%SURF_INDEX, &
+                                            VT%TEXTURE(1),VT%TEXTURE(2),VT%TEXTURE(3)
+   ENDDO
+
+   DO N=1,NDV
+      SURF_INDEX = DEFAULT_SURF_INDEX
+      IF (DUMMY_VENT_INDEX(N)>0) SURF_INDEX=M%VENTS(DUMMY_VENT_INDEX(N))%SURF_INDEX
+      WRITE(LU_SMV,'(6F14.5,I6,I4)') M%X(IDV1(N)),M%X(IDV2(N)),M%Y(JDV1(N)),M%Y(JDV2(N)),  &
+                                     M%Z(KDV1(N)),M%Z(KDV2(N)),M%N_VENT+N,SURF_INDEX
+   ENDDO
+
+   DO N=1,M%N_VENT
+      VT=>M%VENTS(N)
+      IF (VT%RADIUS>0._EB) CYCLE
+      IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY .OR. VT%BOUNDARY_TYPE==MIRROR_BOUNDARY)  THEN
+         COLOR_INDEX = -VT%COLOR_INDICATOR
+      ELSE
+         COLOR_INDEX = VT%COLOR_INDICATOR
+      ENDIF
+      IF (VT%RGB(1)<0) THEN
+         WRITE(LU_SMV,'(8I5)')        MAX(0,VT%I1),MIN(M%IBAR,VT%I2), &
+                                      MAX(0,VT%J1),MIN(M%JBAR,VT%J2), &
+                                      MAX(0,VT%K1),MIN(M%KBAR,VT%K2),COLOR_INDEX,VT%TYPE_INDICATOR
+      ELSE
+         WRITE(LU_SMV,'(8I5,4F13.5)') MAX(0,VT%I1),MIN(M%IBAR,VT%I2), &
+                                      MAX(0,VT%J1),MIN(M%JBAR,VT%J2), &
+                                      MAX(0,VT%K1),MIN(M%KBAR,VT%K2),COLOR_INDEX,VT%TYPE_INDICATOR, &
+                                      REAL(VT%RGB,FB)/255._FB,VT%TRANSPARENCY
+      ENDIF
+   ENDDO
+   DO N=1,NDV
+      COLOR_INDEX = 99
+      TYPE_INDEX  = 0
+      VRGB        = -1
+      IF (DUMMY_VENT_INDEX(N)>0) VRGB = M%VENTS(DUMMY_VENT_INDEX(N))%RGB
+      IF (VRGB(1)<0) THEN
+         WRITE(LU_SMV,'(8I5)') IDV1(N),IDV2(N),JDV1(N),JDV2(N),KDV1(N),KDV2(N),COLOR_INDEX,TYPE_INDEX
+      ELSE
+         WRITE(LU_SMV,'(8I5,4F13.5)') IDV1(N),IDV2(N),JDV1(N),JDV2(N),KDV1(N),KDV2(N),COLOR_INDEX,TYPE_INDEX, &
+                                      REAL(VRGB,FB)/255._FB,1._EB
+      ENDIF
+   ENDDO
+
+   DEALLOCATE(IDV1)
+   DEALLOCATE(IDV2)
+   DEALLOCATE(JDV1)
+   DEALLOCATE(JDV2)
+   DEALLOCATE(KDV1)
+   DEALLOCATE(KDV2)
+   DEALLOCATE(DUMMY_VENT_INDEX)
+
+   ! Write out information about circular vents to Smokeview file
+
+   WRITE(LU_SMV,'(/A)') 'CVENT'
+   WRITE(LU_SMV,'(1I5)') N_CVENT
+
+   DO N=1,M%N_VENT
+      VT=>M%VENTS(N)
+      IF (VT%RADIUS<0._EB) CYCLE
+      WRITE(LU_SMV,'(6F14.5,I6,I4,3F14.5,A,4F13.5)') VT%X1,VT%X2,VT%Y1,VT%Y2,VT%Z1,VT%Z2,VT%ORDINAL,VT%SURF_INDEX, &
+         VT%TEXTURE(1),VT%TEXTURE(2),VT%TEXTURE(3),'  %  ',VT%X0,VT%Y0,VT%Z0,VT%RADIUS
+   ENDDO
+
+   DO N=1,M%N_VENT
+      VT=>M%VENTS(N)
+      IF (VT%RADIUS<0._EB) CYCLE
+      IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY) COLOR_INDEX = -VT%COLOR_INDICATOR
+      IF (VT%BOUNDARY_TYPE/=OPEN_BOUNDARY) COLOR_INDEX =  VT%COLOR_INDICATOR
+      IF (VT%RGB(1)<0) THEN
+         WRITE(LU_SMV,'(8I5)')        MAX(0,VT%I1),MIN(M%IBAR,VT%I2), &
+                                      MAX(0,VT%J1),MIN(M%JBAR,VT%J2), &
+                                      MAX(0,VT%K1),MIN(M%KBAR,VT%K2),COLOR_INDEX,VT%TYPE_INDICATOR
+      ELSE
+         WRITE(LU_SMV,'(8I5,4F13.5)') MAX(0,VT%I1),MIN(M%IBAR,VT%I2), &
+                                      MAX(0,VT%J1),MIN(M%JBAR,VT%J2), &
+                                      MAX(0,VT%K1),MIN(M%KBAR,VT%K2),COLOR_INDEX,VT%TYPE_INDICATOR, &
+                                      REAL(VT%RGB,FB)/255._FB,VT%TRANSPARENCY
+      ENDIF
+   ENDDO
+
+   WRITE(LU_SMV,'()') ! skip line
+
+ENDDO MESH_LOOP
+
+! Flush the .smv file
+
+CLOSE(LU_SMV)
+
+
+CONTAINS
+
+
+!> \brief For exterior mesh face, FI, create "dummy" vent patches for Smokeview
+!>
+!> \param FI Face Index, 1-6, where 1 refers to lower \f$ x \f$ mesh boundary, 2 upper, etc.
+!> \param N1 Number of cells in the first coordinate direction
+!> \param N2 Number of cells in the second coordinate direction
+!> \param IVV1 Lower indices of dummy vents for the first coordinate direction
+!> \param IVV2 Upper indices of dummy vents for the first coordinate direction
+!> \param JVV1 Lower indices of dummy vents for the second coordinate direction
+!> \param JVV2 Upper indices of dummy vents for the second coordinate direction
+!> \param N3 Index of the vent plane
+!> \param KVV1 Lower indices of dummy vents for the vent plane, KVV1=KVV2=N3
+!> \param KVV2 Upper indices of dummy vents for the vent plane, KVV1=KVV2=N3
+
+SUBROUTINE DUMMY_VENTS(FI,N1,N2,IVV1,IVV2,JVV1,JVV2,N3,KVV1,KVV2)
+
+INTEGER, INTENT(IN) :: N1,N2,N3,FI
+INTEGER, INTENT(INOUT), DIMENSION(NDVDIM) :: IVV1,IVV2,JVV1,JVV2,KVV1,KVV2
+INTEGER :: I,J,II,JJ,ISTP,JSTP,VENT_INDEX
+
+JLOOP: DO J=1,N2
+   ILOOP: DO I=1,N1
+
+      IF (VENT_INDICES(I,J,FI)==-1) CYCLE ILOOP
+      VENT_INDEX = VENT_INDICES(I,J,FI)
+
+      ISTP = N1
+      JSTP = N2
+      JJLOOP: DO JJ=J+1,N2
+         IF (VENT_INDICES(I,JJ,FI)/=VENT_INDEX) THEN
+            JSTP = JJ-1
+            EXIT JJLOOP
+         ENDIF
+      ENDDO JJLOOP
+
+      IILOOP: DO II=I+1,N1
+         JJLOOP2: DO JJ=J,JSTP
+         IF (VENT_INDICES(II,JJ,FI)/=VENT_INDEX) THEN
+            ISTP = II-1
+            EXIT IILOOP
+         ENDIF
+         ENDDO JJLOOP2
+      ENDDO IILOOP
+
+      NDV = NDV + 1
+      VENT_INDICES(I:ISTP,J:JSTP,FI) = -1
+      IVV1(NDV) = I-1
+      IVV2(NDV) = ISTP
+      JVV1(NDV) = J-1
+      JVV2(NDV) = JSTP
+      KVV1(NDV) = N3
+      KVV2(NDV) = N3
+      DUMMY_VENT_INDEX(NDV) = VENT_INDEX
+
+   ENDDO ILOOP
+ENDDO JLOOP
+
+END SUBROUTINE DUMMY_VENTS
+
+
+!> \brief Increase size of array holding mesh wire frame coordinates
+
+SUBROUTINE RE_ALLOCATE_SEGMENTS
+
+USE MEMORY_FUNCTIONS, ONLY : ChkMemErr
+TYPE(SEGMENT_TYPE), ALLOCATABLE, DIMENSION(:) :: DUMMY_SEGMENT
+INTEGER :: IZERO
+
+ALLOCATE(DUMMY_SEGMENT(N_SEGMENTS_MAX),STAT=IZERO)
+CALL ChkMemErr('DUMP','DUMMY_SEGMENT',IZERO)
+DUMMY_SEGMENT(1:N_SEGMENTS_MAX) = SEGMENT(1:N_SEGMENTS_MAX)
+
+DEALLOCATE(SEGMENT)
+ALLOCATE(SEGMENT(N_SEGMENTS_MAX+100),STAT=IZERO)
+CALL ChkMemErr('DUMP','SEGMENT',IZERO)
+SEGMENT(1:N_SEGMENTS_MAX) = DUMMY_SEGMENT(1:N_SEGMENTS_MAX)
+N_SEGMENTS_MAX = N_SEGMENTS_MAX + 100
+
+DEALLOCATE(DUMMY_SEGMENT)
+
+END SUBROUTINE RE_ALLOCATE_SEGMENTS
+
+
+END SUBROUTINE WRITE_SMOKEVIEW_FILE
+
+
+!> \brief Status files are used to indicate if FDS has completed
+
+SUBROUTINE WRITE_STATUS_FILES
+
+IF (STATUS_FILES) THEN
+   OPEN(LU_NOTREADY,FILE=FN_NOTREADY,FORM='FORMATTED',STATUS='REPLACE')
+   WRITE(LU_NOTREADY,'(A ,A/)') ' Job ID string: ', TRIM(CHID)
+ENDIF
+
+END SUBROUTINE WRITE_STATUS_FILES
+
+
+!> \brief Running event log for DEVC or CTRL status changes
+!>
+!> \param ITEM Sets whether DEVC or CTRL are being written
+!> \param T Current time (s)
+
+SUBROUTINE WRITE_DEVC_CTRL_LOG(ITEM,T)
+CHARACTER(4), INTENT(IN) :: ITEM
+REAL(EB), INTENT(IN) :: T
+CHARACTER(LABEL_LENGTH) :: ID
+INTEGER :: N
+REAL(FB) :: STIME
+
+IF (ITEM=='DEVC') THEN
+   DO N = 1,N_DEVC
+      IF (ABS(DEVICE(N)%T_CHANGE-T) < TWO_EPSILON_EB) THEN
+         IF (TRIM(DEVICE(N)%ID)/='null') THEN
+            ID = TRIM(DEVICE(N)%ID)
+         ELSE
+            WRITE(ID,'(I0)') N
+         ENDIF
+         STIME = REAL(T_BEGIN + (DEVICE(N)%T_CHANGE-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+         WRITE(LU_DEVC_CTRL,'(ES12.5,",",A,",",A,",",L1,",",ES12.5,",",A)') &
+            STIME,'DEVC',ID,DEVICE(N)%CURRENT_STATE,DEVICE(N)%SMOOTHED_VALUE,TRIM(DEVICE(N)%UNITS)
+      ENDIF
+   ENDDO
+ENDIF
+
+IF (ITEM=='CTRL') THEN
+   DO N = 1,N_CTRL
+      IF (ABS(CONTROL(N)%T_CHANGE-T) < TWO_EPSILON_EB) THEN
+         IF (TRIM(CONTROL(N)%ID)/='null') THEN
+            ID = TRIM(CONTROL(N)%ID)
+         ELSE
+            WRITE(ID,'(I0)') N
+         ENDIF
+         STIME = REAL(T_BEGIN + (CONTROL(N)%T_CHANGE-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+         SELECT CASE (CONTROL(N)%CONTROL_INDEX)
+            CASE(1,4:99)
+               WRITE(LU_DEVC_CTRL,'(ES12.5,",",A,",",A,",",L1)') &
+                  STIME,'CTRL',ID,CONTROL(N)%CURRENT_STATE
+            CASE(2,3,100:)
+               WRITE(LU_DEVC_CTRL,'(ES12.5,",",A,",",A,",",L1,",",ES12.5)') &
+                  STIME,'CTRL',ID,CONTROL(N)%CURRENT_STATE,CONTROL(N)%INSTANT_VALUE
+         END SELECT
+      ENDIF
+   ENDDO
+ENDIF
+
+END SUBROUTINE WRITE_DEVC_CTRL_LOG
+
+
+!> \brief Dump rotated cube MMS data file.
+!> \param NM Mesh number
+!> \param FN_MMS File name
+!> \param T Current simulation time (s)
+
+SUBROUTINE DUMP_ROTCUBE_MMS(NM,FN_MMS,T)
+
+USE COMP_FUNCTIONS, ONLY: GET_FILE_NUMBER
+
+INTEGER, INTENT(IN) :: NM
+REAL(EB), INTENT(IN) :: T
+CHARACTER(80), INTENT(IN) :: FN_MMS
+
+INTEGER  :: I,J,K,LU_MMS,IMIN,JMIN,KMIN,IMAX,JMAX,KMAX,NTOT_U,NTOT_W,NTOT_C,AXIS,ICC,ICF,JCC,JCF
+
+CALL POINT_TO_MESH(NM)
+
+IMIN=1
+JMIN=1
+KMIN=1
+IMAX=IBAR
+JMAX=JBAR
+KMAX=KBAR
+
+NTOT_U = 0
+NTOT_W = 0
+NTOT_C = 0
+
+LU_MMS = GET_FILE_NUMBER()
+OPEN(UNIT=LU_MMS,FILE=TRIM(FN_MMS),FORM='FORMATTED',STATUS='UNKNOWN')
+
+! First count total number of entries for U velocities (regular gas + cut-faces), W velocities and
+! cell centered variables (regular gas + cut-cells)
+IF (CC_IBM) THEN
+   ! PERIODIC_TEST=21,22,23
+   ! U velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF(FCVAR(I,J,K,CC_FGSC,IAXIS) /= CC_GASPHASE) CYCLE
+            NTOT_U = NTOT_U + 1
+         ENDDO
+      ENDDO
+   ENDDO
+   ! W velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF(FCVAR(I,J,K,CC_FGSC,KAXIS) /= CC_GASPHASE) CYCLE
+            NTOT_W = NTOT_W + 1
+         ENDDO
+      ENDDO
+   ENDDO
+   ! Now Gasphase cut-faces for both U and W:
+   DO ICF=1,MESHES(NM)%N_CUTFACE_MESH
+      IF (CUT_FACE(ICF)%STATUS /= CC_GASPHASE) CYCLE
+      AXIS = CUT_FACE(ICF)%IJK(KAXIS+1)
+      SELECT CASE(AXIS)
+      CASE(IAXIS)
+         NTOT_U = NTOT_U + CUT_FACE(ICF)%NFACE
+      CASE(KAXIS)
+         NTOT_W = NTOT_W + CUT_FACE(ICF)%NFACE
+      END SELECT
+   ENDDO
+
+   ! Now cell centered variables:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF(CCVAR(I,J,K,CC_CGSC) /= CC_GASPHASE) CYCLE
+            NTOT_C = NTOT_C + 1
+         ENDDO
+      ENDDO
+   ENDDO
+   DO ICC=1,MESHES(NM)%N_CUTCELL_MESH
+      NTOT_C = NTOT_C + CUT_CELL(ICC)%NCELL
+   ENDDO
+
+   WRITE(LU_MMS,'(I8,A,I8,A,I8,A,E22.15,A,E22.15,A,E22.15)') &
+   NTOT_U,',',NTOT_W,',',NTOT_C,',',T,',',DX(1),',',DZ(1)
+
+   ! Write velocities:
+   ! U velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF(FCVAR(I,J,K,CC_FGSC,IAXIS) /= CC_GASPHASE) CYCLE
+            WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            0,',',X(I),',',ZC(K),',',DY(J)*DZ(K),',',U(I,J,K),',',0._EB,',',0._EB
+         ENDDO
+      ENDDO
+   ENDDO
+   ! Now Gasphase cut-faces for U:
+   DO ICF=1,MESHES(NM)%N_CUTFACE_MESH
+      IF (CUT_FACE(ICF)%STATUS /= CC_GASPHASE) CYCLE
+      AXIS = CUT_FACE(ICF)%IJK(KAXIS+1)
+      SELECT CASE(AXIS)
+      CASE(IAXIS)
+         DO JCF=1,CUT_FACE(ICF)%NFACE
+           WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+           1,',',CUT_FACE(ICF)%XYZCEN(IAXIS,JCF),',',CUT_FACE(ICF)%XYZCEN(KAXIS,JCF),',', &
+           CUT_FACE(ICF)%AREA(JCF),',',CUT_FACE(ICF)%VEL(JCF),',',0._EB,',',0._EB
+         ENDDO
+      END SELECT
+   ENDDO
+   ! W velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF(FCVAR(I,J,K,CC_FGSC,KAXIS) /= CC_GASPHASE) CYCLE
+            WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            0,',',XC(I),',',Z(K),',',DY(J)*DX(I),',',W(I,J,K),',',0._EB,',',0._EB
+         ENDDO
+      ENDDO
+   ENDDO
+   ! Now Gasphase cut-faces for W:
+   DO ICF=1,MESHES(NM)%N_CUTFACE_MESH
+      IF (CUT_FACE(ICF)%STATUS /= CC_GASPHASE) CYCLE
+      AXIS = CUT_FACE(ICF)%IJK(KAXIS+1)
+      SELECT CASE(AXIS)
+      CASE(KAXIS)
+         DO JCF=1,CUT_FACE(ICF)%NFACE
+           WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+           1,',',CUT_FACE(ICF)%XYZCEN(IAXIS,JCF),',',CUT_FACE(ICF)%XYZCEN(KAXIS,JCF),',', &
+           CUT_FACE(ICF)%AREA(JCF),',',CUT_FACE(ICF)%VEL(JCF),',',0._EB,',',0._EB
+         ENDDO
+      END SELECT
+   ENDDO
+
+   ! Now cell centered variables:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF(CCVAR(I,J,K,CC_CGSC) /= CC_GASPHASE) CYCLE
+            WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            0,',',XC(I),',',ZC(K),',',DY(J)*DX(I)*DZ(K),',',ZZ(I,J,K,2),',',H(I,J,K),',', &
+            RHO(I,J,K)*(H(I,J,K)-KRES(I,J,K))
+         ENDDO
+      ENDDO
+   ENDDO
+   DO ICC=1,MESHES(NM)%N_CUTCELL_MESH
+      DO JCC=1,CUT_CELL(ICC)%NCELL
+         WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+         1,',',CUT_CELL(ICC)%XYZCEN(IAXIS,JCC),',',CUT_CELL(ICC)%XYZCEN(KAXIS,JCC),',',&
+         CUT_CELL(ICC)%VOLUME(JCC),',',CUT_CELL(ICC)%ZZ(2,JCC),',',CUT_CELL(ICC)%H(JCC),',',&
+         CUT_CELL(ICC)%RHO(JCC)*(CUT_CELL(ICC)%H(JCC)-KRES(I,J,K))
+      ENDDO
+   ENDDO
+
+ELSE
+   ! PERIODIC_TEST=21 for OBST.
+   ! U velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF (CELL(CELL_INDEX(I,J,K))%SOLID .OR. CELL(CELL_INDEX(I+1,J,K))%SOLID) CYCLE
+            NTOT_U = NTOT_U + 1
+         ENDDO
+      ENDDO
+   ENDDO
+   ! W velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF (CELL(CELL_INDEX(I,J,K))%SOLID .OR. CELL(CELL_INDEX(I+1,J,K+1))%SOLID) CYCLE
+            NTOT_W = NTOT_W + 1
+         ENDDO
+      ENDDO
+   ENDDO
+   ! Now cell centered variables:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF (CELL(CELL_INDEX(I,J,K))%SOLID) CYCLE
+            NTOT_C = NTOT_C + 1
+         ENDDO
+      ENDDO
+   ENDDO
+
+   WRITE(LU_MMS,'(I8,A,I8,A,I8,A,E22.15,A,E22.15,A,E22.15)') &
+   NTOT_U,',',NTOT_W,',',NTOT_C,',',T,',',DX(1),',',DZ(1)
+
+   ! U velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF (CELL(CELL_INDEX(I,J,K))%SOLID .OR. CELL(CELL_INDEX(I+1,J,K))%SOLID) CYCLE
+            WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            0,',',X(I),',',ZC(K),',',DY(J)*DZ(K),',',U(I,J,K),',',0._EB,',',0._EB
+         ENDDO
+      ENDDO
+   ENDDO
+   ! W velocities:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF (CELL(CELL_INDEX(I,J,K))%SOLID .OR. CELL(CELL_INDEX(I+1,J,K+1))%SOLID) CYCLE
+            WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            0,',',XC(I),',',Z(K),',',DY(J)*DX(I),',',W(I,J,K),',',0._EB,',',0._EB
+         ENDDO
+      ENDDO
+   ENDDO
+   ! Now cell centered variables:
+   DO K=KMIN,KMAX
+      DO J=JMIN,JMAX
+         DO I=IMIN,IMAX
+            IF (CELL(CELL_INDEX(I,J,K))%SOLID) CYCLE
+            WRITE(LU_MMS,'(I8,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            0,',',XC(I),',',ZC(K),',',DY(J)*DX(I)*DZ(K),',',ZZ(I,J,K,2),',',H(I,J,K),',', &
+            RHO(I,J,K)*(H(I,J,K)-KRES(I,J,K))
+         ENDDO
+      ENDDO
+   ENDDO
+
+ENDIF
+
+CLOSE(LU_MMS)
+
+END SUBROUTINE DUMP_ROTCUBE_MMS
+
+
+!> \brief Dump MMS file (manufactured solution raw data)
+!> \param NM Mesh number
+!> \param FN_MMS File name
+!> \param T Current simulation time (s)
+
+SUBROUTINE DUMP_MMS(NM,FN_MMS,T)
+
+USE COMP_FUNCTIONS, ONLY: GET_FILE_NUMBER
+INTEGER  :: I,J,K,LU_MMS,IMIN,JMIN,KMIN,IMAX,JMAX,KMAX
+INTEGER, INTENT(IN) :: NM
+REAL(EB), INTENT(IN) :: T
+CHARACTER(80), INTENT(IN) :: FN_MMS
+CHARACTER(4) :: S1,S2,S3,S4,S5,S6
+
+CALL POINT_TO_MESH(NM)
+
+IMIN=1
+JMIN=1
+KMIN=1
+IMAX=IBAR
+JMAX=JBAR
+KMAX=KBAR
+
+LU_MMS = GET_FILE_NUMBER()
+OPEN(UNIT=LU_MMS,FILE=TRIM(FN_MMS),FORM='FORMATTED',STATUS='UNKNOWN')
+
+WRITE(S1,'(I4)') IMIN; S1 = ADJUSTL(S1)
+WRITE(S2,'(I4)') IMAX; S2 = ADJUSTL(S2)
+WRITE(S3,'(I4)') JMIN; S3 = ADJUSTL(S3)
+WRITE(S4,'(I4)') JMAX; S4 = ADJUSTL(S4)
+WRITE(S5,'(I4)') KMIN; S5 = ADJUSTL(S5)
+WRITE(S6,'(I4)') KMAX; S6 = ADJUSTL(S6)
+
+WRITE(LU_MMS,'(A)') TRIM(S1)//','//TRIM(S2)//','//TRIM(S3)//','//TRIM(S4)//','//TRIM(S5)//','//TRIM(S6)
+WRITE(LU_MMS,'(E22.15)') T
+
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX
+         WRITE(LU_MMS,'(E22.15,A,E22.15,A,E22.15,A,E22.15,A,E22.15)') &
+            RHO(I,J,K),',',ZZ(I,J,K,2),',',U(I,J,K),',',W(I,J,K),',',H(I,J,K)
+      ENDDO
+   ENDDO
+ENDDO
+
+CLOSE(LU_MMS)
+
+END SUBROUTINE DUMP_MMS
+
+!> \brief Dump SPEC file
+!> \param NM Mesh number
+!> \param FN_SPEC File name
+
+SUBROUTINE DUMP_SPEC(NM,FN_SPEC)
+
+USE COMP_FUNCTIONS, ONLY: GET_FILE_NUMBER
+INTEGER  :: I,J,K,N,LU_SPEC,IMIN,JMIN,KMIN,IMAX,JMAX,KMAX
+INTEGER, INTENT(IN) :: NM
+CHARACTER(80), INTENT(IN) :: FN_SPEC
+CHARACTER(3) :: S1,S2,S3,S4,S5,S6,S7
+CHARACTER(20) :: FMT
+
+CALL POINT_TO_MESH(NM)
+
+IMIN=1
+JMIN=1
+KMIN=1
+IMAX = IBAR
+JMAX = JBAR
+KMAX = KBAR
+
+LU_SPEC = GET_FILE_NUMBER()
+OPEN(UNIT=LU_SPEC,FILE=TRIM(FN_SPEC),FORM='FORMATTED',STATUS='UNKNOWN')
+
+WRITE(S1,'(I0)') IMIN
+WRITE(S2,'(I0)') IMAX
+WRITE(S3,'(I0)') JMIN
+WRITE(S4,'(I0)') JMAX
+WRITE(S5,'(I0)') KMIN
+WRITE(S6,'(I0)') KMAX
+
+WRITE(LU_SPEC,'(A)') TRIM(S1)//','//TRIM(S2)//','//TRIM(S3)//','//TRIM(S4)//','//TRIM(S5)//','//TRIM(S6)
+
+WRITE(S7,'(I0)') N_TRACKED_SPECIES-1
+WRITE(FMT,'(A)') '('//TRIM(S7)//'(G0,","),G0)'
+
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX
+         WRITE(LU_SPEC,FMT) ( ZZ(I,J,K,N), N=1,N_TRACKED_SPECIES )
+      ENDDO
+   ENDDO
+ENDDO
+
+CLOSE(LU_SPEC)
+
+END SUBROUTINE DUMP_SPEC
+
+!> \brief Print out detector activation times and total elapsed time into .out file.
+
+SUBROUTINE TIMINGS
+
+USE COMP_FUNCTIONS, ONLY: CURRENT_TIME
+REAL(EB) :: T_NOW
+INTEGER :: N
+LOGICAL :: WRITE_HEADER
+TYPE(CONTROL_TYPE), POINTER :: CF=>NULL()
+
+! Print out detector and control activation times
+
+IF (N_DEVC > 0) THEN
+   WRITE_HEADER = .TRUE.
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      IF (DV%SETPOINT>1.E6_EB) CYCLE
+      IF (WRITE_HEADER) WRITE(LU_OUTPUT,'(//A/)')   ' DEVICE Activation Times' ; WRITE_HEADER = .FALSE.
+      IF (WRITE_HEADER) WRITE(LU_OUTPUT,'(/A/)') 'Device number Device ID                 Final State Final activiation time (s)'
+      IF (ABS(DV%T_CHANGE) < 1._EB) WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.5)') N,DV%ID,DV%CURRENT_STATE,DV%T_CHANGE
+      IF (ABS(DV%T_CHANGE) >=1 .AND. ABS(DV%T_CHANGE) < 100._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.3)') N,DV%ID,DV%CURRENT_STATE,DV%T_CHANGE
+      IF (ABS(DV%T_CHANGE) >=100 .AND. ABS(DV%T_CHANGE) < 10000._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.1)') N,DV%ID,DV%CURRENT_STATE,DV%T_CHANGE
+      IF (ABS(DV%T_CHANGE) >=10000 .AND. ABS(DV%T_CHANGE) < 1000000._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.0)') N,DV%ID,DV%CURRENT_STATE,DV%T_CHANGE
+      IF (ABS(DV%T_CHANGE) >= 1000000._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,A)') N,DV%ID,DV%CURRENT_STATE,' No Activation'
+   ENDDO
+ENDIF
+
+IF (N_CTRL > 0) THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' CONTROL Activation Times'
+   WRITE(LU_OUTPUT,'(/A/)') 'Device number Device ID                 Final State Final activiation time (s)'
+   DO N=1,N_CTRL
+      CF => CONTROL(N)
+      IF (ABS(CF%T_CHANGE) < 1._EB) WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.5)') N,CF%ID,CF%CURRENT_STATE,CF%T_CHANGE
+      IF (ABS(CF%T_CHANGE) >=1 .AND. ABS(CF%T_CHANGE) < 100._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.3)') N,CF%ID,CF%CURRENT_STATE,CF%T_CHANGE
+      IF (ABS(CF%T_CHANGE) >=100 .AND. ABS(CF%T_CHANGE) < 10000._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.1)') N,CF%ID,CF%CURRENT_STATE,CF%T_CHANGE
+      IF (ABS(CF%T_CHANGE) >=10000 .AND. ABS(CF%T_CHANGE) < 1000000._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,F8.0)') N,CF%ID,CF%CURRENT_STATE,CF%T_CHANGE
+      IF (ABS(CF%T_CHANGE) >= 1000000._EB) &
+         WRITE(LU_OUTPUT,'(I10,4X,A25,1X,L1,8X,A)') N,CF%ID,CF%CURRENT_STATE,' No Activation'
+   ENDDO
+ENDIF
+
+! Printout elapsed wall clock time
+
+IF (ICYC>0) THEN
+   T_NOW = CURRENT_TIME()
+   WRITE(LU_OUTPUT,'(//A,F12.3)') ' Time Stepping Wall Clock Time (s): ',T_NOW - WALL_CLOCK_START_ITERATIONS
+   WRITE(LU_OUTPUT,'(  A,F12.3)') ' Total Elapsed Wall Clock Time (s): ',T_NOW - WALL_CLOCK_START
+ENDIF
+
+END SUBROUTINE TIMINGS
+
+
+!> \brief Dump immersed boundary (IBM) quantities into CHID_nn.ge file
+!> \param T Current simulation time (s)
+!> \param DO_CFACES Process C_FACES
+
+SUBROUTINE DUMP_GEOM(T,DO_CFACES)
+
+REAL(EB), INTENT(IN) :: T
+LOGICAL, INTENT(IN)  :: DO_CFACES
+REAL(EB) :: STIME
+
+STIME = T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR
+
+IF(.NOT.DO_CFACES) THEN
+   ! Dump geometry triangulation:
+   CALL WRITE_GEOM(STIME)
+ELSE
+   ! Dump CFACES:
+   CALL WRITE_CFACES(STIME)
+ENDIF
+
+END SUBROUTINE DUMP_GEOM
+
+SUBROUTINE DUMP_SLICE_GEOM(FUNIT,SLICETYPE,HEADER,STIME,I1,I2,J1,J2,K1,K2)
+
+CHARACTER(*), INTENT(IN) :: SLICETYPE
+INTEGER, INTENT(IN) :: FUNIT, HEADER, I1, I2, J1, J2, K1, K2
+REAL(FB) :: STIME
+INTEGER :: I
+INTEGER, PARAMETER :: FIRST_FRAME_STATIC=1, NVOLS=0, VERSION=2
+INTEGER :: NVERTS, NVERTS_CUTCELLS, NFACES, NFACES_CUTCELLS
+REAL(FB), PARAMETER :: ZERO_FLOAT=0.0_FB
+REAL(FB), ALLOCATABLE, DIMENSION(:) :: VERTS
+INTEGER, ALLOCATABLE, DIMENSION(:) :: FACES, LOCATIONS
+
+CALL GET_GEOMSIZES(SLICETYPE,I1,I2,J1,J2,K1,K2,NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS)
+
+IF (NVERTS>0 .AND. NFACES>0) THEN
+   ALLOCATE(VERTS(3*NVERTS))
+   ALLOCATE(FACES(3*NFACES))
+   ALLOCATE(LOCATIONS(NFACES))
+   CALL GET_GEOMINFO(SLICETYPE,I1,I2,J1,J2,K1,K2,NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS,VERTS,FACES,LOCATIONS)
+ELSE
+   NVERTS=0
+   NFACES=0
+ENDIF
+
+IF (HEADER==1) THEN
+   WRITE(FUNIT) INTEGER_ONE
+   WRITE(FUNIT) VERSION
+   WRITE(FUNIT) INTEGER_ZERO, INTEGER_ZERO, FIRST_FRAME_STATIC
+ENDIF
+WRITE(FUNIT) STIME
+WRITE(FUNIT) NVERTS, NFACES, NVOLS
+
+IF (NVERTS>0 .AND. NFACES>0) THEN
+   WRITE(FUNIT) (VERTS(I),I=1,3*NVERTS)
+   WRITE(FUNIT) (FACES(I),I=1,3*NFACES)
+   WRITE(FUNIT) (LOCATIONS(I),I=1,NFACES)   ! placeholders for now
+   WRITE(FUNIT) (ZERO_FLOAT,ZERO_FLOAT,   I=1,3*NFACES) ! placeholders for now
+ENDIF
+
+WRITE(FUNIT) ZERO_FLOAT
+WRITE(FUNIT) INTEGER_ZERO, INTEGER_ZERO, INTEGER_ZERO
+IF (NVERTS>0 .AND. NFACES>0) THEN
+      DEALLOCATE(VERTS)
+      DEALLOCATE(FACES)
+      DEALLOCATE(LOCATIONS)
+ENDIF
+END SUBROUTINE DUMP_SLICE_GEOM
+
+
+SUBROUTINE WRITE_CFACES(STIME)
+
+REAL(EB),INTENT(IN) :: STIME
+
+! Local Variables:
+INTEGER :: NM
+
+DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
+   CALL POINT_TO_MESH(NM)
+   OPEN(LU_CFACE_GEOM(NM),FILE=FN_CFACE_GEOM(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+   CALL DUMP_CFACES_GEOM(LU_CFACE_GEOM(NM),STIME)
+   CLOSE(LU_CFACE_GEOM(NM))
+ENDDO
+
+END SUBROUTINE WRITE_CFACES
+
+SUBROUTINE DUMP_CFACES_GEOM(FUNIT,STIME)
+
+INTEGER, INTENT(IN) :: FUNIT
+REAL(EB),INTENT(IN) :: STIME
+INTEGER :: I
+INTEGER, PARAMETER :: HEADER=1,FIRST_FRAME_STATIC=1, NVOLS=0, VERSION=2
+INTEGER :: NVERTS, NVERTS_CUTCELLS, NFACES, NFACES_CUTCELLS
+REAL(FB), ALLOCATABLE, DIMENSION(:) :: VERTS
+INTEGER, ALLOCATABLE, DIMENSION(:) :: FACES, LOCATIONS,SURFIND,GEOMIND
+
+!#define TEST_NORMAL_PROBE
+#ifdef TEST_NORMAL_PROBE
+INTEGER :: ICF, IND1, IND2
+REAL(EB):: XLOC(1:6)
+#endif
+
+CALL GET_GEOMSIZES('INBOUND_FACES',0,0,0,0,0,0,NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS)
+
+IF (NVERTS>0 .AND. NFACES>0) THEN
+   ALLOCATE(VERTS(3*NVERTS))
+   ALLOCATE(FACES(3*NFACES))
+   ALLOCATE(LOCATIONS(NFACES))
+   ALLOCATE(SURFIND(NFACES))
+   ALLOCATE(GEOMIND(NFACES))
+   CALL GET_GEOMINFO('INBOUND_FACES',0,0,0,0,0,0,NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS,&
+                     VERTS,FACES,LOCATIONS,SURFIND=SURFIND,GEOMIND=GEOMIND)
+ELSE
+   NVERTS=0
+   NFACES=0
+ENDIF
+
+IF (HEADER==1) THEN
+   WRITE(FUNIT) INTEGER_ONE
+   WRITE(FUNIT) VERSION
+   WRITE(FUNIT) INTEGER_ZERO, INTEGER_ZERO, FIRST_FRAME_STATIC
+ENDIF
+WRITE(FUNIT) REAL(STIME,FB)
+WRITE(FUNIT) NVERTS, NFACES, NVOLS
+
+IF (NVERTS>0 .AND. NFACES>0) THEN
+   WRITE(FUNIT) (VERTS(I),I=1,3*NVERTS)
+   WRITE(FUNIT) (FACES(I),I=1,3*NFACES)
+   WRITE(FUNIT) (LOCATIONS(I),I=1,NFACES)   ! placeholders for now
+   WRITE(FUNIT) (SURFIND(I),I=1,NFACES)
+   WRITE(FUNIT) (GEOMIND(I),I=1,NFACES)
+ENDIF
+
+#ifdef TEST_NORMAL_PROBE
+IF (N_INTERNAL_CFACE_CELLS>0) THEN
+   IF (ALLOCATED(VERTS)) DEALLOCATE(VERTS)
+   ALLOCATE(VERTS(1:6*N_INTERNAL_CFACE_CELLS))
+   WRITE(FUNIT) N_INTERNAL_CFACE_CELLS
+   DO ICF=INTERNAL_CFACE_CELLS_LB+1,INTERNAL_CFACE_CELLS_LB+N_INTERNAL_CFACE_CELLS
+     IND1 = CFACE(ICF)%CUT_FACE_IND1
+     IND2 = CFACE(ICF)%CUT_FACE_IND2
+     XLOC(1:3) = (/ CFACE(ICF)%X, CFACE(ICF)%Y, CFACE(ICF)%Z /)
+     XLOC(4:6) = XLOC(1:3) + CUT_FACE(IND1)%INT_XN(1,IND2)*CFACE(ICF)%NVEC(IAXIS:KAXIS)
+     VERTS(6*(ICF-INTERNAL_CFACE_CELLS_LB-1)+1:6*(ICF-INTERNAL_CFACE_CELLS_LB)) = REAL(XLOC(1:6),FB)
+   ENDDO
+   WRITE(FUNIT) VERTS(1:6*N_INTERNAL_CFACE_CELLS)
+ENDIF
+#endif
+
+IF (NVERTS>0 .AND. NFACES>0) THEN
+      DEALLOCATE(VERTS)
+      DEALLOCATE(FACES)
+      DEALLOCATE(LOCATIONS)
+      DEALLOCATE(SURFIND)
+      DEALLOCATE(GEOMIND)
+ENDIF
+END SUBROUTINE DUMP_CFACES_GEOM
+
+
+SUBROUTINE DUMP_SLICE_GEOM_DATA(FUNIT_DATA,FUNIT_BOUNDS,CC_INTERP2FACES,CC_CELL_CENTERED,SLICETYPE, &
+                                HEADER,STIME,I1,I2,J1,J2,K1,K2,DEBUG,&
+                                IND,IND2,Y_INDEX,Z_INDEX,PART_INDEX,VELO_INDEX,PIPE_INDEX,PROP_INDEX,REAC_INDEX,MATL_INDEX,T,DT,NM)
+REAL(EB), INTENT(IN) :: T,DT
+CHARACTER(*), INTENT(IN) :: SLICETYPE
+INTEGER, INTENT(IN) :: FUNIT_DATA,FUNIT_BOUNDS,HEADER,I1,I2,J1,J2,K1,K2,DEBUG, &
+                       IND,IND2,Y_INDEX,Z_INDEX,PART_INDEX,VELO_INDEX,PIPE_INDEX,PROP_INDEX,REAC_INDEX,MATL_INDEX,NM
+REAL(FB), INTENT(IN):: STIME
+LOGICAL, INTENT(IN) :: CC_INTERP2FACES,CC_CELL_CENTERED
+
+INTEGER, PARAMETER :: VERSION=2
+INTEGER :: NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS
+INTEGER I, NVALS
+REAL(FB), ALLOCATABLE, DIMENSION(:) :: VALS, VERT_VALS
+REAL(FB) :: VAL_MIN, VAL_MAX
+INTEGER, ALLOCATABLE, DIMENSION(:)  :: VERT_UNIQUE
+REAL(FB), ALLOCATABLE, DIMENSION(:) :: VERTS
+INTEGER, ALLOCATABLE, DIMENSION(:)  :: FACES, LOCATIONS
+
+CALL GET_GEOMSIZES(SLICETYPE,I1,I2,J1,J2,K1,K2,NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS)
+IF (NVERTS>0 .AND. NFACES>0) THEN
+   IF (CC_CELL_CENTERED) THEN
+      NVALS = NFACES
+      ALLOCATE(VALS(NFACES))
+! get values at geometry faces
+      CALL GET_GEOMVALS(CC_INTERP2FACES,CC_CELL_CENTERED,SLICETYPE,&
+                       I1,I2,J1,J2,K1,K2,NFACES,NFACES_CUTCELLS,VALS,&
+                       IND,IND2,Y_INDEX,Z_INDEX,PART_INDEX,VELO_INDEX,PIPE_INDEX,PROP_INDEX,REAC_INDEX,MATL_INDEX,T,DT,NM)
+   ELSE
+      NVALS = NVERTS
+      ALLOCATE(VALS(MAX(NVERTS,NFACES)))
+
+! get values at geometry nodes
+      ALLOCATE(VERTS(3*NVERTS))
+      ALLOCATE(FACES(3*NFACES))
+      ALLOCATE(LOCATIONS(NFACES))
+      ALLOCATE(VERT_UNIQUE(NVERTS))
+      ALLOCATE(VERT_VALS(NVERTS))
+
+      CALL GET_GEOMVALS(CC_INTERP2FACES,CC_CELL_CENTERED,SLICETYPE,&
+                        I1,I2,J1,J2,K1,K2,NFACES,NFACES_CUTCELLS,VALS,&
+                        IND,IND2,Y_INDEX,Z_INDEX,PART_INDEX,VELO_INDEX,PIPE_INDEX,PROP_INDEX,REAC_INDEX,MATL_INDEX,T,DT,NM)
+
+! these two routines need to be moved and called only once
+      CALL GET_GEOMINFO(SLICETYPE,I1,I2,J1,J2,K1,K2,NVERTS,NVERTS_CUTCELLS,NFACES,NFACES_CUTCELLS,VERTS,FACES,LOCATIONS)
+      CALL MAKE_UNIQUE_VERT_ARRAY(VERTS, VERT_UNIQUE, NVERTS)
+
+      CALL AVERAGE_FACE_VALUES(VERT_UNIQUE, VERT_VALS, NVERTS, FACES, VALS, NFACES)
+      VALS(1:NVERTS) = VERT_VALS(1:NVERTS)
+
+      DEALLOCATE(VERTS)
+      DEALLOCATE(FACES)
+      DEALLOCATE(LOCATIONS)
+      DEALLOCATE(VERT_UNIQUE)
+      DEALLOCATE(VERT_VALS)
+   ENDIF
+ELSE
+   NVERTS=0
+   NFACES=0
+   NVALS=0
+ENDIF
+
+IF (HEADER==1) THEN
+   WRITE(FUNIT_DATA) INTEGER_ONE
+   WRITE(FUNIT_DATA) VERSION
+ENDIF
+WRITE(FUNIT_DATA) STIME
+IF (CC_CELL_CENTERED) THEN
+   WRITE(FUNIT_DATA) INTEGER_ZERO, INTEGER_ZERO, INTEGER_ZERO, NVALS
+ELSE
+   WRITE(FUNIT_DATA) INTEGER_ZERO, INTEGER_ZERO, NVALS,        INTEGER_ZERO
+ENDIF
+IF (NVERTS>0 .AND. NFACES>0) THEN
+   IF (DEBUG .EQ. 0) THEN
+      WRITE(FUNIT_DATA) (VALS(I),I=1,NVALS)
+      VAL_MIN = VALS(1)
+      VAL_MAX = VAL_MIN
+      DO I = 2, NVALS
+         VAL_MIN = MIN(VAL_MIN,VALS(I))
+         VAL_MAX = MAX(VAL_MAX,VALS(I))
+      ENDDO
+   ELSE
+      WRITE(FUNIT_DATA) (REAL(100*NM,FB),I=1,NVALS)
+      VAL_MIN = REAL(100*NM,FB)
+      VAL_MAX = REAL(100*NM,FB)
+   ENDIF
+   WRITE(FUNIT_BOUNDS,'(ES13.6,1X,ES13.6,1X,ES13.6)') STIME, VAL_MIN, VAL_MAX
+   DEALLOCATE(VALS)
+ENDIF
+
+END SUBROUTINE DUMP_SLICE_GEOM_DATA
+
+!> \brief Write out isosurface data to file(s).
+!>
+!> \param T Current simulation time (s)
+!> \param DT Current time step size (s)
+!> \param NM Mesh number
+
+SUBROUTINE DUMP_ISOF(T,DT,NM)
+
+USE ISOSMOKE, ONLY: ISO_TO_FILE
+USE TURBULENCE, ONLY: FILL_EDGES
+REAL(EB), INTENT(IN) :: T,DT
+INTEGER, INTENT(IN) :: NM
+REAL(EB) :: SUM
+REAL(FB) :: STIME
+INTEGER  :: ISOOFFSET,DATAFLAG,I,J,K,N,ERROR, HAVE_ISO2
+REAL(EB), POINTER, DIMENSION(:,:,:) :: QUANTITY,QUANTITY2, B,S
+
+STIME = REAL(T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+DATAFLAG = 1
+DRY=.FALSE.
+
+CALL POINT_TO_MESH(NM)
+
+! Create arrays, B and IBLK, that are 1 in open cells and 0 in solid cells.
+
+IBLK = 1
+B => WORK1
+B = 1._EB
+
+DO K=1,KBAR
+   DO J=1,JBAR
+      DO I=1,IBAR
+         IF (CELL(CELL_INDEX(I,J,K))%SOLID) THEN
+            B(I,J,K) = 0._EB
+            IBLK(I,J,K) = 0
+         ENDIF
+      ENDDO
+   ENDDO
+ENDDO
+
+! Create an array, S, that is the reciprocal of the sum of the B values.
+
+S => WORK2
+S = 0._EB
+
+DO K=0,KBAR
+   DO J=0,JBAR
+      DO I=0,IBAR
+         SUM = B(I,J,K)+B(I+1,J+1,K+1)+B(I+1,J,K)+B(I,J+1,K)+B(I,J,K+1)+ B(I+1,J+1,K)+B(I+1,J,K+1)+B(I,J+1,K+1)
+         IF (SUM>0._EB) S(I,J,K) = 1._EB/SUM
+      ENDDO
+   ENDDO
+ENDDO
+
+! Run through ISOF files
+
+QUANTITY => WORK3
+
+ISOF_LOOP: DO N=1,N_ISOF
+   IS => ISOSURFACE_FILE(N)
+   ERROR = 0
+   ISOOFFSET = 1
+   HAVE_ISO2 = 0
+
+   ! Fill up the dummy array QUANTITY with the appropriate gas phase output
+
+   DO K=0,KBP1
+      DO J=0,JBP1
+         DO I=0,IBP1
+            QUANTITY(I,J,K) = GAS_PHASE_OUTPUT(T,DT,NM,I,J,K,IS%INDEX,0,IS%Y_INDEX,IS%Z_INDEX,0,IS%VELO_INDEX,0,0,0,0)
+         ENDDO
+      ENDDO
+   ENDDO
+
+   ! Mirror QUANTITY into ghost cells
+
+   QUANTITY(0   ,0:JBP1,0:KBP1) = QUANTITY(1   ,0:JBP1,0:KBP1)
+   QUANTITY(IBP1,0:JBP1,0:KBP1) = QUANTITY(IBAR,0:JBP1,0:KBP1)
+   QUANTITY(0:IBP1,0   ,0:KBP1) = QUANTITY(0:IBP1,1   ,0:KBP1)
+   QUANTITY(0:IBP1,JBP1,0:KBP1) = QUANTITY(0:IBP1,JBAR,0:KBP1)
+   QUANTITY(0:IBP1,0:JBP1,0   ) = QUANTITY(0:IBP1,0:JBP1,1   )
+   QUANTITY(0:IBP1,0:JBP1,KBP1) = QUANTITY(0:IBP1,0:JBP1,KBAR)
+   CALL FILL_EDGES(QUANTITY)
+
+   ! Average the data (which is assumed to be cell-centered) at cell corners
+
+   DO K=0,KBAR
+      DO J=0,JBAR
+         DO I=0,IBAR
+            QQ(I+1,J+1,K+1,1) = REAL(S(I,J,K)*(QUANTITY(I,J,K)*B(I,J,K)        + QUANTITY(I+1,J,K)*B(I+1,J,K)+ &
+                                               QUANTITY(I,J,K+1)*B(I,J,K+1)    + QUANTITY(I+1,J,K+1)*B(I+1,J,K+1)+ &
+                                               QUANTITY(I,J+1,K)*B(I,J+1,K)    + QUANTITY(I+1,J+1,K)*B(I+1,J+1,K)+ &
+                                               QUANTITY(I,J+1,K+1)*B(I,J+1,K+1)+ QUANTITY(I+1,J+1,K+1)*B(I+1,J+1,K+1)),FB)
+         ENDDO
+      ENDDO
+   ENDDO
+
+   ! Fill up QUANTITY2 and QQ2 arrays if the isosurface is colored with a second quantity
+
+   INDEX2_IF: IF ( IS%INDEX2 /= -1 ) THEN
+      HAVE_ISO2 = 1
+      QUANTITY2 => WORK4
+
+      ! Fill up the dummy array QUANTITY2 with the appropriate gas phase output
+
+      DO K=0,KBP1
+         DO J=0,JBP1
+            DO I=0,IBP1
+               QUANTITY2(I,J,K) = GAS_PHASE_OUTPUT(T,DT,NM,I,J,K,IS%INDEX2,0,IS%Y_INDEX2,IS%Z_INDEX2,0,IS%VELO_INDEX2,0,0,0,0)
+            ENDDO
+         ENDDO
+      ENDDO
+
+      ! Mirror QUANTITY into ghost cells
+
+      QUANTITY2(0   ,0:JBP1,0:KBP1) = QUANTITY2(1   ,0:JBP1,0:KBP1)
+      QUANTITY2(IBP1,0:JBP1,0:KBP1) = QUANTITY2(IBAR,0:JBP1,0:KBP1)
+      QUANTITY2(0:IBP1,0   ,0:KBP1) = QUANTITY2(0:IBP1,1   ,0:KBP1)
+      QUANTITY2(0:IBP1,JBP1,0:KBP1) = QUANTITY2(0:IBP1,JBAR,0:KBP1)
+      QUANTITY2(0:IBP1,0:JBP1,0   ) = QUANTITY2(0:IBP1,0:JBP1,1   )
+      QUANTITY2(0:IBP1,0:JBP1,KBP1) = QUANTITY2(0:IBP1,0:JBP1,KBAR)
+      CALL FILL_EDGES(QUANTITY2)
+
+      ! Average the data (which is assumed to be cell-centered) at cell corners
+
+      DO K=0,KBAR
+         DO J=0,JBAR
+            DO I=0,IBAR
+               QQ2(I+1,J+1,K+1,1) = REAL(S(I,J,K)*(QUANTITY2(I,J,K)*B(I,J,K)        + QUANTITY2(I+1,J,K)*B(I+1,J,K)+ &
+                                                   QUANTITY2(I,J,K+1)*B(I,J,K+1)    + QUANTITY2(I+1,J,K+1)*B(I+1,J,K+1)+ &
+                                                   QUANTITY2(I,J+1,K)*B(I,J+1,K)    + QUANTITY2(I+1,J+1,K)*B(I+1,J+1,K)+ &
+                                                   QUANTITY2(I,J+1,K+1)*B(I,J+1,K+1)+ QUANTITY2(I+1,J+1,K+1)*B(I+1,J+1,K+1)),FB)
+            ENDDO
+         ENDDO
+      ENDDO
+
+   ENDIF INDEX2_IF
+
+   CALL ISO_TO_FILE(LU_ISOF(N,NM),LU_ISOF2(N,NM),NM,IBAR,JBAR,KBAR,STIME,QQ,QQ2,HAVE_ISO2,&
+        IS%VALUE(1:IS%N_VALUES), IS%N_VALUES, IBLK, IS%SKIP, IS%DELTA, XPLT, IBP1, YPLT, JBP1, ZPLT, KBP1)
+
+ENDDO ISOF_LOOP
+
+END SUBROUTINE DUMP_ISOF
+
+!> \brief Dump Lagrangian particle data to CHID.prt5
+!>
+!> \param T Current simulation time (s)
+!> \param NM Mesh number
+
+SUBROUTINE DUMP_PART(T,NM)
+
+USE MEMORY_FUNCTIONS, ONLY: CHKMEMERR
+
+INTEGER, INTENT(IN)  :: NM
+REAL(EB), INTENT(IN) :: T
+REAL(EB) :: STIME
+INTEGER  :: NPP,NPLIM,IP,N,NN,IZERO
+REAL(EB), ALLOCATABLE, DIMENSION(:) :: XP,YP,ZP
+REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: QP
+INTEGER, ALLOCATABLE, DIMENSION(:) :: TA
+REAL(EB) :: PART_MIN, PART_MAX, PFACTOR
+REAL(FB) :: PFACTOR_FB
+INTEGER, PARAMETER :: PART_BOUNDFILE_VERSION=1
+TYPE (BOUNDARY_COORD_TYPE), POINTER :: BC
+
+CALL POINT_TO_MESH(NM)
+
+! Write the current time to the prt5 file, then start looping through the particle classes
+
+STIME = T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR
+
+WRITE(LU_PART(NM)) REAL(STIME,FB)
+WRITE(LU_PART(NM+NMESHES),'(ES13.6,1X,I4,1X,I4)')STIME, N_LAGRANGIAN_CLASSES, PART_BOUNDFILE_VERSION
+
+LAGRANGIAN_PARTICLE_CLASS_LOOP: DO N=1,N_LAGRANGIAN_CLASSES
+
+   LPC => LAGRANGIAN_PARTICLE_CLASS(N)
+
+   ! Count the number of particles to dump out
+
+   NPLIM = 0
+   DO IP=1,NLP
+      LP=>LAGRANGIAN_PARTICLE(IP)
+      IF (LP%SHOW .AND. LP%CLASS_INDEX==N) NPLIM = NPLIM + 1
+   ENDDO
+
+   ! Allocate some temporary 4 byte arrays just to hold the data that is to be dumped to the file
+
+   ALLOCATE(TA(NPLIM),STAT=IZERO)                  ; CALL ChkMemErr('DUMP','TA',IZERO)
+   ALLOCATE(XP(NPLIM),STAT=IZERO)                  ; CALL ChkMemErr('DUMP','XP',IZERO)
+   ALLOCATE(YP(NPLIM),STAT=IZERO)                  ; CALL ChkMemErr('DUMP','YP',IZERO)
+   ALLOCATE(ZP(NPLIM),STAT=IZERO)                  ; CALL ChkMemErr('DUMP','ZP',IZERO)
+   ALLOCATE(QP(NPLIM,LPC%N_QUANTITIES),STAT=IZERO) ; CALL ChkMemErr('DUMP','QP',IZERO)
+
+   ! Load particle data into single precision arrays
+
+   NPP = 0
+   LOAD_LOOP: DO IP=1,NLP
+      LP=>LAGRANGIAN_PARTICLE(IP)
+      BC=>BOUNDARY_COORD(LP%BC_INDEX)
+      IF (.NOT.LP%SHOW .OR. LP%CLASS_INDEX/=N) CYCLE LOAD_LOOP
+      NPP = NPP + 1
+      IF (NPP > NPLIM) EXIT LOAD_LOOP
+      TA(NPP) = LP%TAG
+      XP(NPP) = BC%X
+      YP(NPP) = BC%Y
+      ZP(NPP) = BC%Z
+      DO NN=1,LPC%N_QUANTITIES
+         QP(NPP,NN) = PARTICLE_OUTPUT(T,LPC%QUANTITIES_INDEX(NN),IP,&
+            Y_INDEX=LPC%QUANTITIES_Y_INDEX(NN),Z_INDEX=LPC%QUANTITIES_Z_INDEX(NN),MESH_NUMBER=NM)
+      ENDDO
+   ENDDO LOAD_LOOP
+
+   ! Dump particle data into the .prt5 file
+
+   WRITE(LU_PART(NM)) NPLIM
+   WRITE(LU_PART(NM)) (REAL(XP(IP),FB),IP=1,NPLIM),(REAL(YP(IP),FB),IP=1,NPLIM),(REAL(ZP(IP),FB),IP=1,NPLIM)
+   WRITE(LU_PART(NM)) (TA(IP),IP=1,NPLIM)
+   IF (LPC%DEBUG) THEN
+      PFACTOR = 0.0_EB
+      IF(NPLIM > 1) PFACTOR = 2.0_EB*STIME/REAL(NPLIM-1,FB)
+      IF (LPC%N_QUANTITIES > 0) THEN
+         PFACTOR_FB = REAL(PFACTOR,FB)
+         WRITE(LU_PART(NM)) ((REAL(-STIME,FB)+REAL(IP-1,FB)*PFACTOR_FB,IP=1,NPLIM),NN=1,LPC%N_QUANTITIES)
+      ENDIF
+   ELSE
+      IF (LPC%N_QUANTITIES > 0) WRITE(LU_PART(NM)) ((REAL(QP(IP,NN),FB),IP=1,NPLIM),NN=1,LPC%N_QUANTITIES)
+   ENDIF
+
+   WRITE(LU_PART(NM+NMESHES),'(I4,1X,I7)')LPC%N_QUANTITIES, NPLIM
+   DO NN = 1, LPC%N_QUANTITIES
+      IF (LPC%DEBUG) THEN
+         PART_MIN = -STIME
+         PART_MAX =  STIME
+      ELSE
+         IF (NPLIM > 0) THEN
+            PART_MAX = QP(1,NN)
+            PART_MIN = PART_MAX
+            DO IP = 2, NPLIM
+               PART_MIN = MIN(QP(IP,NN),PART_MIN)
+               PART_MAX = MAX(QP(IP,NN),PART_MAX)
+            ENDDO
+         ELSE
+            PART_MIN = 1.0_EB
+            PART_MAX = 0.0_EB
+         ENDIF
+      ENDIF
+      WRITE(LU_PART(NM+NMESHES),'(5X,ES13.6,1X,ES13.6)')PART_MIN, PART_MAX
+   ENDDO
+
+   DEALLOCATE(XP)
+   DEALLOCATE(YP)
+   DEALLOCATE(ZP)
+   DEALLOCATE(QP)
+   DEALLOCATE(TA)
+
+ENDDO LAGRANGIAN_PARTICLE_CLASS_LOOP
+
+END SUBROUTINE DUMP_PART
+
+
+!> \brief Dump data to a file for possible restart
+!> \param T Current time (s)
+!> \param DT Current time step size (s)
+!> \param NM Mesh number
+
+SUBROUTINE DUMP_RESTART(T,DT,NM)
+
+! Dump data to a file for possible restart
+
+USE MEMORY_FUNCTIONS, ONLY: PACK_PARTICLE,PACK_WALL,PACK_THIN_WALL,PACK_CFACE
+REAL(EB), INTENT(IN) :: T,DT
+REAL(EB) :: STIME
+INTEGER :: NOM,N,IP,IW,ITW,ICF,RC,IC,LC
+INTEGER, INTENT(IN) :: NM
+TYPE(OMESH_TYPE), POINTER :: M2=>NULL()
+TYPE(DUCT_TYPE), POINTER :: DU=>NULL()
+TYPE(DUCTNODE_TYPE), POINTER :: DN=>NULL()
+TYPE(STORAGE_TYPE), POINTER :: OS
+
+OPEN(LU_CORE(NM),FILE=FN_CORE(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+
+CALL POINT_TO_MESH(NM)
+
+STIME = T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR
+
+WRITE(LU_CORE(NM)) U
+WRITE(LU_CORE(NM)) V
+WRITE(LU_CORE(NM)) W
+WRITE(LU_CORE(NM)) D
+WRITE(LU_CORE(NM)) H
+WRITE(LU_CORE(NM)) US
+WRITE(LU_CORE(NM)) VS
+WRITE(LU_CORE(NM)) WS
+WRITE(LU_CORE(NM)) DS
+WRITE(LU_CORE(NM)) HS
+IF (N_LP_ARRAY_INDICES>0 .OR. N_REACTIONS>0 .OR. ANY(SPECIES_MIXTURE%DEPOSITING)) WRITE(LU_CORE(NM)) D_SOURCE
+IF (N_LP_ARRAY_INDICES>0 .OR. N_REACTIONS>0 .OR. ANY(SPECIES_MIXTURE%DEPOSITING)) WRITE(LU_CORE(NM)) M_DOT_PPP
+WRITE(LU_CORE(NM)) RHO
+WRITE(LU_CORE(NM)) TMP
+WRITE(LU_CORE(NM)) Q
+WRITE(LU_CORE(NM)) QR
+WRITE(LU_CORE(NM)) CHI_R
+WRITE(LU_CORE(NM)) UII
+IF (RADIATION) WRITE(LU_CORE(NM)) UIID
+WRITE(LU_CORE(NM)) CELL
+WRITE(LU_CORE(NM)) EDGE
+WRITE(LU_CORE(NM)) UVW_SAVE
+WRITE(LU_CORE(NM)) U_GHOST
+WRITE(LU_CORE(NM)) V_GHOST
+WRITE(LU_CORE(NM)) W_GHOST
+WRITE(LU_CORE(NM)) ZZ
+WRITE(LU_CORE(NM)) DEL_RHO_D_DEL_Z
+
+DO N=1,N_INIT
+   IN => INITIALIZATION(N)
+   WRITE(LU_CORE(NM)) IN%ALREADY_INSERTED(NM)
+   WRITE(LU_CORE(NM)) IN%PARTICLE_INSERT_CLOCK(NM)
+ENDDO
+
+DO N=1,N_SURF
+   SF => SURFACE(N)
+   WRITE(LU_CORE(NM)) SF%PARTICLE_INSERT_CLOCK(NM)
+ENDDO
+
+DO N=1,N_OBST
+   OB => OBSTRUCTION(N)
+   WRITE(LU_CORE(NM)) OB%MASS
+   WRITE(LU_CORE(NM)) OB%HIDDEN
+ENDDO
+
+WRITE(LU_CORE(NM)) STIME,ICYC,BC_CLOCK,WALL_COUNTER,DT, &
+             PBAR,D_PBAR_DT,EDGE_COUNT,RAD_CALL_COUNTER,ANGLE_INC_COUNTER,T_LAST_DUMP_HRR,T_LAST_DUMP_MASS,&
+             RTE_SOURCE_CORRECTION_FACTOR,RAD_Q_SUM,KFST4_SUM,ENTHALPY_SUM(NM)
+WRITE(LU_CORE(NM)) DT_BNDF,DT_CPU,DT_CTRL,DT_DEVC,DT_FLUSH,DT_GEOM,DT_HRR,DT_ISOF,DT_MASS,DT_PART,DT_PL3D,DT_PROF,DT_RADF,&
+                   DT_SLCF,DT_SL3D,DT_SMOKE3D,DT_UVW
+WRITE(LU_CORE(NM)) Q_DOT_SUM(1:N_Q_DOT,NM),M_DOT_SUM(1:N_TRACKED_SPECIES,NM),MASS_DT(0:N_SPECIES+N_TRACKED_SPECIES,NM)
+DO N=1,N_DEVC
+   DV => DEVICE(N)
+   WRITE(LU_CORE(NM)) DV%T,DV%T_CHANGE,DV%TMP_L,DV%Y_C,DV%CURRENT_STATE,DV%PRIOR_STATE,&
+                      DV%LP_TAG,DV%PART_CLASS_INDEX,DV%RMS_VALUE,DV%RMS_VALUE2,DV%COV_VALUE,DV%AVERAGE_VALUE,&
+                      DV%AVERAGE_VALUE2,DV%VALUE,DV%SMOOTHED_VALUE,DV%TIME_INTERVAL
+   IF (DV%QUANTITY(1)=='CHAMBER OBSCURATION') THEN
+      WRITE(LU_CORE(NM)) UBOUND(DV%T_E,1)
+      WRITE(LU_CORE(NM)) DV%N_T_E,DV%T_E,DV%Y_E
+   ENDIF
+   IF (DV%QUANTITY(1)=='ASPIRATION') THEN
+      WRITE(LU_CORE(NM)) DV%YY_SOOT,DV%TIME_ARRAY
+   ENDIF
+   IF (ALLOCATED(DV%TIME_MIN_VALUE)) WRITE(LU_CORE(NM)) DV%TIME_MIN_VALUE(1:DV%N_INTERVALS)
+   IF (ALLOCATED(DV%TIME_MAX_VALUE)) WRITE(LU_CORE(NM)) DV%TIME_MAX_VALUE(1:DV%N_INTERVALS)
+ENDDO
+DO N=1,N_CTRL
+   WRITE(LU_CORE(NM)) CONTROL(N)%T_CHANGE,CONTROL(N)%INTEGRAL,CONTROL(N)%CURRENT_STATE,CONTROL(N)%PRIOR_STATE,&
+                      CONTROL(N)%PREVIOUS_VALUE
+ENDDO
+
+WRITE(LU_CORE(NM)) N_BOUNDARY_COORD_DIM,N_BOUNDARY_ONE_D_DIM,N_BOUNDARY_PROP1_DIM,N_BOUNDARY_PROP2_DIM,N_BOUNDARY_RADIA_DIM
+WRITE(LU_CORE(NM)) NEXT_AVAILABLE_BOUNDARY_COORD_SLOT,NEXT_AVAILABLE_BOUNDARY_ONE_D_SLOT,&
+                   NEXT_AVAILABLE_BOUNDARY_PROP1_SLOT,NEXT_AVAILABLE_BOUNDARY_PROP2_SLOT,NEXT_AVAILABLE_BOUNDARY_RADIA_SLOT
+
+WRITE(LU_CORE(NM)) N_WALL_CELLS,N_WALL_CELLS_DIM
+OS => WALL_STORAGE
+DO IW=1,N_WALL_CELLS
+   WC => WALL(IW)
+   RC=0 ; IC=0 ; LC=0
+   CALL PACK_WALL(NM,OS,WC,WC%SURF_INDEX,RC,IC,LC,UNPACK_IT=.FALSE.,COUNT_ONLY=.FALSE.)
+   WRITE(LU_CORE(NM)) WC%SURF_INDEX
+   WRITE(LU_CORE(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+ENDDO
+
+WRITE(LU_CORE(NM)) N_THIN_WALL_CELLS,N_THIN_WALL_CELLS_DIM
+OS => WALL_STORAGE
+DO ITW=1,N_THIN_WALL_CELLS
+   TW => THIN_WALL(ITW)
+   RC=0 ; IC=0 ; LC=0
+   CALL PACK_THIN_WALL(NM,OS,TW,TW%SURF_INDEX,RC,IC,UNPACK_IT=.FALSE.,COUNT_ONLY=.FALSE.)
+   WRITE(LU_CORE(NM)) TW%SURF_INDEX
+   WRITE(LU_CORE(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+ENDDO
+
+WRITE(LU_CORE(NM)) N_CFACE_CELLS_DIM
+OS => CFACE_STORAGE
+DO ICF=1,N_CFACE_CELLS_DIM
+   CFA => CFACE(ICF)
+   RC=0 ; IC=0 ; LC=0
+   CALL PACK_CFACE(NM,OS,CFA,CFA%SURF_INDEX,RC,IC,LC,UNPACK_IT=.FALSE.,COUNT_ONLY=.FALSE.)
+   WRITE(LU_CORE(NM)) CFA%SURF_INDEX
+   WRITE(LU_CORE(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+ENDDO
+
+WRITE(LU_CORE(NM)) NLP,NLPDIM,PARTICLE_TAG
+DO IP=1,NLP
+   LP => LAGRANGIAN_PARTICLE(IP)
+   LPC => LAGRANGIAN_PARTICLE_CLASS(LP%CLASS_INDEX)
+   OS => LPC%PARTICLE_STORAGE
+   RC=0 ; IC=0 ; LC=0
+   CALL PACK_PARTICLE(NM,OS,LP,LP%CLASS_INDEX,RC,IC,LC,UNPACK_IT=.FALSE.,COUNT_ONLY=.FALSE.)
+   WRITE(LU_CORE(NM)) LP%CLASS_INDEX
+   WRITE(LU_CORE(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+ENDDO
+
+OTHER_MESH_LOOP: DO NOM=1,NMESHES
+   M2=>MESHES(NM)%OMESH(NOM)
+   IF (M2%NIC_R==0) CYCLE OTHER_MESH_LOOP
+   WRITE(LU_CORE(NM)) M2%RHO,M2%RHOS,M2%U,M2%V,M2%W,M2%H
+   WRITE(LU_CORE(NM)) M2%ZZ,M2%ZZS
+ENDDO OTHER_MESH_LOOP
+
+IF (HVAC_SOLVE .AND. NM==1) THEN
+   DO N=1,N_DUCTS
+      DU=>DUCT(N)
+      WRITE(LU_CORE(NM)) DU%CP_D,DU%RHO_D,DU%TMP_D,DU%VEL,DU%RSUM_D,DU%ZZ,DU%DP_FAN,DU%FAN_ON_TIME,DU%COIL_ON_TIME
+      IF (HVAC_MASS_TRANSPORT .AND. DU%N_CELLS > 0) WRITE(LU_CORE(NM)) DU%RHO_C,DU%TMP_C,DU%ZZ_C,DU%CP_C
+   ENDDO
+   DO N=1,N_DUCTNODES
+      DN=>DUCTNODE(N)
+      WRITE(LU_CORE(NM)) DN%ZZ,DN%ZZ_V,DN%P,DN%P_OLD,DN%TMP,DN%RSUM,DN%CP
+      IF (DN%FILTER_INDEX>0) WRITE(LU_CORE(NM)) DN%FILTER_LOADING,DN%FILTER_LOSS
+   ENDDO
+ENDIF
+
+IF (LEVEL_SET_MODE>0) WRITE(LU_CORE(NM)) PHI_LS,TOA
+
+IF (N_BNDF>0) THEN
+   WRITE(LU_CORE(NM)) N_PATCH,N_BNDF_POINTS
+   WRITE(LU_CORE(NM)) PATCH
+ENDIF
+
+CLOSE(LU_CORE(NM))
+
+END SUBROUTINE DUMP_RESTART
+
+
+!> \brief Read data from previous calculation
+!> \param T Current time (s)
+!> \param DT Current time step size (s)
+!> \param NM Mesh number
+
+SUBROUTINE READ_RESTART(T,DT,NM)
+
+USE COMP_FUNCTIONS, ONLY: SHUTDOWN
+USE MEMORY_FUNCTIONS, ONLY: REALLOCATE,PACK_PARTICLE,PACK_WALL,PACK_THIN_WALL,PACK_CFACE,ALLOCATE_STORAGE
+REAL(EB), INTENT(OUT) :: T,DT
+REAL(EB) :: STIME
+INTEGER :: NOM,N,N_T_E_MAX,IP,CLASS_INDEX,IW,ITW,SURF_INDEX,ICF,RC,IC,LC
+INTEGER, INTENT(IN) :: NM
+LOGICAL :: EX
+CHARACTER(MESSAGE_LENGTH) :: MESSAGE
+TYPE(OMESH_TYPE), POINTER :: M2=>NULL()
+TYPE(DUCT_TYPE), POINTER :: DU=>NULL()
+TYPE(DUCTNODE_TYPE), POINTER :: DN=>NULL()
+TYPE(STORAGE_TYPE), POINTER :: OS
+
+INQUIRE(FILE=FN_RESTART(NM),EXIST=EX)
+IF (.NOT.EX) THEN
+   WRITE(MESSAGE,'(A,A,A)') "ERROR: The file, ",TRIM(FN_RESTART(NM)),", does not exist in the current directory"
+   CALL SHUTDOWN(MESSAGE,PROCESS_0_ONLY=.FALSE.) ; RETURN
+ENDIF
+
+OPEN(LU_RESTART(NM),FILE=FN_RESTART(NM),FORM='UNFORMATTED',STATUS='OLD')
+
+CALL POINT_TO_MESH(NM)
+
+READ(LU_RESTART(NM))  U
+READ(LU_RESTART(NM))  V
+READ(LU_RESTART(NM))  W
+READ(LU_RESTART(NM))  D
+READ(LU_RESTART(NM))  H
+READ(LU_RESTART(NM))  US
+READ(LU_RESTART(NM))  VS
+READ(LU_RESTART(NM))  WS
+READ(LU_RESTART(NM))  DS
+READ(LU_RESTART(NM))  HS
+IF (N_LP_ARRAY_INDICES>0 .OR. N_REACTIONS>0 .OR. ANY(SPECIES_MIXTURE%DEPOSITING)) READ(LU_RESTART(NM)) D_SOURCE
+IF (N_LP_ARRAY_INDICES>0 .OR. N_REACTIONS>0 .OR. ANY(SPECIES_MIXTURE%DEPOSITING)) READ(LU_RESTART(NM)) M_DOT_PPP
+READ(LU_RESTART(NM))  RHO
+READ(LU_RESTART(NM))  TMP
+READ(LU_RESTART(NM))  Q
+READ(LU_RESTART(NM))  QR
+READ(LU_RESTART(NM))  CHI_R
+READ(LU_RESTART(NM))  UII
+IF (RADIATION) READ(LU_RESTART(NM)) UIID
+READ(LU_RESTART(NM))  CELL
+READ(LU_RESTART(NM))  EDGE
+READ(LU_RESTART(NM))  UVW_SAVE
+READ(LU_RESTART(NM))  U_GHOST
+READ(LU_RESTART(NM))  V_GHOST
+READ(LU_RESTART(NM))  W_GHOST
+READ(LU_RESTART(NM))  ZZ
+READ(LU_RESTART(NM))  DEL_RHO_D_DEL_Z
+
+DO N=1,N_INIT
+   IN => INITIALIZATION(N)
+   READ(LU_RESTART(NM)) IN%ALREADY_INSERTED(NM)
+   READ(LU_RESTART(NM)) IN%PARTICLE_INSERT_CLOCK(NM)
+ENDDO
+
+DO N=1,N_SURF
+   SF => SURFACE(N)
+   READ(LU_RESTART(NM)) SF%PARTICLE_INSERT_CLOCK(NM)
+ENDDO
+
+DO N=1,N_OBST
+   OB => OBSTRUCTION(N)
+   READ(LU_RESTART(NM)) OB%MASS
+   READ(LU_RESTART(NM)) OB%HIDDEN
+ENDDO
+
+READ(LU_RESTART(NM)) STIME,ICYC,BC_CLOCK,WALL_COUNTER,DT, &
+                     PBAR,D_PBAR_DT,EDGE_COUNT,RAD_CALL_COUNTER,ANGLE_INC_COUNTER,T_LAST_DUMP_HRR,T_LAST_DUMP_MASS,&
+                     RTE_SOURCE_CORRECTION_FACTOR,RAD_Q_SUM,KFST4_SUM,ENTHALPY_SUM(NM)
+
+T = (STIME-T_BEGIN)/TIME_SHRINK_FACTOR+T_BEGIN
+
+READ(LU_RESTART(NM)) DT_BNDF,DT_CPU,DT_CTRL,DT_DEVC,DT_FLUSH,DT_GEOM,DT_HRR,DT_ISOF,DT_MASS,DT_PART,DT_PL3D,DT_PROF,DT_RADF,&
+                     DT_SLCF,DT_SL3D,DT_SMOKE3D,DT_UVW
+READ(LU_RESTART(NM)) Q_DOT_SUM(1:N_Q_DOT,NM),M_DOT_SUM(1:N_TRACKED_SPECIES,NM),MASS_DT(0:N_SPECIES+N_TRACKED_SPECIES,NM)
+DO N=1,N_DEVC
+   DV => DEVICE(N)
+   READ(LU_RESTART(NM)) DV%T,DV%T_CHANGE,DV%TMP_L,DV%Y_C,DV%CURRENT_STATE,DV%PRIOR_STATE,&
+                        DV%LP_TAG,DV%PART_CLASS_INDEX,DV%RMS_VALUE,DV%RMS_VALUE2,DV%COV_VALUE,DV%AVERAGE_VALUE,&
+                        DV%AVERAGE_VALUE2,DV%VALUE,DV%SMOOTHED_VALUE,DV%TIME_INTERVAL
+   IF (DV%QUANTITY(1)=='CHAMBER OBSCURATION') THEN
+      READ(LU_RESTART(NM)) N_T_E_MAX
+      DV%T_E => REALLOCATE(DV%T_E,0,N_T_E_MAX)
+      DV%Y_E => REALLOCATE(DV%Y_E,0,N_T_E_MAX)
+      READ(LU_RESTART(NM)) DV%N_T_E,DV%T_E,DV%Y_E
+   ENDIF
+   IF (DV%QUANTITY(1)=='ASPIRATION') THEN
+      READ(LU_RESTART(NM)) DV%YY_SOOT,DV%TIME_ARRAY
+   ENDIF
+   IF (ALLOCATED(DV%TIME_MIN_VALUE)) READ(LU_RESTART(NM)) DV%TIME_MIN_VALUE(1:DV%N_INTERVALS)
+   IF (ALLOCATED(DV%TIME_MAX_VALUE)) READ(LU_RESTART(NM)) DV%TIME_MAX_VALUE(1:DV%N_INTERVALS)
+ENDDO
+
+DO N=1,N_CTRL
+   READ(LU_RESTART(NM)) CONTROL(N)%T_CHANGE,CONTROL(N)%INTEGRAL,CONTROL(N)%CURRENT_STATE,CONTROL(N)%PRIOR_STATE, &
+                        CONTROL(N)%PREVIOUS_VALUE
+ENDDO
+
+READ(LU_RESTART(NM)) N_BOUNDARY_COORD_DIM,N_BOUNDARY_ONE_D_DIM,N_BOUNDARY_PROP1_DIM,N_BOUNDARY_PROP2_DIM,N_BOUNDARY_RADIA_DIM
+READ(LU_RESTART(NM)) NEXT_AVAILABLE_BOUNDARY_COORD_SLOT,NEXT_AVAILABLE_BOUNDARY_ONE_D_SLOT,&
+                     NEXT_AVAILABLE_BOUNDARY_PROP1_SLOT,NEXT_AVAILABLE_BOUNDARY_PROP2_SLOT,NEXT_AVAILABLE_BOUNDARY_RADIA_SLOT
+
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_COORD_OCCUPANCY)) DEALLOCATE(MESHES(NM)%BOUNDARY_COORD_OCCUPANCY)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_ONE_D_OCCUPANCY)) DEALLOCATE(MESHES(NM)%BOUNDARY_ONE_D_OCCUPANCY)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_PROP1_OCCUPANCY)) DEALLOCATE(MESHES(NM)%BOUNDARY_PROP1_OCCUPANCY)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_PROP2_OCCUPANCY)) DEALLOCATE(MESHES(NM)%BOUNDARY_PROP2_OCCUPANCY)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_RADIA_OCCUPANCY)) DEALLOCATE(MESHES(NM)%BOUNDARY_RADIA_OCCUPANCY)
+ALLOCATE(MESHES(NM)%BOUNDARY_COORD_OCCUPANCY(N_BOUNDARY_COORD_DIM)) ; MESHES(NM)%BOUNDARY_COORD_OCCUPANCY = 0
+ALLOCATE(MESHES(NM)%BOUNDARY_ONE_D_OCCUPANCY(N_BOUNDARY_ONE_D_DIM)) ; MESHES(NM)%BOUNDARY_ONE_D_OCCUPANCY = 0
+ALLOCATE(MESHES(NM)%BOUNDARY_PROP1_OCCUPANCY(N_BOUNDARY_PROP1_DIM)) ; MESHES(NM)%BOUNDARY_PROP1_OCCUPANCY = 0
+ALLOCATE(MESHES(NM)%BOUNDARY_PROP2_OCCUPANCY(N_BOUNDARY_PROP2_DIM)) ; MESHES(NM)%BOUNDARY_PROP2_OCCUPANCY = 0
+ALLOCATE(MESHES(NM)%BOUNDARY_RADIA_OCCUPANCY(N_BOUNDARY_RADIA_DIM)) ; MESHES(NM)%BOUNDARY_RADIA_OCCUPANCY = 0
+NEXT_AVAILABLE_BOUNDARY_COORD_SLOT = 1
+NEXT_AVAILABLE_BOUNDARY_ONE_D_SLOT = 1
+NEXT_AVAILABLE_BOUNDARY_PROP1_SLOT = 1
+NEXT_AVAILABLE_BOUNDARY_PROP2_SLOT = 1
+NEXT_AVAILABLE_BOUNDARY_RADIA_SLOT = 1
+
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_COORD)) DEALLOCATE(MESHES(NM)%BOUNDARY_COORD)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_ONE_D)) DEALLOCATE(MESHES(NM)%BOUNDARY_ONE_D)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_PROP1)) DEALLOCATE(MESHES(NM)%BOUNDARY_PROP1)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_PROP2)) DEALLOCATE(MESHES(NM)%BOUNDARY_PROP2)
+IF (ALLOCATED(MESHES(NM)%BOUNDARY_RADIA)) DEALLOCATE(MESHES(NM)%BOUNDARY_RADIA)
+ALLOCATE(MESHES(NM)%BOUNDARY_COORD(N_BOUNDARY_COORD_DIM))
+ALLOCATE(MESHES(NM)%BOUNDARY_ONE_D(N_BOUNDARY_ONE_D_DIM))
+ALLOCATE(MESHES(NM)%BOUNDARY_PROP1(N_BOUNDARY_PROP1_DIM))
+ALLOCATE(MESHES(NM)%BOUNDARY_PROP2(N_BOUNDARY_PROP2_DIM))
+ALLOCATE(MESHES(NM)%BOUNDARY_RADIA(N_BOUNDARY_RADIA_DIM))
+
+READ(LU_RESTART(NM)) N_WALL_CELLS,N_WALL_CELLS_DIM
+IF (ALLOCATED(MESHES(NM)%WALL)) DEALLOCATE(MESHES(NM)%WALL) ; ALLOCATE(MESHES(NM)%WALL(0:N_WALL_CELLS_DIM))
+OS => WALL_STORAGE
+DO IW=1,N_WALL_CELLS
+   READ(LU_RESTART(NM)) SURF_INDEX
+   READ(LU_RESTART(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+   RC=0 ; IC=0 ; LC=0
+   CALL ALLOCATE_STORAGE(NM,SURF_INDEX=SURF_INDEX,WALL_INDEX=IW)
+   WC => MESHES(NM)%WALL(IW)
+   CALL PACK_WALL(NM,OS,WC,SURF_INDEX,RC,IC,LC,UNPACK_IT=.TRUE.,COUNT_ONLY=.FALSE.)
+ENDDO
+
+READ(LU_RESTART(NM)) N_THIN_WALL_CELLS,N_THIN_WALL_CELLS_DIM
+IF (ALLOCATED(MESHES(NM)%THIN_WALL)) DEALLOCATE(MESHES(NM)%THIN_WALL) ; ALLOCATE(MESHES(NM)%THIN_WALL(1:N_THIN_WALL_CELLS_DIM))
+OS => WALL_STORAGE
+DO ITW=1,N_THIN_WALL_CELLS
+   READ(LU_RESTART(NM)) SURF_INDEX
+   READ(LU_RESTART(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+   RC=0 ; IC=0 ; LC=0
+   CALL ALLOCATE_STORAGE(NM,SURF_INDEX=SURF_INDEX,THIN_WALL_INDEX=ITW)
+   TW => MESHES(NM)%THIN_WALL(ITW)
+   CALL PACK_THIN_WALL(NM,OS,TW,SURF_INDEX,RC,IC,UNPACK_IT=.TRUE.,COUNT_ONLY=.FALSE.)
+ENDDO
+
+READ(LU_RESTART(NM)) N_CFACE_CELLS_DIM
+IF (ALLOCATED(MESHES(NM)%CFACE)) DEALLOCATE(MESHES(NM)%CFACE) ; ALLOCATE(MESHES(NM)%CFACE(N_CFACE_CELLS_DIM))
+OS => CFACE_STORAGE
+DO ICF=1,N_CFACE_CELLS_DIM
+   READ(LU_RESTART(NM)) SURF_INDEX
+   READ(LU_RESTART(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+   RC=0 ; IC=0 ; LC=0
+   CALL ALLOCATE_STORAGE(NM,SURF_INDEX=SURF_INDEX,CFACE_INDEX=ICF)
+   CFA => MESHES(NM)%CFACE(ICF)
+   CALL PACK_CFACE(NM,OS,CFA,SURF_INDEX,RC,IC,LC,UNPACK_IT=.TRUE.,COUNT_ONLY=.FALSE.)
+ENDDO
+
+READ(LU_RESTART(NM)) NLP,NLPDIM,PARTICLE_TAG
+IF (NLPDIM>0) THEN
+   IF (ALLOCATED(MESHES(NM)%LAGRANGIAN_PARTICLE)) DEALLOCATE(MESHES(NM)%LAGRANGIAN_PARTICLE)
+   ALLOCATE(MESHES(NM)%LAGRANGIAN_PARTICLE(NLPDIM))
+   DO IP=1,NLP
+      READ(LU_RESTART(NM)) CLASS_INDEX
+      LPC => LAGRANGIAN_PARTICLE_CLASS(CLASS_INDEX)
+      OS => LPC%PARTICLE_STORAGE
+      READ(LU_RESTART(NM)) OS%REALS,OS%INTEGERS,OS%LOGICALS
+      RC=0 ; IC=0 ; LC=0
+      CALL ALLOCATE_STORAGE(NM,LP_INDEX=IP,LPC_INDEX=CLASS_INDEX,SURF_INDEX=LPC%SURF_INDEX)
+      LP => MESHES(NM)%LAGRANGIAN_PARTICLE(IP)
+      CALL PACK_PARTICLE(NM,OS,LP,CLASS_INDEX,RC,IC,LC,UNPACK_IT=.TRUE.,COUNT_ONLY=.FALSE.)
+   ENDDO
+ENDIF
+
+OTHER_MESH_LOOP: DO NOM=1,NMESHES
+   M2=>MESHES(NM)%OMESH(NOM)
+   IF (M2%NIC_R==0) CYCLE OTHER_MESH_LOOP
+   READ(LU_RESTART(NM)) M2%RHO,M2%RHOS,M2%U,M2%V,M2%W,M2%H
+   READ(LU_RESTART(NM)) M2%ZZ,M2%ZZS
+ENDDO OTHER_MESH_LOOP
+
+IF (HVAC_SOLVE .AND. NM==1) THEN
+   DO N=1,N_DUCTS
+      DU=>DUCT(N)
+      READ(LU_RESTART(NM)) DU%CP_D,DU%RHO_D,DU%TMP_D,DU%VEL,DU%RSUM_D,DU%ZZ,DU%DP_FAN,DU%FAN_ON_TIME,DU%COIL_ON_TIME
+      IF (HVAC_MASS_TRANSPORT .AND. DU%N_CELLS > 0) READ(LU_RESTART(NM)) DU%RHO_C,DU%TMP_C,DU%ZZ_C,DU%CP_C
+   ENDDO
+   DO N=1,N_DUCTNODES
+      DN=>DUCTNODE(N)
+      READ(LU_RESTART(NM)) DN%ZZ,DN%ZZ_V,DN%P,DN%P_OLD,DN%TMP,DN%RSUM,DN%CP
+      IF (DN%FILTER_INDEX>0) READ(LU_RESTART(NM)) DN%FILTER_LOADING,DN%FILTER_LOSS
+   ENDDO
+ENDIF
+
+IF (LEVEL_SET_MODE>0) READ(LU_RESTART(NM)) PHI_LS,TOA
+
+IF (N_BNDF>0) THEN
+   READ(LU_RESTART(NM)) N_PATCH,N_BNDF_POINTS
+   ALLOCATE(MESHES(NM)%PATCH(N_PATCH)) ; PATCH=>MESHES(NM)%PATCH
+   READ(LU_RESTART(NM)) PATCH
+ENDIF
+
+CLOSE(LU_RESTART(NM))
+
+! Keep track of whether the output timing intervals are specified by the user or not
+
+IF (DT_BNDF_SPECIFIED   > 0._EB) DT_BNDF    = DT_BNDF_SPECIFIED
+IF (DT_CPU_SPECIFIED    > 0._EB) DT_CPU     = DT_CPU_SPECIFIED
+IF (DT_CTRL_SPECIFIED   > 0._EB) DT_CTRL    = DT_CTRL_SPECIFIED
+IF (DT_DEVC_SPECIFIED   > 0._EB) DT_DEVC    = DT_DEVC_SPECIFIED
+IF (DT_FLUSH_SPECIFIED  > 0._EB) DT_FLUSH   = DT_FLUSH_SPECIFIED
+IF (DT_GEOM_SPECIFIED   > 0._EB) DT_GEOM    = DT_GEOM_SPECIFIED
+IF (DT_HRR_SPECIFIED    > 0._EB) DT_HRR     = DT_HRR_SPECIFIED
+IF (DT_ISOF_SPECIFIED   > 0._EB) DT_ISOF    = DT_ISOF_SPECIFIED
+IF (DT_MASS_SPECIFIED   > 0._EB) DT_MASS    = DT_MASS_SPECIFIED
+IF (DT_PART_SPECIFIED   > 0._EB) DT_PART    = DT_PART_SPECIFIED
+IF (DT_PL3D_SPECIFIED   > 0._EB) DT_PL3D    = DT_PL3D_SPECIFIED
+IF (DT_PROF_SPECIFIED   > 0._EB) DT_PROF    = DT_PROF_SPECIFIED
+IF (DT_RADF_SPECIFIED   > 0._EB) DT_RADF    = DT_RADF_SPECIFIED
+IF (DT_SLCF_SPECIFIED   > 0._EB) DT_SLCF    = DT_SLCF_SPECIFIED
+IF (DT_SL3D_SPECIFIED   > 0._EB) DT_SL3D    = DT_SL3D_SPECIFIED
+IF (DT_SMOKE3D_SPECIFIED> 0._EB) DT_SMOKE3D = DT_SMOKE3D_SPECIFIED
+IF (DT_UVW_SPECIFIED    > 0._EB) DT_UVW     = DT_UVW_SPECIFIED
+IF (DT_TMP_SPECIFIED    > 0._EB) DT_TMP     = DT_TMP_SPECIFIED
+IF (DT_SPEC_SPECIFIED   > 0._EB) DT_SPEC    = DT_SPEC_SPECIFIED
+
+END SUBROUTINE READ_RESTART
+
+
+!> \brief Write time step diagnostics to the .out and .err files
+!>
+!> \param T Current simulation time (s)
+!> \param DT Current time step size (s)
+
+SUBROUTINE WRITE_DIAGNOSTICS(T,DT)
+
+USE COMP_FUNCTIONS, ONLY : CURRENT_TIME,GET_DATE,GET_DATE_ISO_8601
+REAL(EB), INTENT(IN) :: T,DT
+INTEGER :: NM,II,JJ,KK
+CHARACTER(110) :: SIMPLE_OUTPUT,SIMPLE_OUTPUT_ERR
+CHARACTER(LABEL_LENGTH) :: DATE
+REAL(EB) :: TNOW,CPUTIME,STIME,DTS
+
+TNOW = CURRENT_TIME()
+
+! Write runtime timing diagnostics to the _steps.csv file
+
+CALL GET_DATE_ISO_8601(DATE)
+CALL CPU_TIME(CPUTIME)
+IF (ABS(T)<=999.99999_EB) THEN
+   WRITE(LU_STEPS,'(I7,",",A,",",E10.3,",",F10.5,",",E12.5)') ICYC,TRIM(DATE),DT,T,CPUTIME - CPU_TIME_START
+ELSEIF (ABS(T)>999.99999_EB .AND. ABS(T)<=99999.999_EB) THEN
+   WRITE(LU_STEPS,'(I7,",",A,",",E10.3,",",F10.3,",",E12.5)') ICYC,TRIM(DATE),DT,T,CPUTIME - CPU_TIME_START
+ELSE
+   WRITE(LU_STEPS,'(I7,",",A,",",E10.3,",",F10.1,",",E12.5)') ICYC,TRIM(DATE),DT,T,CPUTIME - CPU_TIME_START
+ENDIF
+
+! Write abridged output to the .err file
+
+IF (ABS(TIME_SHRINK_FACTOR-1._EB) < TWO_EPSILON_EB) THEN
+
+   IF (ABS(T)<=0.0001) THEN
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.5,A)')  'Time Step:',ICYC,', Simulation Time:',T,' s'
+   ELSEIF (ABS(T)>0.0001 .AND. ABS(T) <=0.001) THEN
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.4,A)')  'Time Step:',ICYC,', Simulation Time:',T,' s'
+   ELSEIF (ABS(T)>0.001 .AND. ABS(T)<=0.01) THEN
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.3,A)')  'Time Step:',ICYC,', Simulation Time:',T,' s'
+   ELSE
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.2,A)')  'Time Step:',ICYC,', Simulation Time:',T,' s'
+   ENDIF
+ELSE
+
+   STIME = T_BEGIN + (T-T_BEGIN) * TIME_SHRINK_FACTOR
+   DTS = DT * TIME_SHRINK_FACTOR
+   IF (ABS(STIME)<=0.0001) THEN
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.5,A)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,' s'
+   ELSEIF (ABS(STIME)>0.0001 .AND. ABS(STIME) <=0.001) THEN
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.4,A)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,' s'
+   ELSEIF (ABS(STIME)>0.001 .AND. ABS(STIME)<=0.01) THEN
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.3,A)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,' s'
+   ELSE
+      WRITE(SIMPLE_OUTPUT_ERR,'(1X,A,I7,A,F10.2,A)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,' s'
+   ENDIF
+
+ENDIF
+
+WRITE(LU_ERR,'(A)') TRIM(SIMPLE_OUTPUT_ERR)
+
+
+
+! Header for .out file
+
+IF (ICYC==1) WRITE(LU_OUTPUT,100)
+
+! Write abridged output to the .out file
+
+IF (SUPPRESS_DIAGNOSTICS) THEN
+
+IF (ABS(TIME_SHRINK_FACTOR-1._EB) < TWO_EPSILON_EB) THEN
+
+      IF (ABS(T)<=0.0001) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.6,A,F8.5,A,I0)')  'Time Step:',ICYC,', Simulation Time:',T,' s, Step Size:',DT,&
+            ' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSEIF (ABS(T)>0.0001 .AND. ABS(T) <=0.001) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.5,A,F8.5,A,I0)')  'Time Step:',ICYC,', Simulation Time:',T,' s, Step Size:',DT,&
+            ' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSEIF (ABS(T)>0.001 .AND. ABS(T)<=0.01) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.4,A,F8.5,A,I0)')  'Time Step:',ICYC,', Simulation Time:',T,' s, Step Size:',DT,&
+            ' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSEIF (ABS(T)>0.01 .AND. ABS(T)<=0.1) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.3,A,F8.5,A,I0)')  'Time Step:',ICYC,', Simulation Time:',T,' s, Step Size:',DT,&
+            ' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSE
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.2,A,F8.5,A,I0)')  'Time Step:',ICYC,', Simulation Time:',T,' s, Step Size:',DT,&
+            ' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ENDIF
+
+   WRITE(LU_OUTPUT,'(A)') TRIM(SIMPLE_OUTPUT)
+
+   ELSE
+
+      IF (ABS(STIME)<=0.0001) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.6,A,F8.5,A,I0)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,&
+            ' s, Scaled Step Size:',DTS,' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSEIF (ABS(STIME)>0.0001 .AND. ABS(STIME) <=0.001) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.5,A,F8.5,A,I0)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,&
+            ' s, Scaled Step Size:',DTS,' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSEIF (ABS(STIME)>0.001 .AND. ABS(STIME)<=0.01) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.4,A,F8.5,A,I0)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,&
+            ' s, Scaled Step Size:',DTS,' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSEIF (ABS(STIME)>0.01 .AND. ABS(STIME)<=0.1) THEN
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.3,A,F8.5,A,I0)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,&
+            ' s, Scaled Step Size:',DTS,' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ELSE
+         WRITE(SIMPLE_OUTPUT,'(1X,A,I7,A,F10.2,A,F8.5,A,I0)')  'Time Step:',ICYC,', Scaled Simulation Time:',STIME,&
+            ' s, Scaled Step Size:',DTS,' s, Pressure Iterations: ',PRESSURE_ITERATIONS
+      ENDIF
+   ENDIF
+   RETURN
+ENDIF
+
+! Detailed diagnostics to the .out file
+
+CALL GET_DATE(DATE)
+WRITE(LU_OUTPUT,'(7X,A,I7,3X,A)') 'Time Step ',ICYC,TRIM(DATE)
+IF (ABS(TIME_SHRINK_FACTOR-1._EB) < TWO_EPSILON_EB) THEN
+   IF (ABS(T)<=0.0001) THEN
+      WRITE(LU_OUTPUT,150) DT,T
+   ELSEIF (ABS(T)>0.0001 .AND. ABS(T) <=0.001) THEN
+      WRITE(LU_OUTPUT,151) DT,T
+   ELSEIF (ABS(T)>0.001 .AND. ABS(T) <=0.01) THEN
+      WRITE(LU_OUTPUT,152) DT,T
+   ELSEIF (ABS(T)>0.01 .AND. ABS(T) <=0.1) THEN
+      WRITE(LU_OUTPUT,153) DT,T
+   ELSE
+      WRITE(LU_OUTPUT,253) DT,T
+   ENDIF
+ELSE
+   IF (ABS(STIME)<=0.0001) THEN
+      WRITE(LU_OUTPUT,350) DTS,STIME
+   ELSEIF (ABS(STIME)>0.0001 .AND. ABS(STIME) <=0.001) THEN
+      WRITE(LU_OUTPUT,351) DTS,STIME
+   ELSEIF (ABS(STIME)>0.001 .AND. ABS(STIME) <=0.01) THEN
+      WRITE(LU_OUTPUT,352) DT,STIME
+   ELSEIF (ABS(STIME)>0.01 .AND. ABS(STIME) <=0.1) THEN
+      WRITE(LU_OUTPUT,353) DTS,STIME
+   ELSE
+      WRITE(LU_OUTPUT,453) DTS,STIME
+   ENDIF
+ENDIF
+IF (ITERATE_PRESSURE) THEN
+   NM = MAXLOC(VELOCITY_ERROR_MAX,1)
+   II = VELOCITY_ERROR_MAX_LOC(1,NM)
+   JJ = VELOCITY_ERROR_MAX_LOC(2,NM)
+   KK = VELOCITY_ERROR_MAX_LOC(3,NM)
+   WRITE(LU_OUTPUT,'(7X,A,I0)') 'Pressure Iterations: ',PRESSURE_ITERATIONS
+   WRITE(LU_OUTPUT,'(7X,A,E9.2,A,4(I0,A))') 'Maximum Velocity Error: ',MAXVAL(VELOCITY_ERROR_MAX), &
+                                            ' on Mesh ',NM,' at (',II,',',JJ,',',KK,')'
+   NM = MAXLOC(PRESSURE_ERROR_MAX,1)
+   II = PRESSURE_ERROR_MAX_LOC(1,NM)
+   JJ = PRESSURE_ERROR_MAX_LOC(2,NM)
+   KK = PRESSURE_ERROR_MAX_LOC(3,NM)
+   WRITE(LU_OUTPUT,'(7X,A,E9.2,A,4(I0,A))') 'Maximum Pressure Error: ',MAXVAL(PRESSURE_ERROR_MAX), &
+                                            ' on Mesh ',NM,' at (',II,',',JJ,',',KK,')'
+ENDIF
+
+WRITE(LU_OUTPUT,'(7X,A)') '---------------------------------------------------------------'
+
+DO NM=1,NMESHES
+   IF (NMESHES>1) WRITE(LU_OUTPUT,'(6X,A,I4)') ' Mesh ',NM
+   M => MESHES(NM)
+   WRITE(LU_OUTPUT,154) M%CFL,M%ICFL,M%JCFL,M%KCFL, M%DIVMX,M%IMX,M%JMX,M%KMX, M%DIVMN,M%IMN,M%JMN,M%KMN
+   IF (ABS(M%RESMAX)>1.E-8_EB)  WRITE(LU_OUTPUT,133) M%RESMAX,M%IRM,M%JRM,M%KRM
+   IF (ABS(M%POIS_PTB)>1.E-10_EB)  WRITE(LU_OUTPUT,'(A,E9.2)') '       Poisson Pert. : ',M%POIS_PTB
+   IF (CHECK_POISSON) WRITE(LU_OUTPUT,'(A,E9.2)') '       Poisson Error : ',M%POIS_ERR
+   IF (SIM_MODE==DNS_MODE .OR. CHECK_VN) WRITE(LU_OUTPUT,230) M%VN,M%I_VN,M%J_VN,M%K_VN
+   IF (M%NLP>0) WRITE(LU_OUTPUT,141) M%NLP
+   IF (ABS(Q_DOT(1,NM))>1._EB) WRITE(LU_OUTPUT,119) Q_DOT(1,NM)/1000._EB
+   IF (ABS(Q_DOT(2,NM))>1._EB) WRITE(LU_OUTPUT,120) Q_DOT(2,NM)/1000._EB
+   IF (M%DT_RESTRICT_STORE>0 ) THEN
+      WRITE(LU_OUTPUT,121) M%DT_RESTRICT_STORE
+      M%DT_RESTRICT_STORE=0
+   ENDIF
+
+ENDDO
+
+WRITE(LU_OUTPUT,*)
+
+100 FORMAT(/' Run Time Diagnostics'/)
+150 FORMAT(6X,' Step Size: ',E12.3,' s, Total Time: ',F10.6,' s')
+151 FORMAT(6X,' Step Size: ',E12.3,' s, Total Time: ',F10.5,' s')
+152 FORMAT(6X,' Step Size: ',E12.3,' s, Total Time: ',F10.4,' s')
+153 FORMAT(6X,' Step Size: ',E12.3,' s, Total Time: ',F10.3,' s')
+253 FORMAT(6X,' Step Size: ',E12.3,' s, Total Time: ',F10.2,' s')
+350 FORMAT(6X,' Scaled Step Size: ',E12.3,' s, Scaled Total Time: ',F10.6,' s')
+351 FORMAT(6X,' Scaled Step Size: ',E12.3,' s, Scaled Total Time: ',F10.5,' s')
+352 FORMAT(6X,' Scaled Step Size: ',E12.3,' s, Scaled Total Time: ',F10.4,' s')
+353 FORMAT(6X,' Scaled Step Size: ',E12.3,' s, Scaled Total Time: ',F10.3,' s')
+453 FORMAT(6X,' Scaled Step Size: ',E12.3,' s, Scaled Total Time: ',F10.2,' s')
+154 FORMAT(6X,' Max CFL number: ',E9.2,' at (',I0,',',I0,',',I0,')'/ &
+           6X,' Max divergence: ',E9.2,' at (',I0,',',I0,',',I0,')'/ &
+           6X,' Min divergence: ',E9.2,' at (',I0,',',I0,',',I0,')')
+133 FORMAT(6X,' Max div. error: ',E9.2,' at (',I0,',',I0,',',I0,')')
+230 FORMAT(6X,' Max VN number:  ',E9.2,' at (',I0,',',I0,',',I0,')')
+119 FORMAT(6X,' Total Heat Release Rate:      ',F13.3,' kW')
+120 FORMAT(6X,' Radiation Loss to Boundaries: ',F13.3,' kW')
+141 FORMAT(6X,' No. of Lagrangian Particles:  ',I0)
+121 FORMAT(6X,' No. of CLIP DT restrictions:  ',I0)
+
+T_USED(7) = T_USED(7) + CURRENT_TIME() - TNOW
+END SUBROUTINE WRITE_DIAGNOSTICS
+
+
+!> \brief Dump UVW file
+!> \param NM Mesh number
+!> \param FN_UVW File name
+
+SUBROUTINE DUMP_UVW(NM,FN_UVW)
+
+USE COMP_FUNCTIONS, ONLY: GET_FILE_NUMBER
+INTEGER  :: I,J,K,LU_UVW,IMIN,JMIN,KMIN,IMAX,JMAX,KMAX
+INTEGER, INTENT(IN) :: NM
+CHARACTER(80), INTENT(IN) :: FN_UVW
+CHARACTER(3) :: S1,S2,S3,S4,S5,S6
+
+CALL POINT_TO_MESH(NM)
+
+SELECT CASE (PERIODIC_TEST)
+   CASE(2,9)
+      IMIN=1
+      JMIN=1
+      KMIN=1
+   CASE DEFAULT
+      IMIN=0
+      JMIN=0
+      KMIN=0
+END SELECT
+IMAX = IBAR
+JMAX = JBAR
+KMAX = KBAR
+
+LU_UVW = GET_FILE_NUMBER()
+OPEN(UNIT=LU_UVW,FILE=TRIM(FN_UVW),FORM='FORMATTED',STATUS='UNKNOWN')
+
+WRITE(S1,'(I0)') IMIN
+WRITE(S2,'(I0)') IMAX
+WRITE(S3,'(I0)') JMIN
+WRITE(S4,'(I0)') JMAX
+WRITE(S5,'(I0)') KMIN
+WRITE(S6,'(I0)') KMAX
+
+WRITE(LU_UVW,'(A)') TRIM(S1)//','//TRIM(S2)//','//TRIM(S3)//','//TRIM(S4)//','//TRIM(S5)//','//TRIM(S6)
+
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX
+         WRITE(LU_UVW,'(G0,A,G0,A,G0)') U(I,J,K),',',V(I,J,K),',',W(I,J,K)
+      ENDDO
+   ENDDO
+ENDDO
+
+CLOSE(LU_UVW)
+
+END SUBROUTINE DUMP_UVW
+
+
+!> \brief Dump TMP file
+!> \param NM Mesh number
+!> \param FN_TMP File name
+
+SUBROUTINE DUMP_TMP(NM,FN_TMP)
+
+USE COMP_FUNCTIONS, ONLY: GET_FILE_NUMBER
+INTEGER  :: I,J,K,LU_TMP,IMIN,JMIN,KMIN,IMAX,JMAX,KMAX
+INTEGER, INTENT(IN) :: NM
+CHARACTER(80), INTENT(IN) :: FN_TMP
+CHARACTER(3) :: S1,S2,S3,S4,S5,S6
+
+CALL POINT_TO_MESH(NM)
+
+IMIN=1
+JMIN=1
+KMIN=1
+IMAX = IBAR
+JMAX = JBAR
+KMAX = KBAR
+
+LU_TMP = GET_FILE_NUMBER()
+OPEN(UNIT=LU_TMP,FILE=TRIM(FN_TMP),FORM='FORMATTED',STATUS='UNKNOWN')
+
+WRITE(S1,'(I0)') IMIN
+WRITE(S2,'(I0)') IMAX
+WRITE(S3,'(I0)') JMIN
+WRITE(S4,'(I0)') JMAX
+WRITE(S5,'(I0)') KMIN
+WRITE(S6,'(I0)') KMAX
+
+WRITE(LU_TMP,'(A)') TRIM(S1)//','//TRIM(S2)//','//TRIM(S3)//','//TRIM(S4)//','//TRIM(S5)//','//TRIM(S6)
+
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX
+         WRITE(LU_TMP,'(G0)') TMP(I,J,K)
+      ENDDO
+   ENDDO
+ENDDO
+
+CLOSE(LU_TMP)
+
+END SUBROUTINE DUMP_TMP
+
+! \brief Dump boundary quantities into CHID_nn.bf file
+!> \param T Current simulation time (s)
+!> \param DT Current time step size (s)
+!> \param NM Mesh number
+
+SUBROUTINE DUMP_BNDF(T,DT,NM)
+
+REAL(EB), INTENT(IN) :: T,DT
+REAL(FB) :: STIME, BOUND_MIN, BOUND_MAX, BF_FACTOR
+INTEGER :: ISUM,NF,IND,I,J,K,IC,IW,L,L1,L2,N,N1,N2,IP,NC,I1,I2,J1,J2,K1,K2
+INTEGER :: NBF_DEBUG
+INTEGER, INTENT(IN) :: NM
+TYPE(PATCH_TYPE), POINTER :: PA
+
+IF (MESHES(NM)%N_PATCH==0 .AND. MESHES(NM)%N_INTERNAL_CFACE_CELLS==0) RETURN
+
+FROM_BNDF = .TRUE.
+
+STIME = REAL(T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+
+CALL POINT_TO_MESH(NM)
+
+FILE_LOOP: DO NF=1,N_BNDF
+   IF (N_PATCH == 0) CYCLE FILE_LOOP
+   BF => BOUNDARY_FILE(NF)
+   PY => PROPERTY(BF%PROP_INDEX)
+   BOUND_MAX = -1.0E+33_FB
+   BOUND_MIN = -BOUND_MAX
+   WRITE(LU_BNDF(NF,NM)) STIME
+   IND  = ABS(BF%INDEX)
+   NC = 0
+
+   PATCH_LOOP: DO IP=1,N_PATCH
+
+      PA => PATCH(IP)
+
+      PP  = REAL(OUTPUT_QUANTITY(-IND)%AMBIENT_VALUE,FB)
+      PPN = 0._FB
+      IBK = 0
+
+      ! Adjust PATCH indices depending on orientation
+
+      SELECT CASE(ABS(PA%IOR))
+         CASE(1) ; L1=PA%JG1 ; L2=PA%JG2 ; N1=PA%KG1 ; N2=PA%KG2
+         CASE(2) ; L1=PA%IG1 ; L2=PA%IG2 ; N1=PA%KG1 ; N2=PA%KG2
+         CASE(3) ; L1=PA%IG1 ; L2=PA%IG2 ; N1=PA%JG1 ; N2=PA%JG2
+      END SELECT
+
+      ! Evaluate the given boundary quantity at each cell of the current PATCH
+
+      DO K=PA%KG1,PA%KG2
+         DO J=PA%JG1,PA%JG2
+            DO I=PA%IG1,PA%IG2
+               IC = CELL_INDEX(I,J,K)
+               IW = CELL(IC)%WALL_INDEX(-PA%IOR) ; IF (IW==0) CYCLE
+               SELECT CASE(ABS(PA%IOR))
+                  CASE(1) ; L=J ; N=K
+                  CASE(2) ; L=I ; N=K
+                  CASE(3) ; L=I ; N=J
+               END SELECT
+               IF (WALL(IW)%BOUNDARY_TYPE/=NULL_BOUNDARY .AND. &
+                   WALL(IW)%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY .AND. .NOT.CELL(IC)%SOLID) THEN
+                  IBK(L,N) = 1
+                  PP(L,N)  = REAL(SOLID_PHASE_OUTPUT(NM,IND,BF%Y_INDEX,BF%Z_INDEX,BF%PART_INDEX,OPT_WALL_INDEX=IW,&
+                                                     OPT_BNDF_INDEX=NF),FB)
+               ENDIF
+            ENDDO
+         ENDDO
+      ENDDO
+
+      ! Integrate the boundary quantity in time
+
+      IF (BNDF_COUNTER(NM)>0 .AND. BF%TIME_INTEGRAL_INDEX>0) THEN
+         DO N=N1,N2
+            DO L=L1,L2
+               NC = NC + 1
+               BNDF_TIME_INTEGRAL(NC,BF%TIME_INTEGRAL_INDEX) = BNDF_TIME_INTEGRAL(NC,BF%TIME_INTEGRAL_INDEX) + &
+                  PP(L,N)*REAL(BNDF_CLOCK(BNDF_COUNTER(NM))-BNDF_CLOCK(BNDF_COUNTER(NM)-1),FB)
+               PP(L,N) = BNDF_TIME_INTEGRAL(NC,BF%TIME_INTEGRAL_INDEX)
+            ENDDO
+         ENDDO
+      ENDIF
+
+      ! Interpolate the boundary quantity PP at cell corners, PPN
+
+      IF (.NOT.BF%CELL_CENTERED) THEN
+         DO N=N1-1,N2
+            DO L=L1-1,L2
+               IF (IBK(L,N)==1)     PPN(L,N) = PPN(L,N) + PP(L,N)
+               IF (IBK(L+1,N)==1)   PPN(L,N) = PPN(L,N) + PP(L+1,N)
+               IF (IBK(L,N+1)==1)   PPN(L,N) = PPN(L,N) + PP(L,N+1)
+               IF (IBK(L+1,N+1)==1) PPN(L,N) = PPN(L,N) + PP(L+1,N+1)
+               ISUM = IBK(L,N)+IBK(L,N+1)+IBK(L+1,N)+IBK(L+1,N+1)
+               IF (ISUM>0) THEN
+                  PPN(L,N) = PPN(L,N)/REAL(ISUM,FB)
+               ELSE
+                  PPN(L,N) = REAL(SOLID_PHASE_OUTPUT(NM,IND,BF%Y_INDEX,BF%Z_INDEX,BF%PART_INDEX,OPT_WALL_INDEX=0,&
+                                                     OPT_BNDF_INDEX=NF),FB)
+               ENDIF
+            ENDDO
+         ENDDO
+         IF (BF%DEBUG .EQ. 0) THEN
+            WRITE(LU_BNDF(NF,NM)) ((PPN(L,N),L=L1-1,L2),N=N1-1,N2)
+            DO L = L1-1, L2
+            DO N = N1-1, N2
+               BOUND_MIN = MIN(PPN(L,N),BOUND_MIN)
+               BOUND_MAX = MAX(PPN(L,N),BOUND_MAX)
+            ENDDO
+            ENDDO
+         ELSE
+            NBF_DEBUG = (2+L2-L1)*(2+N2-N1)
+            BF_FACTOR = 0.0_FB
+            IF ( NBF_DEBUG .GT. 1) BF_FACTOR = 2.0_FB*STIME/REAL(NBF_DEBUG-1,FB)
+            WRITE(LU_BNDF(NF,NM)) (REAL(-STIME+L*BF_FACTOR,FB),L=0,NBF_DEBUG-1)
+            BOUND_MIN = -STIME
+            BOUND_MAX =  STIME
+         ENDIF
+
+      ELSE
+         IF (BF%DEBUG .EQ. 0) THEN
+            WRITE(LU_BNDF(NF,NM)) ((PP(L,N),L=L1,L2+1),N=N1,N2+1)
+            DO L = L1, L2+1
+            DO N = N1, N2+1
+               BOUND_MIN = MIN(PP(L,N),BOUND_MIN)
+               BOUND_MAX = MAX(PP(L,N),BOUND_MAX)
+            ENDDO
+            ENDDO
+         ELSE
+            NBF_DEBUG = (2+L2-L1)*(2+N2-N1)
+            BF_FACTOR = 0.0_FB
+            IF ( NBF_DEBUG .GT. 1 ) BF_FACTOR = 2.0_FB*STIME/REAL(NBF_DEBUG-1,FB)
+            WRITE(LU_BNDF(NF,NM)) (REAL(-STIME+L*BF_FACTOR,FB),L=0,NBF_DEBUG-1)
+            BOUND_MIN = -STIME
+            BOUND_MAX =  STIME
+         ENDIF
+      ENDIF
+
+   ENDDO PATCH_LOOP
+   WRITE(LU_BNDF(NF+N_BNDF,NM),'(ES13.6,1X,ES13.6,1X,ES13.6)')STIME,BOUND_MIN,BOUND_MAX
+
+ENDDO FILE_LOOP
+
+IF (CC_IBM) THEN
+   FILE_LOOP2 : DO NF=1,N_BNDF
+      BF => BOUNDARY_FILE(NF)
+      PY => PROPERTY(BF%PROP_INDEX)
+      IND  = ABS(BF%INDEX)
+      NC = 0
+      I1=0; I2=-1; J1=0; J2=-1; K1=0; K2=-1; ! Just dummy numbers, not needed for INBOUND_FACES
+      ! write geometry for slice file
+      IF (REAL(T-T_BEGIN,FB)<TWO_EPSILON_FB) THEN
+         OPEN(LU_BNDG(NF,NM),       FILE=FN_BNDG(NF,NM),       FORM='UNFORMATTED',STATUS='REPLACE')
+         OPEN(LU_BNDG(NF+N_BNDF,NM),FILE=FN_BNDG(NF+N_BNDF,NM),FORM='FORMATTED',  STATUS='REPLACE')
+         CALL DUMP_SLICE_GEOM_DATA(LU_BNDG(NF,NM),LU_BNDG(NF+N_BNDF,NM), &
+                        .FALSE.,.TRUE.,"INBOUND_FACES",1,STIME,I1,I2,J1,J2,K1,K2,BF%DEBUG, &
+                        IND,0,BF%Y_INDEX,BF%Z_INDEX,BF%PART_INDEX,0,0,BF%PROP_INDEX,0,0,T,DT,NM)
+                                   !IND,BF%Y_INDEX,BF%Z_INDEX,BF%PART_INDEX,T,DT,NM)
+      ELSE
+         ! data file at subsequent time steps
+         OPEN(LU_BNDG(NF,NM),       FILE=FN_BNDG(NF,NM),       FORM='UNFORMATTED',STATUS='OLD',POSITION='APPEND')
+         OPEN(LU_BNDG(NF+N_BNDF,NM),FILE=FN_BNDG(NF+N_BNDF,NM),FORM='FORMATTED',  STATUS='OLD',POSITION='APPEND')
+         CALL DUMP_SLICE_GEOM_DATA(LU_BNDG(NF,NM),LU_BNDG(NF+N_BNDF,NM), &
+                         .FALSE.,.TRUE.,"INBOUND_FACES",0,STIME,I1,I2,J1,J2,K1,K2,BF%DEBUG, &
+                         IND,0,BF%Y_INDEX,BF%Z_INDEX,BF%PART_INDEX,0,0,BF%PROP_INDEX,0,0,T,DT,NM)
+                                   !IND,BF%Y_INDEX,BF%Z_INDEX,BF%PART_INDEX,T,DT,NM)
+      ENDIF
+      CLOSE(LU_BNDG(NF,NM))
+      CLOSE(LU_BNDG(NF+N_BNDF,NM))
+   ENDDO FILE_LOOP2
+ENDIF
+
+FROM_BNDF = .FALSE.
+
+END SUBROUTINE DUMP_BNDF
+
+!> \brief Write out the total mass of gas species to the CHID_mass.csv file
+!> \param T Current simulation time (s)
+!> \param DT Current time step size (s)
+
+SUBROUTINE DUMP_MASS(T,DT)
+
+REAL(EB), INTENT(IN) :: T,DT
+REAL(FB) :: STIME
+REAL(EB) :: MASS_TOTAL(0:N_SPECIES+N_TRACKED_SPECIES)
+INTEGER :: NM,N,N_TOTAL_SPECIES
+
+IF (.NOT.MASS_FILE) RETURN
+
+STIME = REAL(T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+MASS_TOTAL(:) = 0._EB
+
+N_TOTAL_SPECIES=N_SPECIES+N_TRACKED_SPECIES
+DO NM=1,NMESHES
+   MASS_TOTAL(0:N_TOTAL_SPECIES) = MASS_TOTAL(0:N_TOTAL_SPECIES) + MASS_DT(0:N_TOTAL_SPECIES,NM)/MAX(DT,T-T_LAST_DUMP_MASS)
+ENDDO
+
+WRITE(TCFORM,'(A,I0,5A)') "(",N_TOTAL_SPECIES+1,"(",FMT_R,",','),",FMT_R,")"
+WRITE(LU_MASS,TCFORM) STIME,(MASS_TOTAL(N),N=0,N_TOTAL_SPECIES)
+
+END SUBROUTINE DUMP_MASS
+
+!> \brief Record HVAC quanties in the file CHID.hvac
+!> \param T Current simulation time (s)
+
+SUBROUTINE DUMP_HVAC(T)
+
+USE HVAC_ROUTINES, ONLY: N_DUCT_QUANTITY,N_NODE_QUANTITY, DUCT_QUANTITY_ARRAY,NODE_QUANTITY_ARRAY
+INTEGER :: N,NN,NNN,NODE_INDEX(2)
+REAL(EB), INTENT(IN) :: T
+REAL(FB) :: STIME, OUTVAL_D(N_DUCT_QUANTITY), OUTVAL_N(N_NODE_QUANTITY)
+TYPE(HVAC_QUANTITY_TYPE), POINTER :: HQT=>NULL()
+
+! N_NODES_OUT N_NODE_VARS N_DUCTS_OUT N_DUCTS_VARS
+
+! STIME
+! NODEVAL1 NODEVAL2 ... NODEVALN
+! ...  N_NODE_OUT rows, N=N_NODE_VARS columns
+! ...
+! DUCTVAL1 DUCTVAL2 ... DUCTVALM
+! ...  N_DUCT_OUT * N_CELLS rows, M=N_DUCT_VARS columns
+! ...
+
+STIME = REAL(T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+WRITE(LU_HVAC) STIME
+
+DEBUG_IF: IF (HVAC_DEBUG) THEN
+   NODE_INDEX=-1
+      DO N=1,N_DUCTNODES
+         IF (DUCTNODE(N)%LEAKAGE) CYCLE
+         NODE_INDEX(1)=N
+         DO NN = 1, N_NODE_QUANTITY
+            OUTVAL_N(NN) = 100.0_FB*REAL(N,FB) + 10.0_FB*REAL(NN,FB) ! 100*NODE + 10*QUANTITY
+         ENDDO
+         WRITE(LU_HVAC) OUTVAL_N
+      ENDDO
+
+   NODE_INDEX=-1
+   DO N=1,N_DUCTS
+      IF (DUCT(N)%LEAKAGE) CYCLE
+      IF (DUCT(N)%N_CELLS > 0) THEN
+         DO NNN=1,DUCT(N)%N_CELLS
+            DO NN = 1, N_DUCT_QUANTITY
+               OUTVAL_D(NN) = 100.0_FB*REAL(N,FB) + 10.0_FB*REAL(NNN) + REAL(NN,FB) ! 100*DUCT + 10*CELL + QUANTITY
+            ENDDO
+            WRITE(LU_HVAC) OUTVAL_D
+         ENDDO
+      ELSE
+         DO NN = 1, N_DUCT_QUANTITY
+            OUTVAL_D(NN) = 100.0_FB*REAL(N,FB) + REAL(NN,FB) ! 100*DUCT + QUANTITY
+         ENDDO
+         WRITE(LU_HVAC) OUTVAL_D
+      ENDIF
+   ENDDO
+
+ELSE DEBUG_IF
+   NODE_INDEX=-1
+      DO N=1,N_DUCTNODES
+         IF (DUCTNODE(N)%LEAKAGE) CYCLE
+         NODE_INDEX(1)=N
+         DO NN = 1, N_NODE_QUANTITY
+            HQT=>NODE_QUANTITY_ARRAY(NN)
+            OUTVAL_N(NN) = REAL(HVAC_OUTPUT(HQT%OUTPUT_INDEX,HQT%Y_INDEX,HQT%Z_INDEX,-1,NODE_INDEX,-1),FB)
+         ENDDO
+         WRITE(LU_HVAC) OUTVAL_N
+      ENDDO
+
+   NODE_INDEX=-1
+   DO N=1,N_DUCTS
+      IF (DUCT(N)%LEAKAGE) CYCLE
+      IF (DUCT(N)%N_CELLS > 0) THEN
+         DO NNN=1,DUCT(N)%N_CELLS
+            DO NN = 1, N_DUCT_QUANTITY
+               HQT=>DUCT_QUANTITY_ARRAY(NN)
+               OUTVAL_D(NN) = REAL(HVAC_OUTPUT(HVAC_SMV_EQUIVALENCE(HQT%OUTPUT_INDEX),HQT%Y_INDEX,HQT%Z_INDEX,N,NODE_INDEX,NNN),FB)
+            ENDDO
+            WRITE(LU_HVAC) OUTVAL_D
+         ENDDO
+      ELSE
+         DO NN = 1, N_DUCT_QUANTITY
+            HQT=>DUCT_QUANTITY_ARRAY(NN)
+            OUTVAL_D(NN) = REAL(HVAC_OUTPUT(HQT%OUTPUT_INDEX,HQT%Y_INDEX,HQT%Z_INDEX,N,NODE_INDEX,-1),FB)
+         ENDDO
+         WRITE(LU_HVAC) OUTVAL_D
+      ENDIF
+   ENDDO
+ENDIF DEBUG_IF
+
+END SUBROUTINE DUMP_HVAC
+
+!> \brief Write out to CHID_prof_nn.csv the PROFile data
+!> \param T Current simulation time (s)
+!> \param NM Mesh number
+
+SUBROUTINE DUMP_PROF(T,NM)
+
+USE GEOMETRY_FUNCTIONS, ONLY: GET_WALL_NODE_WEIGHTS
+USE MEMORY_FUNCTIONS, ONLY: GET_LAGRANGIAN_PARTICLE_INDEX
+REAL(EB), INTENT(IN) :: T
+REAL(FB) :: STIME
+INTEGER, INTENT(IN)  :: NM
+INTEGER :: I,N,NN,IW,SURF_INDEX,NWP,LP_INDEX
+REAL(EB) :: DXF,DXB,THICKNESS
+TYPE (PROFILE_TYPE), POINTER :: PF
+TYPE(BOUNDARY_ONE_D_TYPE), POINTER :: ONE_D
+
+PROF_LOOP: DO N=1,N_PROF
+
+   PF => PROFILE(N)
+   IF (NM/=PF%MESH) CYCLE PROF_LOOP
+
+   IF (PF%WALL_INDEX>0) THEN
+      IW  =  PF%WALL_INDEX
+      WC  => MESHES(NM)%WALL(IW)
+      IF (WC%BOUNDARY_TYPE==NULL_BOUNDARY) CYCLE PROF_LOOP
+      ONE_D => MESHES(NM)%BOUNDARY_ONE_D(WC%OD_INDEX)
+      SURF_INDEX = WC%SURF_INDEX
+   ELSEIF (PF%LP_TAG>0) THEN
+      CALL GET_LAGRANGIAN_PARTICLE_INDEX(NM,PF%LP_TAG,LP_INDEX)
+      IF (LP_INDEX==0) CYCLE PROF_LOOP
+      LP => MESHES(NM)%LAGRANGIAN_PARTICLE(LP_INDEX)
+      ONE_D => MESHES(NM)%BOUNDARY_ONE_D(LP%OD_INDEX)
+      SURF_INDEX = LAGRANGIAN_PARTICLE_CLASS(LP_INDEX)%SURF_INDEX
+   ELSE
+      CYCLE PROF_LOOP
+   ENDIF
+
+   SF  => SURFACE(SURF_INDEX)
+   IF (SF%PYROLYSIS_MODEL==PYROLYSIS_PREDICTED .OR. SF%HT_DIM>1) THEN
+      NWP = SUM(ONE_D%N_LAYER_CELLS)
+      IF (NWP==0) CYCLE PROF_LOOP
+      X_S_NEW(0:NWP) = ONE_D%X(0:NWP)
+      THICKNESS = SUM(ONE_D%LAYER_THICKNESS)
+      CALL GET_WALL_NODE_WEIGHTS(NWP,SF%N_LAYERS,ONE_D%N_LAYER_CELLS,ONE_D%LAYER_THICKNESS,SF%GEOMETRY, &
+         ONE_D%X(0:NWP),SF%LAYER_DIVIDE,DX_S(1:NWP),RDX_S(0:NWP+1),RDXN_S(0:NWP),DX_WGT_S(0:NWP),DXF,DXB,LAYER_INDEX,MF_FRAC,&
+         SF%INNER_RADIUS)
+   ELSE
+      NWP = SF%N_CELLS_INI
+      IF (NWP==0) CYCLE PROF_LOOP
+      X_S_NEW(0:NWP) = SF%X_S(0:NWP)
+      DX_WGT_S(0:NWP) = SF%DX_WGT(0:NWP)
+   ENDIF
+
+   STIME = REAL(T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+   IF (PF%QUANTITY == 'TEMPERATURE') THEN
+      IF (PF%FORMAT_INDEX==1) THEN
+         IF (PF%CELL_CENTERED) THEN
+            WRITE(TCFORM,'(3A,I5,5A)') "(",FMT_R,",',',I5,',',",2*NWP-1,"(",FMT_R,",','),",FMT_R,")"
+            WRITE(LU_PROF(N),TCFORM) STIME,NWP,(0.5_EB*(X_S_NEW(I)+X_S_NEW(I-1)),I=1,NWP),(ONE_D%TMP(I)-TMPM,I=1,NWP)
+         ELSE
+            WRITE(TCFORM,'(3A,I5,5A)') "(",FMT_R,",',',I5,',',",2*NWP+1,"(",FMT_R,",','),",FMT_R,")"
+            WRITE(LU_PROF(N),TCFORM) STIME,NWP+1,(X_S_NEW(I),I=0,NWP),&
+                                    (ONE_D%TMP(I)+DX_WGT_S(I)*(ONE_D%TMP(I+1)-ONE_D%TMP(I))-TMPM,I=0,NWP)
+         ENDIF
+      ELSE
+         REWIND(LU_PROF(N))
+         WRITE(LU_PROF(N),'(A)') 'm,C'
+         WRITE(LU_PROF(N),'(A)') 'Depth,Temperature'
+         WRITE(TCFORM,'(5A)') "(" , FMT_R , ",','," , FMT_R , ")"
+         IF (PF%CELL_CENTERED) THEN
+            DO I=1,NWP
+               WRITE(LU_PROF(N),TCFORM) 0.5_EB*(X_S_NEW(I)+X_S_NEW(I-1)),ONE_D%TMP(I)-TMPM
+            ENDDO
+         ELSE
+            DO I=0,NWP
+               WRITE(LU_PROF(N),TCFORM) X_S_NEW(I),ONE_D%TMP(I)+DX_WGT_S(I)*(ONE_D%TMP(I+1)-ONE_D%TMP(I))-TMPM
+            ENDDO
+         ENDIF
+      ENDIF
+   ELSE
+      RHO_S = 0._EB
+      DO NN=1,SF%N_MATL
+         IF (PF%QUANTITY==SF%MATL_NAME(NN) .OR. PF%QUANTITY=='DENSITY') THEN
+            DO I=1,NWP
+               RHO_S(I) = RHO_S(I) + ONE_D%MATL_COMP(NN)%RHO(I)
+            ENDDO
+         ENDIF
+      ENDDO
+      RHO_S(0)     = RHO_S(1)
+      RHO_S(NWP+1) = RHO_S(NWP)
+      IF (PF%CELL_CENTERED) THEN
+         WRITE(TCFORM,'(3A,I5,5A)') "(",FMT_R,",',',I5,',',",2*NWP-1,"(",FMT_R,",','),",FMT_R,")"
+         WRITE(LU_PROF(N),TCFORM) STIME,NWP,(0.5_EB*(X_S_NEW(I)+X_S_NEW(I-1)),I=1,NWP),(RHO_S(I),I=1,NWP)
+      ELSE
+         WRITE(TCFORM,'(3A,I5,5A)') "(",FMT_R,",',',I5,',',",2*NWP+1,"(",FMT_R,",','),",FMT_R,")"
+         WRITE(LU_PROF(N),TCFORM) STIME,NWP+1,(X_S_NEW(I),I=0,NWP),(RHO_S(I)+DX_WGT_S(I)*(RHO_S(I+1)-RHO_S(I)),I=0,NWP)
+      ENDIF
+   ENDIF
+
+ENDDO PROF_LOOP
+
+END SUBROUTINE DUMP_PROF
+
+
+!> \brief Write out to CHID_devc.csv the DEViCe output quantities
+!> \param T Current simulation time (s)
+
+SUBROUTINE DUMP_DEVICES(T)
+
+REAL(EB), INTENT(IN) :: T
+REAL(EB) :: STIME,DI,DD,VALUE
+INTEGER :: I,J,N,NN,N_OUT
+REAL(EB) :: DEVC_TIME,CONST,CUMSUM,COORD_FACTOR
+
+! Determine the time to write into file
+
+STIME = T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR
+DEVC_TIME = STIME
+
+! Load time and line device values into arrays
+
+IF (LU_LINE > 0) THEN
+   INQUIRE(LU_LINE,OPENED=OPN)
+   IF (OPN) CLOSE(LU_LINE)
+ENDIF
+
+! Write out the histogram file
+
+IF (N_HISTOGRAM>0) THEN
+
+   N=0
+   DO J=1,N_HISTOGRAM
+      DV => DEVICE(J)
+      PY => PROPERTY(DV%PROP_INDEX)
+      IF (PY%HISTOGRAM) THEN
+         N=N+1
+         IF (DV%HIDE_COORDINATES) THEN
+            HISTOGRAM_VALUE(N,:) = 'NaN'
+         ELSE
+            HISTOGRAM_VALUE(N,:) = 'NaN,NaN'
+         ENDIF
+      ENDIF
+   ENDDO
+
+   N=0
+   DO J=1,N_DEVC
+      DV => DEVICE(J)
+      PY => PROPERTY(DV%PROP_INDEX)
+      IF (PY%HISTOGRAM) THEN
+         N=N+1
+         ! Scale the bin center coordinates
+         SELECT CASE(PY%QUANTITY)
+            CASE('DIAMETER') ! m -> mu-m
+               COORD_FACTOR=1E6_EB
+            CASE DEFAULT
+               COORD_FACTOR=1._EB
+         END SELECT
+         DD=(PY%HISTOGRAM_LIMITS(2)-PY%HISTOGRAM_LIMITS(1))/PY%HISTOGRAM_NBINS
+         CONST = SUM(DV%HISTOGRAM_COUNTS(1:PY%HISTOGRAM_NBINS))*DD
+         CUMSUM = 0._EB
+         DO NN =1,MAX_HISTOGRAM_NBINS
+            IF (NN>PY%HISTOGRAM_NBINS) EXIT
+            VALUE = DV%HISTOGRAM_COUNTS(NN)
+            CUMSUM = CUMSUM + VALUE*DD
+            DI=PY%HISTOGRAM_LIMITS(1)+(REAL(NN,EB)-0.5_EB)*DD
+            IF (PY%HISTOGRAM_CUMULATIVE) VALUE = CUMSUM
+            IF (PY%HISTOGRAM_NORMALIZE .AND. CONST>TWO_EPSILON_EB) VALUE = VALUE / CONST
+            IF (PY%HISTOGRAM_NORMALIZE .AND. .NOT.PY%HISTOGRAM_CUMULATIVE) VALUE = VALUE / COORD_FACTOR
+            WRITE(TCFORM,'(5A)') "(1(",FMT_R,",A),",FMT_R,")"
+            IF (DV%HIDE_COORDINATES) THEN
+               WRITE(HISTOGRAM_VALUE(N,NN),TCFORM) VALUE
+            ELSE
+               WRITE(HISTOGRAM_VALUE(N,NN),TCFORM) DI*COORD_FACTOR,',',VALUE
+            ENDIF
+         ENDDO
+      ENDIF
+   ENDDO
+
+   INQUIRE(LU_HISTOGRAM,OPENED=OPN)
+   IF (OPN) CLOSE(LU_HISTOGRAM)
+   OPEN(LU_HISTOGRAM,FILE=FN_HISTOGRAM,FORM='FORMATTED',STATUS='REPLACE')
+   IF (N_HISTOGRAM==1) WRITE(TCFORM,'(A)') "(A)"
+   IF (N_HISTOGRAM>1 ) WRITE(TCFORM,'(A,I0,A)') "(",N_HISTOGRAM-1,"(A,','),A)"
+   WRITE(LU_HISTOGRAM,TCFORM) (TRIM(HISTOGRAM_UNITS(N)),N=1,N_HISTOGRAM)
+   WRITE(LU_HISTOGRAM,TCFORM) (TRIM(HISTOGRAM_LABEL(N)),N=1,N_HISTOGRAM)
+   DO N=1,MAX_HISTOGRAM_NBINS
+      WRITE(LU_HISTOGRAM,TCFORM) (TRIM(HISTOGRAM_VALUE(NN,N)),NN=1,N_HISTOGRAM)
+   ENDDO
+   CLOSE(LU_HISTOGRAM)
+ENDIF
+
+! Compute the time-averaged point device values
+
+NN = 0
+DO N=1,N_DEVC
+   DV => DEVICE(N)
+   IF (DV%LINE==0 .AND. DV%OUTPUT) THEN
+      NN = NN + 1
+      TIME_DEVC_VALUE(NN) = DV%VALUE/DV%TIME_INTERVAL
+   ENDIF
+ENDDO
+
+! Write the point device values into CHID_devc.csv
+
+DO I=1,N_DEVC_FILES
+   N_OUT = MIN(DEVC_COLUMN_LIMIT, N_DEVC_TIME - DEVC_COLUMN_LIMIT * (I - 1))
+   WRITE(TCFORM,'(A,I0,5A)') "(",N_OUT,"(",FMT_R,",','),",FMT_R,")"
+   WRITE(LU_DEVC(I),TCFORM) DEVC_TIME,(TIME_DEVC_VALUE(N),N=DEVC_COLUMN_LIMIT*(I-1)+1, MIN(N_DEVC_TIME,DEVC_COLUMN_LIMIT*I))
+ENDDO
+
+! Write the line device values into CHID_line.csv
+
+IF (N_DEVC_LINE>0) THEN
+
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      IF (DV%LINE>0 .AND. DV%POINT==1) THEN
+         SELECT CASE(DV%LINE_COORD_CODE)
+            CASE(0)
+               LINE_DEVC_VALUE(DV%LINE,:) = 'NaN'
+            CASE(1:5)
+               LINE_DEVC_VALUE(DV%LINE,:) = 'NaN,NaN'
+            CASE(12:23)
+               LINE_DEVC_VALUE(DV%LINE,:) = 'NaN,NaN,NaN'
+            CASE(123)
+               LINE_DEVC_VALUE(DV%LINE,:) = 'NaN,NaN,NaN,NaN'
+         END SELECT
+      ENDIF
+   ENDDO
+
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      IF (DV%LINE>0) THEN
+         SELECT CASE(DV%LINE_COORD_CODE)
+            CASE(0)
+               WRITE(TCFORM,'(3A)') "(",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) DV%VALUE/DV%TIME_INTERVAL
+            CASE(1)
+               WRITE(TCFORM,'(5A)') "(1(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) DV%X*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(2)
+               WRITE(TCFORM,'(5A)') "(1(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) DV%Y*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(3)
+               WRITE(TCFORM,'(5A)') "(1(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) DV%Z*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(4)
+               WRITE(TCFORM,'(5A)') "(1(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) SQRT(DV%X**2+DV%Y**2+DV%Z**2)*DV%COORD_FACTOR, &
+                                                               ',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(5)
+               WRITE(TCFORM,'(5A)') "(1(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) SQRT((DV%X-DV%X0)**2+(DV%Y-DV%Y0)**2+(DV%Z-DV%Z0)**2)&
+                                              *DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(12)
+               WRITE(TCFORM,'(5A)') "(2(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) &
+                  DV%X*DV%COORD_FACTOR,',',DV%Y*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(13)
+               WRITE(TCFORM,'(5A)') "(2(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) &
+                  DV%X*DV%COORD_FACTOR,',',DV%Z*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(23)
+               WRITE(TCFORM,'(5A)') "(2(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) &
+                  DV%Y*DV%COORD_FACTOR,',',DV%Z*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+            CASE(123)
+               WRITE(TCFORM,'(5A)') "(3(",FMT_R,",A),",FMT_R,")"
+               WRITE(LINE_DEVC_VALUE(DV%LINE,DV%POINT),TCFORM) &
+                  DV%X*DV%COORD_FACTOR,',',DV%Y*DV%COORD_FACTOR,',',DV%Z*DV%COORD_FACTOR,',',DV%VALUE/DV%TIME_INTERVAL
+         END SELECT
+      ENDIF
+   ENDDO
+
+   INQUIRE(LU_LINE,OPENED=OPN)
+   IF (OPN) CLOSE(LU_LINE)
+   OPEN(LU_LINE,FILE=FN_LINE,FORM='FORMATTED',STATUS='REPLACE')
+   IF (N_DEVC_LINE==1) WRITE(TCFORM,'(A)') "(A)"
+   IF (N_DEVC_LINE>1 ) WRITE(TCFORM,'(A,I0,A)') "(",N_DEVC_LINE-1,"(A,','),A)"
+   WRITE(LU_LINE,TCFORM) (TRIM(LINE_DEVC_UNITS(N)),N=1,N_DEVC_LINE)
+   WRITE(LU_LINE,TCFORM) (TRIM(LINE_DEVC_LABEL(N)),N=1,N_DEVC_LINE)
+   DO N=1,MAX_DEVC_LINE_POINTS
+      WRITE(LU_LINE,TCFORM) (TRIM(LINE_DEVC_VALUE(NN,N)),NN=1,N_DEVC_LINE)
+   ENDDO
+   CLOSE(LU_LINE)
+ENDIF
+
+END SUBROUTINE DUMP_DEVICES
+
+
+!> \brief Write out to CHID_ctrl.csv the ConTRoL output quantities
+!> \param T Current simulation time (s)
+
+SUBROUTINE DUMP_CONTROLS(T)
+
+USE CONTROL_VARIABLES
+REAL(EB), INTENT(IN) :: T
+REAL(FB) :: STIME
+INTEGER :: WRITE_VALUE(N_CTRL)
+INTEGER :: I,N,N_OUT
+
+STIME = REAL(T_BEGIN + (T-T_BEGIN)*TIME_SHRINK_FACTOR,FB)
+WHERE (CONTROL%CURRENT_STATE)
+   WRITE_VALUE=1
+ELSEWHERE
+   WRITE_VALUE=-1
+END WHERE
+
+DO I=1,N_CTRL_FILES
+   N_OUT = MIN(CTRL_COLUMN_LIMIT, N_CTRL - CTRL_COLUMN_LIMIT * (I - 1))
+   WRITE(TCFORM,'(3A,I0,A)') "(",FMT_R,",",N_OUT,"(',',I2))"
+   WRITE(LU_CTRL(I),TCFORM) STIME,(WRITE_VALUE(N), N=CTRL_COLUMN_LIMIT*(I-1)+1, MIN(N_CTRL,CTRL_COLUMN_LIMIT*I))
+ENDDO
+
+END SUBROUTINE DUMP_CONTROLS
+
+
+
+
+!> \brief Write out preliminary stuff to error file (unit 0)
+!> \param DT Time step size (s)
+
+SUBROUTINE INITIALIZE_DIAGNOSTIC_FILE(DT)
+
+USE RADCONS, ONLY: NRT,RSA,NRP,TIME_STEP_INCREMENT,PATH_LENGTH
+USE MISC_FUNCTIONS, ONLY : WRITE_SUMMARY_INFO
+USE PHYSICAL_FUNCTIONS, ONLY: GET_VISCOSITY, GET_CONDUCTIVITY, GET_SPECIFIC_HEAT, GET_ENTHALPY
+USE SOOT_ROUTINES, ONLY: PARTICLE_RADIUS
+USE FIRE, ONLY: GET_FLAME_TEMPERATURE
+REAL(EB), INTENT(IN) :: DT
+INTEGER :: NM,I,NN,N,NR,NL,NS,ITMP, CELL_COUNT,KK
+REAL(EB) :: ZZ_GET(1:N_TRACKED_SPECIES),ZZ_REAC(1:N_TRACKED_SPECIES),ZZ_PROD(1:N_TRACKED_SPECIES),&
+            MU_Z,K_Z,CP_ZN,H_Z, PHI_TILDE,TMP_FLAME
+CHARACTER(LABEL_LENGTH) :: QUANTITY,ODE_SOLVER,OUTFORM
+TYPE(SPECIES_MIXTURE_TYPE),POINTER :: SM=>NULL()
+
+! Open and initialize diagnostic output file
+
+IF (APPEND) THEN
+   INQUIRE(FILE=FN_OUTPUT,EXIST=EX)
+   IF (EX) OPEN(LU_OUTPUT,FILE=FN_OUTPUT,FORM='FORMATTED',STATUS='OLD',POSITION='APPEND')
+ELSE
+   OPEN(LU_OUTPUT,FILE=FN_OUTPUT,FORM='FORMATTED',STATUS='REPLACE')
+ENDIF
+
+OUT_FILE_OPENED = .TRUE.
+
+! Write out the input parameters to output file (unit 6)
+
+CALL WRITE_SUMMARY_INFO(LU_OUTPUT,.TRUE.)
+
+WRITE(LU_OUTPUT,'(/A,A)')     ' Job TITLE        : ',TRIM(TITLE)
+WRITE(LU_OUTPUT,'(A,A/)')     ' Job ID string    : ',TRIM(CHID)
+
+IF (APPEND) RETURN
+
+IF (.NOT.SUPPRESS_DIAGNOSTICS) THEN
+   CELL_COUNT = 0
+   MESH_LOOP: DO NM=1,NMESHES
+      M => MESHES(NM)
+      WRITE(LU_OUTPUT,'(/A,I5/)') ' Grid Dimensions, Mesh ',NM
+      WRITE(LU_OUTPUT,'(A,I8)')     '   Cells in the X Direction      ',M%IBAR
+      WRITE(LU_OUTPUT,'(A,I8)')     '   Cells in the Y Direction      ',M%JBAR
+      WRITE(LU_OUTPUT,'(A,I8)')     '   Cells in the Z Direction      ',M%KBAR
+      WRITE(LU_OUTPUT,'(A,I8)')     '   Number of Grid Cells          ',M%IBAR*M%JBAR*M%KBAR
+      CELL_COUNT = CELL_COUNT + M%IBAR*M%JBAR*M%KBAR
+      WRITE(LU_OUTPUT,'(//A,I5/)')' Physical Dimensions, Mesh ',NM
+      WRITE(LU_OUTPUT,'(A,F10.3)')  '   Length (m)                  ',M%XF-M%XS
+      WRITE(LU_OUTPUT,'(A,F10.3)')  '   Width  (m)                  ',M%YF-M%YS
+      WRITE(LU_OUTPUT,'(A,F10.3)')  '   Height (m)                  ',M%ZF-M%ZS
+      WRITE(LU_OUTPUT,'(A,F10.3)')  '   Initial Time Step (s)       ',DT
+   ENDDO MESH_LOOP
+   WRITE(LU_OUTPUT,'(/A,I9/)'  ) ' Total Number of Grid Cells     ',CELL_COUNT
+   WRITE(LU_OUTPUT,'(/A,F9.3)')  ' Maximum Cell Aspect Ratio      ',MAXVAL(MAX_CELL_ASPECT_RATIO)
+   WRITE(LU_OUTPUT,'(A,I9/)')    ' CFL Velocity Norm              ',CFL_VELOCITY_NORM
+ENDIF
+
+IF (ORIGIN_LAT>-1.E6_EB) THEN
+   WRITE(LU_OUTPUT,'(/A/)')     ' Geographic Parameters'
+   WRITE(LU_OUTPUT,'(A,F11.7)')   '   Origin Latitude            ',ORIGIN_LAT
+   WRITE(LU_OUTPUT,'(A,F12.7)')   '   Origin Longitude          ',ORIGIN_LON
+ENDIF
+
+WRITE(LU_OUTPUT,'(/A/)')     ' Miscellaneous Parameters'
+IF (ABS(TIME_SHRINK_FACTOR -1._EB)>SPACING(1._EB)) &
+WRITE(LU_OUTPUT,'(A,F8.1)')   '   Time Shrink Factor (s/s)      ',TIME_SHRINK_FACTOR
+WRITE(LU_OUTPUT,'(A,F8.1)')   '   Simulation Start Time (s)     ',T_BEGIN
+WRITE(LU_OUTPUT,'(A,F15.1)')  '   Simulation End Time (s)'       ,(T_END-T_BEGIN) * TIME_SHRINK_FACTOR + T_BEGIN
+WRITE(LU_OUTPUT,'(A,F10.2)')  '   Background Pressure (Pa)    '  ,P_INF
+WRITE(LU_OUTPUT,'(A,F8.2)')   '   Ambient Temperature (C)       ',TMPA-TMPM
+
+IF (.NOT.TWO_D)                   WRITE(LU_OUTPUT,'(/3X,A)') '3D Cartesian'
+IF (TWO_D .AND. .NOT.CYLINDRICAL) WRITE(LU_OUTPUT,'(/3X,A)') '2D Cartesian'
+IF (TWO_D .AND.      CYLINDRICAL) WRITE(LU_OUTPUT,'(/3X,A)') '2D Cylindrical'
+SELECT CASE (SIM_MODE)
+   CASE(DNS_MODE);   WRITE(LU_OUTPUT,'(3X,A)') 'DNS Calculation'
+   CASE(LES_MODE);   WRITE(LU_OUTPUT,'(3X,A)') 'LES Calculation'
+   CASE(VLES_MODE);  WRITE(LU_OUTPUT,'(3X,A)') 'VLES Calculation'
+   CASE(SVLES_MODE); WRITE(LU_OUTPUT,'(3X,A)') 'SVLES Calculation'
+END SELECT
+IF (SIM_MODE/=DNS_MODE) THEN
+   SELECT CASE (TURB_MODEL)
+      CASE(CONSMAG)
+         WRITE(LU_OUTPUT,'(A,1X,A,F4.2,A)') '   Eddy Viscosity Model:',' Smagorinsky (C_SMAGORINSKY = ',C_SMAGORINSKY,')'
+      CASE(DYNSMAG)
+         WRITE(LU_OUTPUT,'(A,1X,A)')        '   Eddy Viscosity Model:',' Dynamic Smagorinsky'
+      CASE(DEARDORFF)
+         WRITE(LU_OUTPUT,'(A,1X,A,F4.2,A)') '   Eddy Viscosity Model:',' Deardorff (C_DEARDORFF = ',C_DEARDORFF,')'
+      CASE(VREMAN)
+         WRITE(LU_OUTPUT,'(A,1X,A,F4.2,A)') '   Eddy Viscosity Model:',' Vreman (C_VREMAN = ',C_VREMAN,')'
+      CASE(WALE)
+         WRITE(LU_OUTPUT,'(A,1X,A,F4.2,A)') '   Eddy Viscosity Model:',' WALE (C_WALE = ',C_WALE,')'
+   END SELECT
+   DO N=0,N_SURF
+      SF=>SURFACE(N)
+      IF ( N==DEFAULT_SURF_INDEX .OR. SF%USER_DEFINED .OR. (HVAC_SOLVE .AND. N==HVAC_SURF_INDEX) ) THEN
+         SELECT CASE (SF%NEAR_WALL_TURB_MODEL)
+            CASE(WALE)
+               WRITE(LU_OUTPUT,'(A,A,A,1X,A,F4.2,A)') '   Surface ',TRIM(SF%ID), &
+                  ' Eddy Viscosity Model:',' WALE (C_WALE = ',C_WALE,')'
+            CASE(CONSMAG)
+               WRITE(LU_OUTPUT,'(A,A,A,1X,A,F4.2,A)') '   Surface ',TRIM(SF%ID), &
+                  ' Eddy Viscosity Model:',' Smagorinsky with Van Driest damping (C_SMAGORINSKY = ',C_SMAGORINSKY,')'
+            CASE(CONSTANT_EDDY_VISCOSITY)
+               WRITE(LU_OUTPUT,'(A,A,A,1X,A,F4.2,A)') '   Surface ',TRIM(SF%ID), &
+                  ' Eddy Viscosity Model:',' Constant (NU_EDDY = ',SF%NEAR_WALL_EDDY_VISCOSITY,' m^2/s)'
+         END SELECT
+      ENDIF
+   ENDDO
+   WRITE(LU_OUTPUT,'(A,F8.2)')   '   Turbulent Prandtl Number:     ',PR
+   WRITE(LU_OUTPUT,'(A,F8.2)')   '   Turbulent Schmidt Number:     ',SC
+ENDIF
+
+! Print out pressure solver information
+
+WRITE(LU_OUTPUT,'(//A/)')  ' Pressure solver information'
+SELECT CASE(PRES_FLAG)
+   CASE(FFT_FLAG);    WRITE(LU_OUTPUT,'(3X,A,28X,A)') 'Solver:',    'FFT'
+   CASE(GLMAT_FLAG);  WRITE(LU_OUTPUT,'(3X,A,26X,A)') 'Solver:',  'GLMAT'
+   CASE(UGLMAT_FLAG); WRITE(LU_OUTPUT,'(3X,A,25X,A)') 'Solver:', 'UGLMAT'
+   CASE(ULMAT_FLAG);  WRITE(LU_OUTPUT,'(3X,A,26X,A)') 'Solver:',  'ULMAT'
+END SELECT
+WRITE(LU_OUTPUT,'(3X,A,ES10.3)' ) 'Velocity tolerance (m/s):   ',VELOCITY_TOLERANCE
+WRITE(LU_OUTPUT,'(3X,A,ES10.3)' ) 'Press eqn res tol (1/s^2):  ',PRESSURE_TOLERANCE
+WRITE(LU_OUTPUT,'(3X,A,8X,I0)')   'Max pressure iterations:    ',MAX_PRESSURE_ITERATIONS
+IF (SUSPEND_PRESSURE_ITERATIONS) THEN
+WRITE(LU_OUTPUT,'(3X,A,F10.2)')   'Iteration suspend factor:   ',ITERATION_SUSPEND_FACTOR
+ENDIF
+
+! Print out information about background pressure and temperature stratification
+
+IF (STRATIFICATION .AND. .NOT.SUPPRESS_DIAGNOSTICS) THEN
+   WRITE(LU_OUTPUT,'(//A/)')  ' Background Stratification'
+   WRITE(LU_OUTPUT,'(A)')     '      Z (m)     P_0 (Pa)    TMP_0 (C)'
+   WRITE(LU_OUTPUT,'(A)')     '   ------------------------------------'
+   DO KK=MESHES(1)%KBAR,1,-1
+      WRITE(LU_OUTPUT,'(4X,F8.2,3X,F10.2,2X,F8.2)') MESHES(1)%ZC(KK), MESHES(1)%P_0(KK), MESHES(1)%TMP_0(KK)-TMPM
+   ENDDO
+ENDIF
+
+! Write out the transformation matrix that converts species mixtures to primitive species
+
+WRITE(LU_OUTPUT,'(//A/)') ' Mass Fraction Transformation Matrix to Convert Species Mixtures (Columns) to Primitive Species (Rows)'
+
+WRITE(LU_OUTPUT,'(25X,100(A8,2X))') (SPECIES_MIXTURE(N)%ID,N=1,N_TRACKED_SPECIES)
+DO NN=1,N_SPECIES
+   WRITE(LU_OUTPUT,'(3X,A20,100F10.6)') SPECIES(NN)%ID,(Z2Y(NN,N),N=1,N_TRACKED_SPECIES)
+ENDDO
+
+! Print out information about species
+
+WRITE(LU_OUTPUT,'(//A)') ' Primitive Species Information'
+SPEC_LOOP: DO N=1,N_SPECIES
+   SS => SPECIES(N)
+   WRITE(LU_OUTPUT,'(/3X,A)') TRIM(SS%ID)
+   SELECT CASE(SS%MODE)
+      CASE (GAS_SPECIES)
+         WRITE(LU_OUTPUT,'( 3X,A)') 'Gas Species'
+      CASE (AEROSOL_SPECIES)
+         WRITE(LU_OUTPUT,'( 3X,A)') 'Aerosol'
+         IF (SS%CONDENSABLE) WRITE(LU_OUTPUT,'( 3X,A)') 'Condensable Species'
+   END SELECT
+   WRITE(LU_OUTPUT,'(A,F11.5)')   '   Molecular Weight (g/mol)             ',SS%MW
+   WRITE(LU_OUTPUT,'(A,F8.3)')    '   Ambient Density (kg/m^3)             ',SS%MW*P_INF/(TMPA*R0)
+   IF (SS%EXPLICIT_H_F) THEN
+      WRITE(LU_OUTPUT,'(A,ES10.3)')  '           Enthalpy of Formation (J/kg) ',SS%H_F
+   ELSE
+      IF (SS%LISTED .AND. SS%H_F_LISTED > -1.E21_EB) THEN
+         WRITE(LU_OUTPUT,'(A,ES10.3)') '           Enthalpy of Formation (J/kg) ',SS%H_F_LISTED
+      ELSE
+         WRITE(LU_OUTPUT,'(A,ES10.3)') '   Assumed Enthalpy of Formation (J/kg) ',SS%H_F
+      ENDIF
+   ENDIF
+ENDDO SPEC_LOOP
+
+! Write lumped species summary
+
+WRITE(LU_OUTPUT,'(//A)') ' Tracked (Lumped) Species Information'
+
+DO N=1,N_TRACKED_SPECIES
+   SM=>SPECIES_MIXTURE(N)
+   ZZ_GET = 0._EB
+   ZZ_GET(N) = 1._EB
+   WRITE(LU_OUTPUT,'(/3X,A)') TRIM(SM%ID)
+   WRITE(LU_OUTPUT,'(A,F11.5)')   '   Molecular Weight (g/mol)         ',SM%MW
+   WRITE(LU_OUTPUT,'(A,F8.3)')    '   Ambient Density (kg/m^3)         ',SM%MW*P_INF/(TMPA*R0)
+   WRITE(LU_OUTPUT,'(A,F8.3)')    '   Initial Mass Fraction            ',SM%ZZ0
+   WRITE(LU_OUTPUT,'(A,ES10.3)')   '   Enthalpy of Formation (J/kg)     ',SM%H_F
+   WRITE(LU_OUTPUT,'(/3X,A)') 'Sub Species                    Mass Fraction     Mole Fraction'
+   DO NN = 1,N_SPECIES
+      IF (SM%SPEC_ID(NN)/='null') WRITE(LU_OUTPUT,'( 3X,A29,A,ES13.6,5X,ES13.6)') &
+         SM%SPEC_ID(NN),' ',SM%MASS_FRACTION(NN),SM%VOLUME_FRACTION(NN)
+   ENDDO
+   ITMP = NINT(TMPA)
+   WRITE(LU_OUTPUT,'(A)') ' '
+   CALL GET_VISCOSITY(ZZ_GET,MU_Z,TMPA)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '     Viscosity (kg/m/s) Ambient, ',ITMP,' K: ', MU_Z
+   CALL GET_VISCOSITY(ZZ_GET,MU_Z,500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                  500 K: ', MU_Z
+   CALL GET_VISCOSITY(ZZ_GET,MU_Z,1000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1000 K: ', MU_Z
+   CALL GET_VISCOSITY(ZZ_GET,MU_Z,1500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1500 K: ', MU_Z
+   CALL GET_VISCOSITY(ZZ_GET,MU_Z,2000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 2000 K: ', MU_Z
+   CALL GET_CONDUCTIVITY(ZZ_GET,K_Z,TMPA)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '   Therm. Cond. (W/m/K) Ambient, ',ITMP,' K: ', K_Z
+   CALL GET_CONDUCTIVITY(ZZ_GET,K_Z,500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                  500 K: ', K_Z
+   CALL GET_CONDUCTIVITY(ZZ_GET,K_Z,1000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1000 K: ', K_Z
+   CALL GET_CONDUCTIVITY(ZZ_GET,K_Z,1500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1500 K: ', K_Z
+   CALL GET_CONDUCTIVITY(ZZ_GET,K_Z,2000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 2000 K: ', K_Z
+   CALL GET_ENTHALPY(ZZ_GET,H_Z,TMPA)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '        Enthalpy (J/kg) Ambient, ',ITMP,' K: ', H_Z
+   CALL GET_ENTHALPY(ZZ_GET,H_Z,500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                  500 K: ', H_Z
+   CALL GET_ENTHALPY(ZZ_GET,H_Z,1000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1000 K: ', H_Z
+   CALL GET_ENTHALPY(ZZ_GET,H_Z,1500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1500 K: ', H_Z
+   CALL GET_ENTHALPY(ZZ_GET,H_Z,2000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 2000 K: ', H_Z
+   CALL GET_SPECIFIC_HEAT(ZZ_GET,CP_ZN,TMPA)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '    Spec. Heat (J/kg/K) Ambient, ',ITMP,' K: ', CP_ZN
+   CALL GET_SPECIFIC_HEAT(ZZ_GET,CP_ZN,500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                  500 K: ', CP_ZN
+   CALL GET_SPECIFIC_HEAT(ZZ_GET,CP_ZN,1000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1000 K: ', CP_ZN
+   CALL GET_SPECIFIC_HEAT(ZZ_GET,CP_ZN,1500._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1500 K: ', CP_ZN
+   CALL GET_SPECIFIC_HEAT(ZZ_GET,CP_ZN,2000._EB)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 2000 K: ', CP_ZN
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '   Diff. Coeff. (m^2/s) Ambient, ',ITMP,' K: ', D_Z(ITMP,N)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                  500 K: ', D_Z( 500,N)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1000 K: ', D_Z(1000,N)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 1500 K: ', D_Z(1500,N)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                 2000 K: ', D_Z(2000,N)
+   IF (SM%EXPLICIT_G_F) THEN
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  ' Gibbs Energy Amb. (kJ/mol), ',ITMP,' K: ', G_F_Z(ITMP,N)
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '                                  500 K: ', G_F_Z( 500,N)
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '                                 1000 K: ', G_F_Z(1000,N)
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '                                 1500 K: ', G_F_Z(1500,N)
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '                                 2000 K: ', G_F_Z(2000,N)
+   ENDIF
+   IF (SM%EVAPORATING) THEN
+      WRITE(LU_OUTPUT,'(A)') ' '
+      SS => SPECIES(SM%SINGLE_SPEC_INDEX)
+      ITMP = MIN(NINT(SS%TMP_MELT),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '   Liq. Enthalpy (J/kg)     Melt ',ITMP,' K: ', &
+         SS%C_P_L_BAR(ITMP)*SS%TMP_MELT
+      ITMP = MIN(NINT(0.5_EB*(SS%TMP_V+SS%TMP_MELT)),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '                                 ',ITMP,' K: ', &
+         SS%C_P_L_BAR(ITMP)*0.5_EB*(SS%TMP_V+SS%TMP_MELT)
+      ITMP = MIN(NINT(SS%TMP_V),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '                            Boil ',ITMP,' K: ', &
+         SS%C_P_L_BAR(ITMP)*SS%TMP_V
+      WRITE(LU_OUTPUT,'(A)') ' '
+      SS => SPECIES(SM%SINGLE_SPEC_INDEX)
+      ITMP = MIN(NINT(SS%TMP_MELT),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '   Liq. Spec. Heat (J/kg/K) Melt ',ITMP,' K: ', SS%C_P_L(ITMP)
+      ITMP = MIN(NINT(0.5_EB*(SS%TMP_V+SS%TMP_MELT)),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '                                 ',ITMP,' K: ', SS%C_P_L(ITMP)
+      ITMP = MIN(NINT(SS%TMP_V),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '                            Boil ',ITMP,' K: ', SS%C_P_L(ITMP)
+      WRITE(LU_OUTPUT,'(A)') ' '
+      ITMP = MIN(NINT(SS%TMP_MELT),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '   Heat of Vapor. (J/kg)    Melt ',ITMP,' K: ', SS%H_V(ITMP)
+      ITMP = MIN(NINT(0.5_EB*(SS%TMP_V+SS%TMP_MELT)),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '                                 ',ITMP,' K: ', SS%H_V(ITMP)
+      ITMP = MIN(NINT(SS%TMP_V),5000)
+      WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '                            Boil ',ITMP,' K: ', SS%H_V(ITMP)
+   ENDIF
+ENDDO
+
+! Print out Stoichiometric parameters for reactions
+
+IF (N_REACTIONS>0) WRITE(LU_OUTPUT,'(//A)') ' Gas Phase Reaction Information'
+
+REACTION_LOOP: DO NR=1,N_REACTIONS
+   RN => REACTION(NR)
+   SELECT CASE (COMBUSTION_ODE_SOLVER)
+      CASE (EXPLICIT_EULER)
+         ODE_SOLVER = 'EXPLICIT EULER'
+      CASE (RK2_RICHARDSON)
+         ODE_SOLVER = 'RK2 RICHARDSON'
+   END SELECT
+   SELECT CASE (EXTINCT_MOD)
+      CASE (EXTINCTION_1)
+         EXTINCTION_MODEL = 'EXTINCTION 1'
+      CASE (EXTINCTION_2)
+         EXTINCTION_MODEL = 'EXTINCTION 2'
+   END SELECT
+
+   IF (N_REACTIONS>1) THEN
+      IF (RN%ID/='null')  THEN
+         WRITE(LU_OUTPUT,'(/3X,A,A)')    'Reaction ID:  ', TRIM(RN%ID)
+      ELSE
+         WRITE(LU_OUTPUT,'(/3X,A,I0)')   'Reaction ',NR
+      ENDIF
+                      WRITE(LU_OUTPUT,'(/6X,A,45X,I3)')  'Priority:                ', RN%PRIORITY
+      IF (RN%REVERSE) WRITE(LU_OUTPUT,'(/6X,A,A)'     )  'Reverse Reaction of ID:  ', TRIM(REACTION(RN%REVERSE_INDEX)%ID)
+   ENDIF
+
+   WRITE(LU_OUTPUT,'(/6X,A)')     'Fuel                                           Heat of Combustion (kJ/kg)'
+   WRITE(LU_OUTPUT,'(6X,A,1X,F12.4)') RN%FUEL,RN%HEAT_OF_COMBUSTION/1000._EB
+
+   IF (RN%PAIR_INDEX > NR .AND. RN%PAIR_INDEX <=N_REACTIONS) THEN
+      WRITE(LU_OUTPUT,'(6X,A,1X,F12.4)') '2-step reaction,  Total Heat of Combustion                  ',&
+         RN%HOC_COMPLETE/1000._EB
+   ENDIF
+
+   WRITE(LU_OUTPUT,'(/6X,A)')     'Primitive Species Stoich. Coeff.'
+   WRITE(LU_OUTPUT,'(6X,A)')      'Species ID                                                          Molar'
+   DO NN=1,N_SPECIES
+      IF (ABS(RN%NU_SPECIES(NN))<=TWO_EPSILON_EB) CYCLE
+      WRITE(OUTFORM,'(A,I1,A,I1,A)') '(6X,A,1X,F12.',MAX(1,MIN(6,8-INT(LOG10(ABS(RN%NU_SPECIES(NN))))+1)),')'
+      WRITE(LU_OUTPUT,OUTFORM) SPECIES(NN)%ID,RN%NU_SPECIES(NN)
+   ENDDO
+
+   WRITE(LU_OUTPUT,'(/6X,A)')     'Tracked (Lumped) Species Stoich. Coeff.'
+   WRITE(LU_OUTPUT,'(6X,A)')      'Species ID                                             Molar         Mass'
+   DO NN=1,N_TRACKED_SPECIES
+      IF (ABS(RN%NU(NN)) < TWO_EPSILON_EB) CYCLE
+      WRITE(OUTFORM,'(A,I1,A,I1,A)') '(6X,A,1X,F12.',MAX(1,MIN(6,8-INT(LOG10(ABS(RN%NU(NN))))+1)),',1X,F12.', &
+         MAX(1,MIN(6,8-INT(LOG10(ABS(RN%NU(NN))*SPECIES_MIXTURE(NN)%MW/SPECIES_MIXTURE(RN%FUEL_SMIX_INDEX)%MW))+1)),')'
+      WRITE(LU_OUTPUT,OUTFORM) SPECIES_MIXTURE(NN)%ID(1:47),RN%NU(NN),&
+         RN%NU(NN)*SPECIES_MIXTURE(NN)%MW/SPECIES_MIXTURE(RN%FUEL_SMIX_INDEX)%MW
+   ENDDO
+
+   WRITE(LU_OUTPUT,'(/6X,A)')     'Reaction Kinetics'
+
+   IF (RN%FAST_CHEMISTRY) THEN
+      WRITE(LU_OUTPUT,'(/6X,A)')           'Fast chemistry'
+   ELSE
+      WRITE(LU_OUTPUT,'(/6X,A)')           'Arrhenius Parameters'
+      WRITE(LU_OUTPUT,'(6X,A,1X,ES13.6)')  'Pre-exponential ((mol/cm^3)^(1-order)/s): ',RN%A_IN
+      WRITE(LU_OUTPUT,'(6X,A,1X,ES13.6)')  'Activation Energy (J/mol):                ',RN%E_IN
+      WRITE(LU_OUTPUT,'(/6X,A)')  'Species ID                                                  Rate Exponent'
+      DO NN=1,RN%N_SPEC
+         WRITE(LU_OUTPUT,'(6X,A,1X,F12.6)') SPECIES(RN%N_S_INDEX(NN))%ID,RN%N_S(NN)
+      ENDDO
+      IF (ABS(RN%N_T)>TWO_EPSILON_EB) WRITE(LU_OUTPUT,'(6X,A,50X,F12.6)') 'Temperature',RN%N_T
+      IF (RN%THIRD_BODY) THEN
+         WRITE(LU_OUTPUT,'(/6X,A)') 'Third body reaction'
+         IF (RN%N_THIRD > 0) THEN
+            WRITE(LU_OUTPUT,'(/6X,A)') 'Non-unity third body efficiencies'
+            WRITE(LU_OUTPUT,'(6X,A)') 'Species ID                                                     Efficiency'
+            DO NN=1,N_SPECIES
+               IF (ABS(RN%THIRD_EFF(NN)-1._EB)>TWO_EPSILON_EB) &
+                  WRITE(LU_OUTPUT,'(6X,A,1X,F12.6)') SPECIES(NN)%ID,RN%THIRD_EFF(NN)
+            ENDDO
+         ENDIF
+      ENDIF
+   ENDIF
+
+   WRITE(LU_OUTPUT,'(/6X,A,A)')      'ODE Solver:  ', TRIM(ODE_SOLVER)
+   IF (N_FIXED_CHEMISTRY_SUBSTEPS>0) THEN
+      WRITE(LU_OUTPUT,'(/6X,A,I3)')  'Number of Fixed Substeps:  ', N_FIXED_CHEMISTRY_SUBSTEPS
+   ENDIF
+   IF (SUPPRESSION .AND. RN%FAST_CHEMISTRY .AND. RN%PRIORITY==1) THEN
+      WRITE(LU_OUTPUT,'(/6X,A,A)')   'Extinction Model:  ', TRIM(EXTINCTION_MODEL)
+      WRITE(LU_OUTPUT,'(6X,A,F8.1)') 'Auto-Ignition Temperature (C):          ', RN%AUTO_IGNITION_TEMPERATURE - TMPM
+      WRITE(LU_OUTPUT,'(6X,A,F8.1)') 'Critical Flame Temperature (C):         ', RN%CRITICAL_FLAME_TEMPERATURE - TMPM
+   ENDIF
+   IF (SIM_MODE/=DNS_MODE) THEN
+      WRITE(LU_OUTPUT,'(/6X,A,F8.3)') 'Prescribed Radiative Fraction:          ', RN%CHI_R
+   ENDIF
+   IF (COMPUTE_ADIABATIC_FLAME_TEMPERATURE .AND. RN%FAST_CHEMISTRY) THEN
+      ! first, create a stoichiometric mixture for current REACTION
+      ZZ_REAC=0._EB
+      ZZ_PROD=0._EB
+      DO NN=1,N_TRACKED_SPECIES
+         IF (RN%NU(NN) < -TWO_EPSILON_EB) ZZ_REAC(NN)=RN%NU(NN)*SPECIES_MIXTURE(NN)%MW/SPECIES_MIXTURE(RN%FUEL_SMIX_INDEX)%MW
+         IF (RN%NU(NN) >  TWO_EPSILON_EB) ZZ_PROD(NN)=RN%NU(NN)*SPECIES_MIXTURE(NN)%MW/SPECIES_MIXTURE(RN%FUEL_SMIX_INDEX)%MW
+      ENDDO
+      ! add background diluents
+      DO NN=1,N_TRACKED_SPECIES
+         IF (ABS(RN%NU(NN)) > TWO_EPSILON_EB) CYCLE
+         IF (SPECIES_MIXTURE(RN%AIR_SMIX_INDEX)%ZZ0>TWO_EPSILON_EB) THEN
+            ZZ_REAC(NN) = SPECIES_MIXTURE(NN)%ZZ0/SPECIES_MIXTURE(RN%AIR_SMIX_INDEX)%ZZ0 * ZZ_REAC(RN%AIR_SMIX_INDEX)
+            ZZ_PROD(NN) = -ZZ_REAC(NN)
+         ENDIF
+      ENDDO
+      ! normalize stoichiometric mixture compositions
+      IF (ABS(SUM(ZZ_REAC))>TWO_EPSILON_EB) ZZ_REAC = ZZ_REAC/SUM(ZZ_REAC)
+      IF (ABS(SUM(ZZ_PROD))>TWO_EPSILON_EB) ZZ_PROD = ZZ_PROD/SUM(ZZ_PROD)
+      CALL GET_FLAME_TEMPERATURE(TMP_FLAME,PHI_TILDE,ZZ_GET,ZZ_REAC,ZZ_PROD,TMPA,NR)
+      WRITE(LU_OUTPUT,'(/6X,A,F8.3)') 'Check of equivalence ratio at stoich:   ', PHI_TILDE
+      WRITE(LU_OUTPUT,'(6X,A,F8.1)')  'Stoich adiabatic flame temperature (C): ', TMP_FLAME - TMPM
+   ENDIF
+
+ENDDO REACTION_LOOP
+
+! Print out information about agglomeration
+
+IF (N_AGGLOMERATION_SPECIES > 0) THEN
+   DO NN=1,N_AGGLOMERATION_SPECIES
+      WRITE(LU_OUTPUT,'(//A)')    ' Agglomeration Information'
+      WRITE(LU_OUTPUT,'(/A,A)')   '     Agglomerating Species:         ',&
+                                        TRIM(SPECIES(AGGLOMERATION_SPEC_INDEX(NN))%ID)
+      WRITE(LU_OUTPUT,'(A,I0)')   '     Number of Particle Bins:       ',N_PARTICLE_BINS(NN)
+      WRITE(LU_OUTPUT,'(A,F9.3)') '     Particle Density (kg/m^3):     ',SPECIES(AGGLOMERATION_SPEC_INDEX(NN))%DENSITY_SOLID
+      WRITE(LU_OUTPUT,'(A,F8.3)') '     Minimum Particle Diameter (um):',MIN_PARTICLE_DIAMETER(NN)*1.E6_EB
+      WRITE(LU_OUTPUT,'(A,F8.3)') '     Maximum Particle Diameter (um):',MAX_PARTICLE_DIAMETER(NN)*1.E6_EB
+      WRITE(LU_OUTPUT,'(A)')      '     Bin #  Bin Diameter (um)'
+      DO N=1,N_PARTICLE_BINS(NN)
+         WRITE(LU_OUTPUT,'(A,I3,A,F8.3)') '     ',N,'        ',2._EB*PARTICLE_RADIUS(NN,N)*1.E6_EB
+      ENDDO
+   ENDDO
+ENDIF
+
+! Print out information about materials
+
+WRITE(LU_OUTPUT,'(//A)')  ' Material Information'
+
+MATL_LOOP: DO N=1,N_MATL
+
+   ML => MATERIAL(N)
+
+   WRITE(LU_OUTPUT,'(/I4,1X,A)')    N,TRIM(MATL_NAME(N))
+   IF (ML%FYI/='null') WRITE(LU_OUTPUT,'(5X,A)') TRIM(ML%FYI)
+   WRITE(LU_OUTPUT,'(A,F8.3)') '     Emissivity:                               ',ML%EMISSIVITY
+   WRITE(LU_OUTPUT,'(A,F8.1)') '     Density (kg/m3):                          ',ML%RHO_S
+   ITMP = NINT(TMPA)
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '     Specific Heat (kJ/kg/K) Ambient, ',ITMP,' K: ',ML%C_S(ITMP)*0.001_EB
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       350 K: ', ML%C_S(350)*0.001_EB
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       500 K: ', ML%C_S(500)*0.001_EB
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       800 K: ', ML%C_S(800)*0.001_EB
+
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '     Therm. Cond. (W/m/K) Ambient,    ',ITMP,' K: ', ML%K_S(ITMP)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       350 K: ', ML%K_S(350)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       500 K: ', ML%K_S(500)
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       800 K: ', ML%K_S(800)
+
+   WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)')  '     Enthalpy (kJ/kg) Ambient,        ',ITMP,' K: ',ML%H(ITMP)*0.001_EB
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       350 K: ', ML%H(350)*0.001_EB
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       500 K: ', ML%H(500)*0.001_EB
+   WRITE(LU_OUTPUT,'(A,ES10.3)')  '                                       800 K: ', ML%H(800)*0.001_EB
+
+   IF (ML%KAPPA_S<5.0E4_EB) THEN
+      WRITE(LU_OUTPUT,'(A,F8.2)') '     Absorption coefficient (1/m) ',ML%KAPPA_S
+   ENDIF
+
+   IF (ML%PYROLYSIS_MODEL==PYROLYSIS_SOLID .OR. ML%PYROLYSIS_MODEL==PYROLYSIS_SURFACE_OXIDATION) THEN
+      DO NR=1,ML%N_REACTIONS
+         WRITE(LU_OUTPUT,'(A,I2)')   '     Reaction ', NR
+         WRITE(LU_OUTPUT,'(A)')      '        Residue Yields:'
+         DO NN=1,ML%N_RESIDUE(NR)
+            IF (ABS(ML%NU_RESIDUE(NN,NR)) > 0._EB) WRITE(LU_OUTPUT,'(A,A,A,F6.3)')'        ',&
+               MATERIAL(ML%RESIDUE_MATL_INDEX(NN,NR))%ID,': ', ML%NU_RESIDUE(NN,NR)
+         ENDDO
+         WRITE(LU_OUTPUT,'(A)')      '        Gaseous Yields:'
+         DO NS = 1,N_TRACKED_SPECIES
+            WRITE(LU_OUTPUT,'(A,A,A,F6.3)')'        ',SPECIES_MIXTURE(NS)%ID,': ',ML%NU_GAS(NS,NR)
+         ENDDO
+         WRITE(LU_OUTPUT,'(A,ES10.3)')'        A (1/s):                     ',ML%A(NR)
+         WRITE(LU_OUTPUT,'(A,ES10.3)')'        E (J/mol):                   ',ML%E(NR)/1000.
+         IF (ML%TMP_REF(NR) <= TWO_EPSILON_EB) THEN
+            ITMP = INT(TMPA)
+            WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)') '        H_R (kJ/kg) TMPA,    ',ITMP,' K: ',ML%H_R(NR,ITMP)/1000._EB
+         ELSE
+            ITMP = NINT(ML%TMP_REF(NR))
+            WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)') '        H_R (kJ/kg) TMP_REF, ',ITMP,' K: ',ML%H_R(NR,ITMP)/1000._EB
+            ITMP = MAX(0,NINT(ML%TMP_REF(NR)-ML%PYROLYSIS_RANGE(NR)*0.5_EB))
+            WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)') '                             ',ITMP,' K: ',ML%H_R(NR,ITMP)/1000._EB
+            ITMP = NINT(ML%TMP_REF(NR)+ML%PYROLYSIS_RANGE(NR)*0.5_EB)
+            WRITE(LU_OUTPUT,'(A,I4,A,ES10.3)') '                             ',ITMP,' K: ',ML%H_R(NR,ITMP)/1000._EB
+         ENDIF
+         WRITE(LU_OUTPUT,'(A,F8.2)') '        N_S:                          ',ML%N_S(NR)
+         WRITE(LU_OUTPUT,'(A,F8.2)') '        N_T:                          ',ML%N_T(NR)
+         IF (ML%N_O2(NR)>0._EB) THEN
+            WRITE(LU_OUTPUT,'(A,F8.2)') '        N_O2       : ',ML%N_O2(NR)
+            WRITE(LU_OUTPUT,'(A,F8.4)') '        Gas diffusion depth (m): ',ML%GAS_DIFFUSION_DEPTH(NR)
+         ENDIF
+      ENDDO
+   ENDIF
+
+   IF (ML%PYROLYSIS_MODEL==PYROLYSIS_LIQUID) THEN
+      WRITE(LU_OUTPUT,'(A)')      '     Liquid evaporation reaction'
+      WRITE(LU_OUTPUT,'(A)')      '        Gaseous Yields:'
+      DO NS = 1,N_TRACKED_SPECIES
+         WRITE(LU_OUTPUT,'(A,A,A,F8.2)')'        ',SPECIES_MIXTURE(NS)%ID,': ',ML%NU_GAS(NS,1)
+      ENDDO
+      WRITE(LU_OUTPUT,'(A,F8.2)') '        Boiling temperature (C): ',ML%TMP_BOIL-TMPM
+      WRITE(LU_OUTPUT,'(A,ES10.3)')'        H_R (kJ/kg)            : ',ML%H_R(1,NINT(TMPA))/1000._EB
+   ENDIF
+
+ENDDO MATL_LOOP
+
+! Print out information about surface types
+
+WRITE(LU_OUTPUT,'(//A)')  ' Surface Conditions'
+
+SURFLOOP: DO N=0,N_SURF
+
+   SF => SURFACE(N)
+   IF (N==DEFAULT_SURF_INDEX) THEN
+      WRITE(LU_OUTPUT,'(/I4,1X,A,A)')  N,TRIM(SF%ID),' (DEFAULT)'
+   ELSE
+      WRITE(LU_OUTPUT,'(/I4,1X,A)')    N,TRIM(SF%ID)
+   ENDIF
+   IF (SF%FYI/='null') WRITE(LU_OUTPUT,'(5X,A)') TRIM(SF%FYI)
+   IF (N==OPEN_SURF_INDEX) THEN
+      WRITE(LU_OUTPUT,'(A)')      '     Passive Vent to Atmosphere'
+      CYCLE SURFLOOP
+   ENDIF
+   IF (N==MIRROR_SURF_INDEX) THEN
+      WRITE(LU_OUTPUT,'(A)')      '     Symmetry Plane'
+      CYCLE SURFLOOP
+   ENDIF
+
+   THICK: IF (SF%THERMAL_BC_INDEX == THERMALLY_THICK) THEN
+      WRITE(LU_OUTPUT,'(A)')      '     Material List'
+      DO NN=1,SF%N_MATL
+         WRITE(LU_OUTPUT,'(8X,I3,2X,A)') NN,TRIM(SF%MATL_NAME(NN))
+      ENDDO
+      DO NL=1,SF%N_LAYERS
+         WRITE(LU_OUTPUT,'(A,I2)')      '     Layer ',NL
+         IF (SF%HT_DIM==1) WRITE(LU_OUTPUT,'(A,F8.5)')    '        Thickness   (m): ',SF%LAYER_THICKNESS(NL)
+         WRITE(LU_OUTPUT,'(A,F8.2)')    '        Density (kg/m3): ',SF%LAYER_DENSITY(NL)
+         DO NN=1,SF%N_LAYER_MATL(NL)
+            WRITE(LU_OUTPUT,'(8X,A,A,F7.2)') TRIM(SF%LAYER_MATL_NAME(NL,NN)),', Mass fraction: ',SF%LAYER_MATL_FRAC(NL,NN)
+         ENDDO
+      ENDDO
+      IF (SF%LAYER_DIVIDE<=SF%N_LAYERS) &
+      WRITE(LU_OUTPUT,'(A,F5.2,A)')     '     Reaction products considered from the first ',SF%LAYER_DIVIDE, ' layers.'
+      IF (SF%HT_DIM==1) THEN
+         WRITE(LU_OUTPUT,'(A,F9.3,A)')     '     Total surface density ', SF%SURFACE_DENSITY, ' kg/m2'
+         WRITE(LU_OUTPUT,'(A)')            '     Solid Phase Node, Layer, Coordinates(m):'
+         DO I=0,SF%N_CELLS_INI
+            WRITE(LU_OUTPUT,'(15X,I6, I7, F16.7)') I,SF%LAYER_INDEX(MAX(I,1)), SF%X_S(I)
+         ENDDO
+      ENDIF
+      IF (SF%GEOMETRY==SURF_CARTESIAN) THEN
+         IF (SF%BACKING==VOID)      WRITE(LU_OUTPUT,'(A)') '     Backing to void'
+         IF (SF%BACKING==INSULATED) WRITE(LU_OUTPUT,'(A)') '     Insulated Backing'
+         IF (SF%BACKING==EXPOSED)   WRITE(LU_OUTPUT,'(A)') '     Exposed Backing'
+      ENDIF
+      IF (SF%GEOMETRY==SURF_CYLINDRICAL) WRITE(LU_OUTPUT,'(A)') '     Assumed cylindrical symmetry'
+      IF (SF%GEOMETRY==SURF_SPHERICAL)   WRITE(LU_OUTPUT,'(A)') '     Assumed spherical symmetry'
+   ENDIF THICK
+
+   IF (SF%THERMAL_BC_INDEX==SPECIFIED_TEMPERATURE .AND. SF%TMP_FRONT>0._EB) &
+                                  WRITE(LU_OUTPUT,'(A,F8.1)') '     Wall or Vent Temperature (C)', SF%TMP_FRONT - TMPM
+   IF (ABS(SF%VEL)>TWO_EPSILON_EB)             WRITE(LU_OUTPUT,'(A,F8.3)')  '     Normal Velocity (m/s)      ', SF%VEL
+   IF (ABS(SF%MASS_FLUX_TOTAL)>TWO_EPSILON_EB) WRITE(LU_OUTPUT,'(A,ES10.3)') '     Total Mass Flux (kg/m^2/s) ', SF%MASS_FLUX_TOTAL
+   IF (ABS(SF%VOLUME_FLOW)>TWO_EPSILON_EB)     WRITE(LU_OUTPUT,'(A,ES10.3)') '     Volume Flow     (m^3/s)    ', SF%VOLUME_FLOW
+
+   IF (SF%HRRPUA>0._EB .AND. .NOT.SF%VEG_LSET_SPREAD) &
+      WRITE(LU_OUTPUT,'(A,F12.1)') '     HRR Per Unit Area (kW/m2) ', SF%HRRPUA/1000._EB
+   DO NN=1,N_TRACKED_SPECIES
+      IF (SF%MASS_FRACTION(NN)>TWO_EPSILON_EB) WRITE(LU_OUTPUT,'(5X,A,A,8X,F6.3)') &
+          TRIM(SPECIES_MIXTURE(NN)%ID),' Mass Fraction',SF%MASS_FRACTION(NN)
+      IF (ABS(SF%MASS_FLUX(NN))>TWO_EPSILON_EB) WRITE(LU_OUTPUT,'(5X,A,A,2X,ES10.3)') &
+          TRIM(SPECIES_MIXTURE(NN)%ID),' Mass Flux (kg/s/m2)',SF%MASS_FLUX(NN)
+   ENDDO
+
+   IF (ABS(SF%CONV_LENGTH - 1._EB)>SPACING(1._EB)) WRITE(LU_OUTPUT,'(A,ES10.3)') '     Convection length scale (m) ', SF%CONV_LENGTH
+
+   IF (SF%VEG_LSET_SPREAD) THEN
+      WRITE(LU_OUTPUT,'(A)')        '     Level Set Fire Spread Model'
+      IF (SF%VEG_LSET_IGNITE_T<1.E6_EB) &
+      WRITE(LU_OUTPUT,'(A,ES10.3)')  '     Ignition Time (s)           ', SF%VEG_LSET_IGNITE_T
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '     Burn Duration (s)           ', SF%BURN_DURATION
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '     Rate of Spread, ROS_00 (m/s)', SF%VEG_LSET_ROS_00
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '     Packing Ratio               ', SF%VEG_LSET_BETA
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '     Surface Area/Volume (1/m)   ', SF%VEG_LSET_SIGMA*100.  ! Convert from 1/cm to 1/m
+      WRITE(LU_OUTPUT,'(A,ES10.3)') '     Fuel Depth (m)              ', SF%VEG_LSET_HT
+   ENDIF
+
+ENDDO SURFLOOP
+
+! Print out information about particle classes
+
+WRITE(LU_OUTPUT,'(//A)')  ' Lagrangian Particle Classes'
+
+PARTLOOP: DO N=1,N_LAGRANGIAN_CLASSES
+   LPC => LAGRANGIAN_PARTICLE_CLASS(N)
+   WRITE(LU_OUTPUT,'(/I4,1X,A)')  N,TRIM(LPC%ID)
+   WRITE(LU_OUTPUT,'(4X,A,A)')   ' SURFace ID: ',TRIM(SURFACE(LPC%SURF_INDEX)%ID)
+   WRITE(LU_OUTPUT,'(4X,A,I0)')  ' # Reals: ',LPC%N_STORAGE_REALS
+   WRITE(LU_OUTPUT,'(4X,A,I0)')  ' # Integers: ',LPC%N_STORAGE_INTEGERS
+   WRITE(LU_OUTPUT,'(4X,A,I0)')  ' # Logicals: ',LPC%N_STORAGE_LOGICALS
+ENDDO PARTLOOP
+
+! Print out information about all Devices
+
+IF (N_PROP > 0) WRITE(LU_OUTPUT,'(//A,I2)')  ' PROPerty Information'
+
+PROPERTY_LOOP: DO N=1,N_PROP
+   PY => PROPERTY(N)
+   WRITE(LU_OUTPUT,'(/I4,1X,A)')  N,TRIM(PY%ID)
+   QUANTITY = PY%QUANTITY
+   SELECT CASE(QUANTITY)
+      CASE('NOZZLE FLOW RATE')
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Flow Rate (L/min)           ', PY%FLOW_RATE
+         WRITE(LU_OUTPUT,'(A,A   )') '     Particle Class              ', TRIM(PY%PART_ID)
+      CASE('SPRINKLER LINK TEMPERATURE')
+         WRITE(LU_OUTPUT,'(A,F8.1)') '     RTI (m-s)^1/2               ', PY%RTI
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     C-Factor (m/s)^1/2          ', PY%C_FACTOR
+         WRITE(LU_OUTPUT,'(A,F8.1)') '     Activation Temperature (C)  ', PY%ACTIVATION_TEMPERATURE
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Flow Rate (L/min)           ', PY%FLOW_RATE
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     K-Factor (L/min/bar**0.5)   ', PY%K_FACTOR
+         WRITE(LU_OUTPUT,'(A,A   )') '     Particle Class              ', TRIM(PY%PART_ID)
+      CASE('LINK TEMPERATURE')
+         WRITE(LU_OUTPUT,'(A,F8.1)') '     RTI (m-s)^1/2               ', PY%RTI
+         WRITE(LU_OUTPUT,'(A,F8.1)') '     Activation Temperature (C)  ', PY%ACTIVATION_TEMPERATURE
+      CASE('CHAMBER OBSCURATION')
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Activation Obscuration (%/m)', PY%ACTIVATION_OBSCURATION
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Alpha_c or L                ', PY%ALPHA_C
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Beta_c                      ', PY%BETA_C
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Alpha_e                     ', PY%ALPHA_E
+         WRITE(LU_OUTPUT,'(A,F8.2)') '     Beta_e                      ', PY%BETA_E
+   END SELECT
+   WRITE(LU_OUTPUT,'(A,A   )') '     Smokeview ID                ', TRIM(PY%SMOKEVIEW_ID(1))
+ENDDO PROPERTY_LOOP
+
+! Write out maximum and minimum density and temperature
+
+WRITE(LU_OUTPUT,'(//A/)')       ' Cut-off Density and Temperature'
+WRITE(LU_OUTPUT,'(A,F7.1,A)')   '    Minimum Temperature: ',TMPMIN-TMPM,' C'
+WRITE(LU_OUTPUT,'(A,F7.1,A)')   '    Maximum Temperature: ',TMPMAX-TMPM,' C'
+WRITE(LU_OUTPUT,'(A,ES10.3,A)') '    Minimum Density: ',RHOMIN,' kg/m3'
+WRITE(LU_OUTPUT,'(A,ES10.3,A)') '    Maximum Density: ',RHOMAX,' kg/m3'
+
+! Print out DEVICE locations and info
+
+IF (N_DEVC>0) THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' Device Information'
+   DO N=1,N_DEVC
+      DV => DEVICE(N)
+      WRITE(LU_OUTPUT,'(I4,A,A)') N,' ID: ',TRIM(DV%ID)
+      WRITE(LU_OUTPUT,'(4X,A,A)') ' QUANTITY: ',TRIM(DV%QUANTITY(1))
+      IF (DV%Y_INDEX>0) WRITE(LU_OUTPUT,'(4X,A,A)') ' Species ID: ',TRIM(SPECIES(DV%Y_INDEX)%ID)
+      IF (DV%Z_INDEX>0) WRITE(LU_OUTPUT,'(4X,A,A)') ' Species ID: ',TRIM(SPECIES_MIXTURE(DV%Z_INDEX)%ID)
+      WRITE(LU_OUTPUT,'(4X,A,3ES16.6)') ' Coordinates (X,Y,Z):',DV%X,DV%Y,DV%Z
+      IF (DV%SPATIAL_STATISTIC/='null') WRITE(LU_OUTPUT,'(4X,A,A)')   ' SPATIAL STATISTIC: ',TRIM(DV%SPATIAL_STATISTIC)
+      IF (DV%TEMPORAL_STATISTIC/='null') WRITE(LU_OUTPUT,'(4X,A,A)')   ' TEMPORAL STATISTIC: ',TRIM(DV%TEMPORAL_STATISTIC)
+      IF (DV%PROP_INDEX>0) WRITE(LU_OUTPUT,'(A,A)') '  Property ID: ',TRIM(PROPERTY(DV%PROP_INDEX)%ID)
+      IF (DV%PART_CLASS_INDEX>0) WRITE(LU_OUTPUT,'(4X,A,A)') ' Particle Class: ',&
+         TRIM(LAGRANGIAN_PARTICLE_CLASS(DV%PART_CLASS_INDEX)%ID)
+   ENDDO
+ENDIF
+
+! Write out PLOT3D Info
+
+IF (ALLOCATED(PL3D_CLOCK)) THEN
+   IF (PL3D_CLOCK(0)<T_END) THEN
+      WRITE(LU_OUTPUT,'(//A/)')   ' PLOT3D Information'
+      DO N=1,5
+         IF (PLOT3D_Y_INDEX(N)>0) THEN
+            WRITE(LU_OUTPUT,'(I4,A,A,A,A)') N,' Quantity: ',TRIM(PLOT3D_QUANTITY(N)), &
+               ', Species: ',TRIM(SPECIES(PLOT3D_Y_INDEX(N))%ID)
+         ELSEIF (PLOT3D_Z_INDEX(N)>=0) THEN
+            WRITE(LU_OUTPUT,'(I4,A,A,A,A)') N,' Quantity: ',TRIM(PLOT3D_QUANTITY(N)), &
+               ', Species: ',TRIM(SPECIES_MIXTURE(PLOT3D_Z_INDEX(N))%ID)
+         ELSE
+            WRITE(LU_OUTPUT,'(I4,A,A)') N,' Quantity: ',TRIM(PLOT3D_QUANTITY(N))
+         ENDIF
+      ENDDO
+   ENDIF
+ENDIF
+
+! Write out Isosurface File Info
+
+IF (N_ISOF>0) THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' Isosurface File Information'
+   DO N=1,N_ISOF
+      IS => ISOSURFACE_FILE(N)
+      WRITE(LU_OUTPUT,'(I4,A,A,A,10F8.3)')N,' Quantity: ',TRIM(IS%SMOKEVIEW_LABEL),', VALUE(s):',(IS%VALUE(I),I=1,IS%N_VALUES)
+   ENDDO
+ENDIF
+
+! Write out Slice File Info
+
+MESH_LOOP_4: DO NM=1,NMESHES
+   M => MESHES(NM)
+   IF (M%N_SLCF>0) THEN
+      WRITE(LU_OUTPUT,'(//A,I5/)')   ' Slice File Information, Mesh ',NM
+      DO N=1,M%N_SLCF
+         SL=> M%SLICE(N)
+         WRITE(LU_OUTPUT,'(I4,A,6I4,A,A)') N,' Nodes:',SL%I1,SL%I2,SL%J1,SL%J2,SL%K1,SL%K2,', Quantity: ',TRIM(SL%SMOKEVIEW_LABEL)
+      ENDDO
+   ENDIF
+ENDDO MESH_LOOP_4
+
+! Write out Boundary File info
+
+IF (N_BNDF>0) THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' Boundary File Information'
+   DO N=1,N_BNDF
+      BF => BOUNDARY_FILE(N)
+      WRITE(LU_OUTPUT,'(I4,A,A)') N,' Quantity: ',TRIM(BF%SMOKEVIEW_LABEL)
+   ENDDO
+ENDIF
+
+! Write out radiation info
+
+WRITE_RADIATION: IF (RADIATION .AND. ALLOCATED(RSA)) THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' Radiation Model Information'
+   WRITE(LU_OUTPUT,'(A,I4)')   '   Number of control angles ', NUMBER_RADIATION_ANGLES
+   WRITE(LU_OUTPUT,'(A,I4)')   '   Time step increment      ', TIME_STEP_INCREMENT
+   WRITE(LU_OUTPUT,'(A,I4)')   '   Angle increment          ', ANGLE_INCREMENT
+   IF (CYLINDRICAL .OR. .NOT.TWO_D) THEN
+      WRITE(LU_OUTPUT,'(A)')   '   Theta band N_phi   Solid angle'
+   ELSE
+      WRITE(LU_OUTPUT,'(A)')   '   Phi band   N_theta Solid angle'
+   ENDIF
+   N = 1
+   DO I=1,NRT
+      WRITE(LU_OUTPUT,'(I6,A,I6,F10.3)') I,':   ',NRP(I),RSA(N)
+      N = N + NRP(I)
+   ENDDO
+   IF (PATH_LENGTH>0._EB) THEN
+      IF (NUMBER_SPECTRAL_BANDS>1) THEN
+         WRITE(LU_OUTPUT,'(A,I4)')  '   Number of spectral bands is ', NUMBER_SPECTRAL_BANDS
+      ELSE
+         WRITE(LU_OUTPUT,'(A,I4)')  '   Using gray gas absorption.'
+         WRITE(LU_OUTPUT,'(A,ES10.3,A)')'   Mean beam length ',PATH_LENGTH,' m'
+      ENDIF
+   ELSEIF (KAPPA0 >= 0._EB) THEN
+      WRITE(LU_OUTPUT,'(A,F7.3,A)')'   Using constant absorption coefficient of ',KAPPA0,' 1/m'
+   ENDIF
+ENDIF WRITE_RADIATION
+
+! Write pressure ZONE info
+
+IF (N_ZONE>0) THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' Pressure Zone Information'
+   DO N=1,N_ZONE
+      WRITE(LU_OUTPUT,'(3X,I0,A,ES11.4,A,I0,A,I0,A,I0,A,I0,A,I0,A)') N,' Volume:',P_ZONE(N)%VOLUME,' mÂ³, Cells: ',&
+         P_ZONE(N)%N_CELLS,', Mesh: ',P_ZONE(N)%MESH_INDEX,&
+         ', Indices: (',P_ZONE(N)%CELL_INDICES(1),',',P_ZONE(N)%CELL_INDICES(2),',',P_ZONE(N)%CELL_INDICES(3),')'
+   ENDDO
+ENDIF
+
+! Write out GLMAT info:
+
+GLMAT_IF : IF(TRIM(PRES_METHOD)=='GLMAT') THEN
+   WRITE(LU_OUTPUT,'(//A/)')   ' GlMat Information'
+#ifdef WITH_MKL
+   WRITE(LU_OUTPUT,'(3X,A)') 'Global Pressure solver       : Intel MKL Cluster Sparse Solver'
+#endif
+ENDIF GLMAT_IF
+
+WRITE(LU_OUTPUT,*)
+WRITE(LU_OUTPUT,*)
+
+END SUBROUTINE INITIALIZE_DIAGNOSTIC_FILE

@@ -1,0 +1,15 @@
+module load CrayIntel
+module load cray-netcdf
+#patch -p0 < makefile.patch
+
+rm fds_impi_intel_linux
+
+rm -r ../Source 
+mkdir ../Source 
+
+#take clean fds-6.8.0 from checkout
+cp ../fds/Source/* ../Source/
+
+cp ../source_mods/dump.f90  ../Source/
+
+FFLAGS="$FFLAGS -fpp" FCOMPL="ifort" obj="fds" make  -j 8 impi_intel_linux_nc

@@ -1,0 +1,12 @@
+module load CrayIntel
+#patch -p0 < makefile.patch
+
+rm fds_impi_intel_linux
+
+rm -r ../Source 
+mkdir ../Source 
+
+cp ../Source_clean/* ../Source/
+#cp ../Source_mods/* ../Source/
+
+FFLAGS="$FFLAGS -fpp" FCOMPL="ifort" obj="fds" make  -j 8 impi_intel_linux
