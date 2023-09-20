@@ -1,0 +1,35 @@
+    
+ !for netcdf
+ INTEGER:: status, dimid1, dimid2,dimid3, varid1,varid2,varid3,varid4, varid5
+ 
+ status= nf90_create(FN_XYZ(NM),NF90_CLOBBER,LU_XYZ(NM))
+ ! Define dimensions
+ status = nf90_def_dim(LU_XYZ(NM), "x", IBP1, dimid1)
+ status = nf90_def_dim(LU_XYZ(NM), "y", JBP1, dimid2)   
+ status = nf90_def_dim(LU_XYZ(NM), "z", KBP1, dimid3)
+ 
+ !Define variables 
+ status = nf90_def_var(LU_XYZ(NM), "iblk", NF90_FLOAT, (/dimid1,dimid2,dimid3/), varid1)
+ status = nf90_def_var(LU_XYZ(NM), "x_m", NF90_FLOAT, (/dimid1/), varid2)
+ status = nf90_def_var(LU_XYZ(NM), "y_m", NF90_FLOAT, (/dimid2/), varid3)
+ status = nf90_def_var(LU_XYZ(NM), "z_m", NF90_FLOAT, (/dimid3/), varid4)
+ 
+ 
+ ! End definitions
+ status = nf90_enddef(LU_XYZ(NM))
+ 
+ ! Write data to variable 
+ status = nf90_put_var(LU_XYZ(NM), varid1, M%IBLK)
+ status = nf90_put_var(LU_XYZ(NM), varid2, M%XPLT)
+ status = nf90_put_var(LU_XYZ(NM), varid3, M%YPLT)
+ status = nf90_put_var(LU_XYZ(NM), varid4, M%ZPLT)
+
+ 
+ ! Close the NetCDF file
+ status = nf90_close(LU_XYZ(NM))
+ 
+ 
+ .q -      FN_PL3D(NM)
+ .q.bnd    FN_PL3D(NM+NMESHES)
+ .s3d.sz   FN_SMOKE3D(N+N_SMOKE3D,NM)
+ .s3d      FN_SMOKE3D(N,NM)

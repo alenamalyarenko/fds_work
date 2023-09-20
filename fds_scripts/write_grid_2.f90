@@ -80,7 +80,6 @@ program read_grid
 ! Close the NetCDF file
        status = nf90_close(ncid)
 
-
        close(50)
 
 
