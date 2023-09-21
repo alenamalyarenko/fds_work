@@ -1247,7 +1247,7 @@ REAL(EB) :: BSUM,TT
 INTEGER :: I,J,K,NQT,I1,I2,J1,J2,K1,K2,ITM,ITM1,IQ,IQ2,IQ3,IQQ,IND,IND2,II1,II2,JJ1,JJ2,KK1,KK2, &
            IC,Y_INDEX,Z_INDEX,PART_INDEX,VELO_INDEX,PROP_INDEX,REAC_INDEX,MATL_INDEX,NOM,IIO,JJO,KKO,I_INC,J_INC
 INTEGER :: KTS,NTSL
-REAL(EB), POINTER, DIMENSION(:,:,:) :: B,S,QUANTITY
+REAL(EB), POINTER, DIMENSION(:,:,:) :: B,S,QUANTITY !, QQ2
 INTEGER, POINTER, DIMENSION(:,:,:) :: C
 REAL(FB) :: ZERO,STIME
 LOGICAL :: PLOT3D,SLCF3D
@@ -1257,6 +1257,8 @@ INTEGER :: NX, NY, NZ
 INTEGER :: IFACT, JFACT, KFACT
 REAL(FB), ALLOCATABLE, DIMENSION(:) :: QQ_PACK
 REAL(FB) :: UVEL, VVEL, WVEL, VEL, PLOT3D_MIN, PLOT3D_MAX
+
+INTEGER::status, dimid1,dimid2,dimid3,dimid4, varid1
 
 ! Return if there are no slices to process and this is not a Plot3D dump
 
@@ -1332,7 +1334,8 @@ IF (PLOT3D) THEN  ! Write out information to .smv file
       ITM = ITM+1
       ITM1 = 0
    ENDIF
-   WRITE(FN_PL3D(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q'
+   WRITE(FN_PL3D(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q.nc'
+   !WRITE(FN_PL3D(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q'
    WRITE(FN_PL3D(NM+NMESHES),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q.bnd'
    IF (N_STRINGS+17>N_STRINGS_MAX) THEN
       CALL RE_ALLOCATE_STRINGS(NM)
@@ -1350,7 +1353,8 @@ IF (PLOT3D) THEN  ! Write out information to .smv file
       N_STRINGS = N_STRINGS + 1
       WRITE(STRING(N_STRINGS),'(1X,A)') TRIM(OUTPUT_QUANTITY(PLOT3D_QUANTITY_INDEX(IQ))%UNITS)
    ENDDO
-   OPEN(LU_PL3D(NM),FILE=FN_PL3D(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+   !OPEN(LU_PL3D(NM),FILE=FN_PL3D(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+   
    OPEN(LU_PL3D(NM+NMESHES),FILE=FN_PL3D(NM+NMESHES),FORM='FORMATTED',STATUS='REPLACE')
 ENDIF
 
@@ -1633,10 +1637,44 @@ ENDDO QUANTITY_LOOP
 
 IF (PLOT3D) THEN
    ZERO = 0._EB
-   WRITE(LU_PL3D(NM)) IBP1,JBP1,KBP1
-   WRITE(LU_PL3D(NM)) ZERO,ZERO,ZERO,ZERO
-   WRITE(LU_PL3D(NM)) ((((QQ(I,J,K,IQ),I=0,IBAR),J=0,JBAR),K=0,KBAR),IQ=1,5)
-   CLOSE(LU_PL3D(NM))
+   
+   
+    !  DO K = 0, KBAR
+    !     DO J = 0, JBAR
+    !        DO I = 0, IBAR
+    !          QQ2(I,J,K)=1
+    !        ENDDO
+    !       ENDDO 
+    !     ENDDO
+     
+   
+   status = nf90_create(FN_PL3D(NM), NF90_CLOBBER, LU_PL3D(NM))
+   
+   status = nf90_def_dim(LU_PL3D(NM),"x",IBP1,dimid1)
+   status = nf90_def_dim(LU_PL3D(NM),"y",JBP1,dimid2)
+   status = nf90_def_dim(LU_PL3D(NM),"z",KBP1,dimid3)
+   status = nf90_def_dim(LU_PL3D(NM),"var",5 ,dimid4)
+   
+   
+   status = nf90_def_var(LU_PL3D(NM), "QQ", NF90_FLOAT, (/dimid1,dimid2,dimid3,dimid4/),varid1)
+   
+   status = nf90_enddef(LU_PL3D(NM))
+   
+   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(0:IBAR,0:JBAR,0:KBAR,1:5))
+   if(status /= nf90_noerr) then
+          print *, trim(nf90_strerror(status)), NM, IBP1,JBP1,KBP1,size(QQ)
+          stop "Stopped"
+        end if
+   
+   
+   status = nf90_close(LU_PL3D(NM))
+
+   
+   
+   !WRITE(LU_PL3D(NM)) IBP1,JBP1,KBP1
+   !WRITE(LU_PL3D(NM)) ZERO,ZERO,ZERO,ZERO
+   !WRITE(LU_PL3D(NM)) ((((QQ(I,J,K,IQ),I=0,IBAR),J=0,JBAR),K=0,KBAR),IQ=1,5)
+   !CLOSE(LU_PL3D(NM))
    DO IQ = 1, 5
       PLOT3D_MIN = QQ(0,0,0,IQ)
       PLOT3D_MAX = PLOT3D_MIN
