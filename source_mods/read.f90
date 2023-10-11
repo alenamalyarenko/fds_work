@@ -2,6 +2,8 @@
 #define GITHASH_PP "unknown"
 #endif
 
+#include 'keys.h'
+
 !> \brief Subroutines that read the various NAMELIST lines in the FDS input file
 
 MODULE READ_INPUT
@@ -115,7 +117,7 @@ WIND_LOOP: DO
 ENDDO WIND_LOOP
 23 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
 
-
+#ifdef temperature_init_in
  status=nf90_open('wind_n.nc', nf90_nowrite, ncid)
  
   !status= nf90_inquire(ncid, ndims_in, nvars_in, ngatts_in, unlimdimid_in) 
@@ -128,6 +130,8 @@ ENDDO WIND_LOOP
  status=nf90_get_var(ncid, varid2, V0)
  status=nf90_close(ncid)
  print*, 'Wind check', U0,V0
+
+#endif
 
 ! If nothing specified on SURF, then use 0.03 m as default
 
