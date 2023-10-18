@@ -326,7 +326,14 @@ DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
    IF (PERIODIC_TEST==22) CALL ROTATED_CUBE_ANN_SOLN(NM,T_BEGIN) ! 27 deg Rotation.
    IF (PERIODIC_TEST==23) CALL ROTATED_CUBE_ANN_SOLN(NM,T_BEGIN) ! 45 deg Rotation.
    IF (UVW_RESTART)      CALL UVW_INIT(NM,CSVFINFO(NM)%UVWFILE)
+#if defined init_in
+    print*,'defined init_in'
+!   CALL UVW_INIT_NC(NM)
+!   CALL TEMP_INIT_NC(NM)
+#endif
 ENDDO
+
+
 
 ! Init centroid data (i.e. rho,zz) on cut-cells, cut-faces and CFACEs.
 IF (CC_IBM) CALL INIT_CUTCELL_DATA(T_BEGIN,DT,FIRST_CALL=.TRUE.)

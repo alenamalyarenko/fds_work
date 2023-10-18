@@ -54,6 +54,9 @@ LOGICAL :: RETURN_BEFORE_STOP_FILE=.FALSE., RETURN_BEFORE_SIM_MODE=.FALSE.
 
 CONTAINS
 
+
+
+
 !> \brief Read the WIND namelist line
 
 SUBROUTINE READ_WIND
@@ -822,7 +825,11 @@ CHARACTER(LABEL_LENGTH) :: MULT_ID,TRNX_ID,TRNY_ID,TRNZ_ID
 NAMELIST /MESH/ CHECK_MESH_ALIGNMENT,COLOR,CYLINDRICAL,FYI,ID,IJK,MPI_PROCESS,MULT_ID,RGB,TRNX_ID,TRNY_ID,TRNZ_ID,XB
 TYPE (MESH_TYPE), POINTER :: M,M2
 TYPE (MULTIPLIER_TYPE), POINTER :: MR
-
+#if defined global_mesh
+INTEGER :: II2, JJ2,KK2, NM3, NM4
+TYPE (MESH_TYPE), POINTER :: pnt, pnt2      
+real :: i1,i2,j1,j2,k1,k2
+#endif
 NMESHES = 0
 NMESHES_READ = 0
 CYLINDRICAL_OLD_VALUE = .FALSE.
@@ -995,6 +1002,8 @@ MESH_LOOP: DO N=1,NMESHES_READ
             JBAR_MAX = MAX(JBAR_MAX,M%JBAR)
             KBAR_MAX = MAX(KBAR_MAX,M%KBAR)
             M%N_EXTERNAL_WALL_CELLS = 2*M%IBAR*M%JBAR+2*M%IBAR*M%KBAR+2*M%JBAR*M%KBAR
+            
+           
 
             IF (M%JBAR==1) TWO_D = .TRUE.
             IF (TWO_D .AND. M%JBAR/=1) THEN
@@ -1094,6 +1103,111 @@ MESH_LOOP: DO N=1,NMESHES_READ
          ENDDO I_MULT_LOOP
       ENDDO J_MULT_LOOP
    ENDDO K_MULT_LOOP
+
+!print*, 'ok1 before mesh def', NM2
+
+#if defined global_mesh
+   NM3=0  
+   K_MULT_LOOP2: DO KK=MR%K_LOWER,MR%K_UPPER
+      J_MULT_LOOP2: DO JJ=MR%J_LOWER,MR%J_UPPER
+         I_MULT_LOOP2: DO II=MR%I_LOWER,MR%I_UPPER
+            NM3=NM3+1
+            M => MESHES(NM3)
+
+            M%MI = II
+            M%MJ = JJ
+            M%MK = KK
+            
+            M%GK1 = 0
+            M%GK2 = 0
+            M%GI1 = 0
+            M%GI2 = 0            
+            M%GJ1 = 0
+            M%GJ2 = 0      
+            
+            IF (NM3.eq.1) THEN
+            ! we can find corner coordinates
+            M%GK1 = 0
+            M%GK2 = M%KBAR
+            M%GI1 = 0
+            M%GI2 = M%IBAR          
+            M%GJ1 = 0
+            M%GJ2 = M%JBAR
+              
+            ENDIF
+            
+       ENDDO I_MULT_LOOP2
+      ENDDO J_MULT_LOOP2
+   ENDDO K_MULT_LOOP2
+   
+               
+  ! we need other meshes to know where this one is 
+   NM3=0
+   K_MULT_LOOP3: DO KK=MR%K_LOWER,MR%K_UPPER
+    J_MULT_LOOP3: DO JJ=MR%J_LOWER,MR%J_UPPER
+     I_MULT_LOOP3: DO II=MR%I_LOWER,MR%I_UPPER
+      NM3=NM3+1           
+      pnt => MESHES(NM3)
+      IF (NM3>1) THEN
+
+      i1=0
+      i2=0
+      j1=0
+      j2=0
+      k1=0
+      k2=0
+
+       DO KK2=(MR%K_LOWER),pnt%MK  
+        DO JJ2=(MR%J_LOWER),pnt%MJ
+         DO II2=(MR%I_LOWER),pnt%MI                
+          !previos mesh number based on loop:
+          !KK*9+JJ*3 + (II+1)=KK*(I_UPPER+1)*(J_UPPER+1)  JJ*(I_UPPER+1) + (II+1)
+             
+          NM4=KK2*(MR%I_UPPER +1)*(MR%J_UPPER +1)+JJ2*(MR%I_UPPER +1) + (II2+1)
+          pnt2 => MESHES(NM4)
+          IF (NM4.le.NM3) THEN
+          
+           IF ((pnt2%MI .eq. pnt%MI ).AND.(pnt2%MJ .lt. pnt%MJ ))  THEN
+           j1=j1 + pnt2%JBAR
+           j2=j2 + pnt2%JBAR
+           ENDIF
+           IF ((pnt2%MI .eq. pnt%MI ).AND.(pnt2%MJ .eq. pnt%MJ ))  THEN
+            j2 = j2 + pnt2%JBAR
+           ENDIF
+           IF ((pnt2%MJ .eq. pnt%MJ ).AND.(pnt2%MI .lt. pnt%MI ))  THEN
+            i1 = i1 + pnt2%IBAR
+            i2 = i2 + pnt2%IBAR
+           ENDIF
+           IF ((pnt2%MJ .eq. pnt%MJ ).AND.(pnt2%MI .eq. pnt%MI ))  THEN
+            i2 = i2 + pnt2%IBAR
+           ENDIF
+           IF ((pnt2%MI .eq. pnt%MI ).AND. (pnt2%MJ .eq. pnt%MJ ).AND. &
+               (pnt2%MK .lt. pnt%MK )) THEN
+            k1 = k1 + pnt2%KBAR
+            k2 = k2 + pnt2%KBAR
+           ENDIF
+           IF ((pnt2%MI .eq. pnt%MI ).AND. (pnt2%MJ .eq. pnt%MJ ).AND. &
+               (pnt2%MK .eq. pnt%MK )) THEN
+            k2 = k2 + pnt2%KBAR
+           ENDIF       
+           
+           pnt%GI1 = i1
+           pnt%GI2 = i2              
+           pnt%GJ1 = j1
+           pnt%GJ2 = j2
+           pnt%GK1 = k1
+           pnt%GK2 = k2                
+          ENDIF
+         ENDDO
+        ENDDO
+       ENDDO             
+      ENDIF
+     ENDDO I_MULT_LOOP3
+    ENDDO J_MULT_LOOP3
+   ENDDO K_MULT_LOOP3
+     
+#endif 
+
 
 ENDDO MESH_LOOP
 
@@ -13685,7 +13799,6 @@ PROC_DEVC_LOOP: DO N=1,N_DEVC
             CALL SHUTDOWN(MESSAGE) ; RETURN
          ENDIF
 
-         DV%SETPOINT = PROPERTY(DV%PROP_INDEX)%ACTIVATION_TEMPERATURE
          DV%TMP_L    = PROPERTY(DV%PROP_INDEX)%INITIAL_TEMPERATURE
 
       CASE ('THERMOCOUPLE')
