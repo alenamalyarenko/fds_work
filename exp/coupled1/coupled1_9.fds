@@ -1,17 +1,19 @@
 &HEAD CHID='Coupled1'/
 
 # GRID
-# NX NY NZ  x1 x2 y1 y2 z1 z2 
-&MESH IJK=20,20,20, XB=0.0,320.0,0.0, 320.0,0.0,180.0, MULT_ID='mesh_fire' /
+# NX NY NZ (counted from zero, so there's NX+1 tacer cells) 
+# x1 x2 y1 y2 z1 z2 (tracer cell coordinates! take dx/2 and add to corner of global grid)
+&MESH IJK=20,20,20, XB=0.0,320.0,0.0, 320.0,0,180, MULT_ID='mesh_fire' /
 &MULT ID='mesh_fire', DX=320, DY=320, DZ=180., I_UPPER=2, J_UPPER=2, K_UPPER=0/
 
-
-
-
 # TIME
-&TIME T_END=20/
+#&TIME T_END=86400/
 
+&TIME T_END=60,LOCK_TIME_STEP=T, DT=1/
 
+#character(10)
+#&ICCD ICFile='ic_pal6.nc', OBFile='' /
+&ICCD ICFile='ic_pal6.nc' /
 # OUTPUT FREQ
 # SIG_FIGS - precision of output
 # DT_HRR - output of heat release rate, averaged over DT
@@ -28,36 +30,28 @@
 # HRRPUV - per unit volume 
 # WRITE_XYZ - outputs coordinates (.xyz)
 # DT_UVW - velocity field
-&DUMP DT_PL3D=10, DT_HRR =10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
-
-#&DUMP DT_HRR=1., DT_DEVC=1., DT_SLCF=1., SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
-
-#&VENT MB='ZMAX', SURF_ID='OPEN' /
-#&VENT MB='YMAX', SURF_ID='OPEN' /
-#&VENT MB='XMAX', SURF_ID='OPEN' /
-#&VENT MB='XMIN', SURF_ID='OPEN' /
-#&VENT MB='YMIN', SURF_ID='OPEN' /
-
-&SURF ID='inlet', VEL=-1., PROFILE='ATMOSPHERIC', Z0=0.5, PLE=0.3, COLOR='BLUE' /
-
 # output:
 # species : O2, CO2, fuel , soot particles - 3d (concentration / mass fraction)
 # heat flux : total ( convective  + radiation )
 # butning rate - g/s / m2 
 
-#this will define 5 vents???
-#VT%BOUNDARY_TYPE = OPEN_BOUNDARY
+&DUMP DT_PL3D=10, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
 
+&VENT MB='ZMAX', SURF_ID='OPEN' /
+&VENT MB='YMAX', SURF_ID='OPEN' /
+&VENT MB='XMAX', SURF_ID='OPEN' /
+&VENT MB='XMIN', SURF_ID='OPEN' /
+&VENT MB='YMIN', SURF_ID='OPEN' /
 
-
+#&SURF ID='inlet', VEL=-1., PROFILE='ATMOSPHERIC', Z0=0.5, PLE=0.3, COLOR='BLUE' /
 
 # WHAT IS THE PHYSICS/CHEMISTRY SETTING
+# level set 4 - wind and fire are fully coupled
+# Simple very large eddy simulation
 &MISC SIMULATION_MODE='SVLES', LEVEL_SET_MODE=4 /
 
 # WIND AND TEMP AT DOMAIN BOUNDARIES
-#&WIND SPEED=4.8, DIRECTION=270., L=-500., Z_0=0.03, TMP_REF=20, STRATIFICATION=FALSE, 
-#      FILE_NAME_N='wind_n.nc' /
-&WIND SPEED=4.8, DIRECTION=270., L=-500., Z_0=0.03, TMP_REF=20, STRATIFICATION=FALSE /
+#&WIND SPEED=4.8, DIRECTION=270., L=-500., Z_0=0.03, TMP_REF=20, STRATIFICATION=FALSE /
 
 
 # FIRE STUFF
@@ -71,19 +65,12 @@
 #&VENT XB=-10,0.0, 5.,90.,0.,0., SURF_ID='LINE' /
 #&VENT XB= 0.0,200.0,-100.,100.,0.,0., SURF_ID='Tall Grass' /
 
-#&VENT MB='XMIN', SURF_ID='OPEN' /
-#&VENT MB='XMAX', SURF_ID='OPEN' /
-#&VENT MB='YMIN', SURF_ID='OPEN' /
-#&VENT MB='YMAX', SURF_ID='OPEN' /
-#&VENT MB='ZMAX', SURF_ID='OPEN' /
-
-
 #&SURF ID                        = 'Tall Grass'
 #      VEG_LSET_FUEL_INDEX       = 3
 #      VEG_LSET_M1               = 0.058 /
 
 
-
+&MISC VERBOSE=T /
 
 
 

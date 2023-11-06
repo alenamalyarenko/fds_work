@@ -326,10 +326,11 @@ DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
    IF (PERIODIC_TEST==22) CALL ROTATED_CUBE_ANN_SOLN(NM,T_BEGIN) ! 27 deg Rotation.
    IF (PERIODIC_TEST==23) CALL ROTATED_CUBE_ANN_SOLN(NM,T_BEGIN) ! 45 deg Rotation.
    IF (UVW_RESTART)      CALL UVW_INIT(NM,CSVFINFO(NM)%UVWFILE)
-#if defined init_in
-    print*,'defined init_in'
-!   CALL UVW_INIT_NC(NM)
-!   CALL TEMP_INIT_NC(NM)
+#if defined init_u_in
+   CALL UVW_INIT_NC(NM) 
+#endif
+#if defined init_t_in   
+   CALL TEMP_INIT_NC(NM)  
 #endif
 ENDDO
 
@@ -628,6 +629,12 @@ MAIN_LOOP: DO
             EXCHANGE_INSERTED_PARTICLES = .FALSE.
          ENDIF
       ENDIF
+      
+#if defined coupled_bc
+     ! Apply Temp open boundary conditions
+     
+     
+#endif      
 
       ! Calculate convective and diffusive terms of the velocity equation.
 
@@ -738,6 +745,12 @@ MAIN_LOOP: DO
    VELOCITY_BC_LOOP: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
       IF (SYNTHETIC_EDDY_METHOD) CALL SYNTHETIC_TURBULENCE(DT,T,NM)
       CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.TRUE.)
+#if defined coupled_bc
+      ! Apply UVW open boundary conditions - 1
+      ! use velocity_bc
+      CALL VELOCITY_BC_COUPLED(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.TRUE.)
+#endif         
+      
    ENDDO VELOCITY_BC_LOOP
 
    !================================================================================================================================
@@ -917,6 +930,11 @@ MAIN_LOOP: DO
 
    VELOCITY_BC_LOOP_2: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
       CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
+#if defined coupled_bc
+     ! Apply UVW open boundary conditions - 2
+     ! use velocity_bc
+      CALL VELOCITY_BC_COUPLED(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
+#endif  
       CALL UPDATE_GLOBAL_OUTPUTS(T,DT,NM)
    ENDDO VELOCITY_BC_LOOP_2
 
@@ -4279,4 +4297,8 @@ WRITE(COMPILE_DATE,'(A)')  GCOMPILE_DATE(INDEX(GCOMPILE_DATE,':')+2:LEN_TRIM(GCO
 
 END SUBROUTINE GET_INFO
 
+
+#if defined coupled_bc
+# include 'velocity_bc_coupled.h'
+#endif
 END PROGRAM FDS

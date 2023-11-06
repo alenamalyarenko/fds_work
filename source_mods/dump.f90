@@ -2,6 +2,7 @@
 #define GITHASH_PP "unknown"
 #endif
 
+#include 'keys.h'
 !> \brief Routines for handling output
 
 MODULE DUMP
@@ -235,9 +236,11 @@ SUBROUTINE ASSIGN_FILE_NAMES
     LU_XYZ(NM)  = GET_FILE_NUMBER()
     LU_PL3D(NM) = GET_FILE_NUMBER()
     LU_PL3D(NM+NMESHES) = GET_FILE_NUMBER()
+#if defined output_nc     
     WRITE(FN_XYZ(NM),'(A,A,I0,A)') TRIM(CHID),'_',NM,'.xyz.nc'
-    !WRITE(FN_XYZ(NM),'(A,A,I0,A)') TRIM(CHID),'_',NM,'.xyz'
- 
+#else    
+    WRITE(FN_XYZ(NM),'(A,A,I0,A)') TRIM(CHID),'_',NM,'.xyz'
+#endif 
     ! Iso Surface Files
  
     ! Allocate unit numbers and file names for isosurface files
@@ -405,7 +408,7 @@ END SUBROUTINE UPDATE_GLOBAL_OUTPUTS
 !> \brief Call subroutines that output quantities associated with each mesh, like slice, boundary, and particle files
 
 SUBROUTINE DUMP_MESH_OUTPUTS(T,DT,NM)
-
+ USE GLOBAL_CONSTANTS, ONLY: T_BEGIN
  USE COMP_FUNCTIONS, ONLY : CURRENT_TIME
  USE TURBULENCE, ONLY: SANDIA_OUT, SPECTRAL_OUTPUT
  REAL(EB) :: TNOW
@@ -470,6 +473,8 @@ SUBROUTINE DUMP_MESH_OUTPUTS(T,DT,NM)
        IF (PL3D_CLOCK(PL3D_COUNTER(NM))>=T) EXIT
     ENDDO
  ENDIF
+ 
+ IF (T==T_BEGIN) CALL DUMP_SLCF(T,DT,NM,1)
  
  IF (T>=PROF_CLOCK(PROF_COUNTER(NM))) THEN
     CALL DUMP_PROF(T,NM)
@@ -542,8 +547,11 @@ SUBROUTINE INITIALIZE_MESH_DUMPS(NM)
  TYPE (BOUNDARY_COORD_TYPE), POINTER :: BC
  TYPE (RAD_FILE_TYPE), POINTER :: RF
  
-  INTEGER:: status, dimid1, dimid2,dimid3, varid1,varid2,varid3,varid4
- 
+ INTEGER:: status, dimid1, dimid2,dimid3, varid1,varid2,varid3,varid4
+#if defined global_mesh
+INTEGER:: dimid4, varid5,varid6,varid7,varid8,varid9
+INTEGER:: varid10,varid11,varid12,varid13
+#endif 
  
  TNOW=CURRENT_TIME()
  
@@ -587,10 +595,11 @@ SUBROUTINE INITIALIZE_MESH_DUMPS(NM)
  M%QQ2=0._FB
  
  WRITE_XYZ_FILE: IF (WRITE_XYZ) THEN
+#if defined output_nc
     status= nf90_create(FN_XYZ(NM),NF90_CLOBBER,LU_XYZ(NM))
-    
-    
-    !OPEN(LU_XYZ(NM),FILE=FN_XYZ(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+#else    
+    OPEN(LU_XYZ(NM),FILE=FN_XYZ(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+#endif    
     DO K=0,KBAR
        DO J=0,JBAR
           DO I=0,IBAR
@@ -605,13 +614,16 @@ SUBROUTINE INITIALIZE_MESH_DUMPS(NM)
           ENDDO
        ENDDO
     ENDDO
-    !WRITE(LU_XYZ(NM)) IBP1,JBP1,KBP1
-    !WRITE(LU_XYZ(NM)) (((M%XPLT(I),I=0,IBAR),J=0,JBAR),K=0,KBAR),(((M%YPLT(J),I=0,IBAR),J=0,JBAR),K=0,KBAR), &
-    !                  (((M%ZPLT(K),I=0,IBAR),J=0,JBAR),K=0,KBAR),(((M%IBLK(I,J,K),I=0,IBAR),J=0,JBAR),K=0,KBAR)
+
     ! Define dimensions
-    status = nf90_def_dim(LU_XYZ(NM), "x", IBP1, dimid1)
-    status = nf90_def_dim(LU_XYZ(NM), "y", JBP1, dimid2)   
-    status = nf90_def_dim(LU_XYZ(NM), "z", KBP1, dimid3)
+#if defined output_nc
+    status = nf90_def_dim(LU_XYZ(NM), "x", IBAR, dimid1)
+    status = nf90_def_dim(LU_XYZ(NM), "y", JBAR, dimid2)   
+    status = nf90_def_dim(LU_XYZ(NM), "z", KBAR, dimid3)
+# if defined global_mesh
+    status = nf90_def_dim(LU_XYZ(NM), "dum", 1, dimid4)
+# endif      
+    
     
     !Define variables 
     status = nf90_def_var(LU_XYZ(NM), "iblk", NF90_FLOAT, (/dimid1,dimid2,dimid3/), varid1)
@@ -619,22 +631,48 @@ SUBROUTINE INITIALIZE_MESH_DUMPS(NM)
     status = nf90_def_var(LU_XYZ(NM), "y_m", NF90_FLOAT, (/dimid2/), varid3)
     status = nf90_def_var(LU_XYZ(NM), "z_m", NF90_FLOAT, (/dimid3/), varid4)
     
-    
+# if defined global_mesh
+    status = nf90_def_var(LU_XYZ(NM), "MI",  NF90_FLOAT, (/dimid4/), varid5)
+    status = nf90_def_var(LU_XYZ(NM), "MJ",  NF90_FLOAT, (/dimid4/), varid6)
+    status = nf90_def_var(LU_XYZ(NM), "MK",  NF90_FLOAT, (/dimid4/), varid7)
+    status = nf90_def_var(LU_XYZ(NM), "GI1", NF90_FLOAT, (/dimid4/), varid8)
+    status = nf90_def_var(LU_XYZ(NM), "GI2", NF90_FLOAT, (/dimid4/), varid9)
+    status = nf90_def_var(LU_XYZ(NM), "GJ1", NF90_FLOAT, (/dimid4/), varid10)
+    status = nf90_def_var(LU_XYZ(NM), "GJ2", NF90_FLOAT, (/dimid4/), varid11)
+    status = nf90_def_var(LU_XYZ(NM), "GK1", NF90_FLOAT, (/dimid4/), varid12)
+    status = nf90_def_var(LU_XYZ(NM), "GK2", NF90_FLOAT, (/dimid4/), varid13)            
+# endif  
     ! End definitions
     status = nf90_enddef(LU_XYZ(NM))
     
     ! Write data to variable 
-    status = nf90_put_var(LU_XYZ(NM), varid1, M%IBLK)
-    status = nf90_put_var(LU_XYZ(NM), varid2, M%XPLT)
-    status = nf90_put_var(LU_XYZ(NM), varid3, M%YPLT)
-    status = nf90_put_var(LU_XYZ(NM), varid4, M%ZPLT)
-
-    
+    status = nf90_put_var(LU_XYZ(NM), varid1, M%IBLK(1:IBAR,1:JBAR,1:KBAR))
+    status = nf90_put_var(LU_XYZ(NM), varid2, M%XPLT(1:IBAR))
+    status = nf90_put_var(LU_XYZ(NM), varid3, M%YPLT(1:JBAR))
+    status = nf90_put_var(LU_XYZ(NM), varid4, M%ZPLT(1:KBAR))
+# if defined global_mesh
+    status = nf90_put_var(LU_XYZ(NM), varid5, M%MI)
+    status = nf90_put_var(LU_XYZ(NM), varid6, M%MJ)
+    status = nf90_put_var(LU_XYZ(NM), varid7, M%MK)
+    status = nf90_put_var(LU_XYZ(NM), varid8, M%GI1)
+    status = nf90_put_var(LU_XYZ(NM), varid9, M%GI2)
+    status = nf90_put_var(LU_XYZ(NM), varid10, M%GJ1)
+    status = nf90_put_var(LU_XYZ(NM), varid11, M%GJ2)
+    status = nf90_put_var(LU_XYZ(NM), varid12, M%GK1)
+    status = nf90_put_var(LU_XYZ(NM), varid13, M%GK2)    
+# endif
     ! Close the NetCDF file
-       status = nf90_close(LU_XYZ(NM))
-    !CLOSE(LU_XYZ(NM))
-    
-    
+    status = nf90_close(LU_XYZ(NM))
+
+
+#else   ! standart non-nc output 
+    WRITE(LU_XYZ(NM)) IBP1,JBP1,KBP1
+    WRITE(LU_XYZ(NM)) (((M%XPLT(I),I=0,IBAR),J=0,JBAR),K=0,KBAR),(((M%YPLT(J),I=0,IBAR),J=0,JBAR),K=0,KBAR), &
+                      (((M%ZPLT(K),I=0,IBAR),J=0,JBAR),K=0,KBAR),(((M%IBLK(I,J,K),I=0,IBAR),J=0,JBAR),K=0,KBAR)
+    CLOSE(LU_XYZ(NM))                      
+#endif                      
+
+  
     IF (M%N_STRINGS+2>M%N_STRINGS_MAX) THEN
        CALL RE_ALLOCATE_STRINGS(NM)
     ENDIF
@@ -1258,7 +1296,8 @@ INTEGER :: IFACT, JFACT, KFACT
 REAL(FB), ALLOCATABLE, DIMENSION(:) :: QQ_PACK
 REAL(FB) :: UVEL, VVEL, WVEL, VEL, PLOT3D_MIN, PLOT3D_MAX
 
-INTEGER::status, dimid1,dimid2,dimid3,dimid4, varid1
+INTEGER::status, dimid1,dimid2,dimid3, dimid1c,dimid2c,dimid3c 
+INTEGER:: varid1, varid2,varid3,varid4,varid5
 
 ! Return if there are no slices to process and this is not a Plot3D dump
 
@@ -1353,7 +1392,9 @@ IF (PLOT3D) THEN  ! Write out information to .smv file
       N_STRINGS = N_STRINGS + 1
       WRITE(STRING(N_STRINGS),'(1X,A)') TRIM(OUTPUT_QUANTITY(PLOT3D_QUANTITY_INDEX(IQ))%UNITS)
    ENDDO
-   !OPEN(LU_PL3D(NM),FILE=FN_PL3D(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+#if !defined outout_nc   
+   OPEN(LU_PL3D(NM),FILE=FN_PL3D(NM),FORM='UNFORMATTED',STATUS='REPLACE')
+#endif   
    
    OPEN(LU_PL3D(NM+NMESHES),FILE=FN_PL3D(NM+NMESHES),FORM='FORMATTED',STATUS='REPLACE')
 ENDIF
@@ -1638,38 +1679,40 @@ ENDDO QUANTITY_LOOP
 IF (PLOT3D) THEN
    ZERO = 0._EB
    
-   
-    !  DO K = 0, KBAR
-    !     DO J = 0, JBAR
-    !        DO I = 0, IBAR
-    !          QQ2(I,J,K)=1
-    !        ENDDO
-    !       ENDDO 
-    !     ENDDO
-     
-   
-   
-   
+#if defined output_nc   
    status = nf90_create(FN_PL3D(NM), NF90_CLOBBER, LU_PL3D(NM))
    status = nf90_def_dim(LU_PL3D(NM),"x",IBP1,dimid1)
    status = nf90_def_dim(LU_PL3D(NM),"y",JBP1,dimid2)
    status = nf90_def_dim(LU_PL3D(NM),"z",KBP1,dimid3)
-   status = nf90_def_dim(LU_PL3D(NM),"var",5 ,dimid4)
-   status = nf90_def_var(LU_PL3D(NM), "QQ", NF90_FLOAT, (/dimid1,dimid2,dimid3,dimid4/),varid1)
-   status = nf90_enddef(LU_PL3D(NM))
-   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(0:IBAR,0:JBAR,0:KBAR,1:5))
-!   if(status /= nf90_noerr) then
-!          print *, trim(nf90_strerror(status)), NM, IBP1,JBP1,KBP1,size(QQ)
-!          stop "Stopped"
-!   end if
-   status = nf90_close(LU_PL3D(NM))
+   
+   status = nf90_def_dim(LU_PL3D(NM),"xc",IBAR,dimid1c)
+   status = nf90_def_dim(LU_PL3D(NM),"yc",JBAR,dimid2c)
+   status = nf90_def_dim(LU_PL3D(NM),"zc",KBAR,dimid3c)
+   
+   
+   
 
    
+   status = nf90_def_var(LU_PL3D(NM),"temp",   NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid1)
+   status = nf90_def_var(LU_PL3D(NM),"u",      NF90_FLOAT, (/dimid1,dimid2c,dimid3c/),varid2)
+   status = nf90_def_var(LU_PL3D(NM),"v",      NF90_FLOAT, (/dimid1c,dimid2,dimid3c/),varid3)
+   status = nf90_def_var(LU_PL3D(NM),"w",      NF90_FLOAT, (/dimid1c,dimid2c,dimid3/),varid4)
+   status = nf90_def_var(LU_PL3D(NM),"hrrpuv", NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid5)
    
-   !WRITE(LU_PL3D(NM)) IBP1,JBP1,KBP1
-   !WRITE(LU_PL3D(NM)) ZERO,ZERO,ZERO,ZERO
-   !WRITE(LU_PL3D(NM)) ((((QQ(I,J,K,IQ),I=0,IBAR),J=0,JBAR),K=0,KBAR),IQ=1,5)
-   !CLOSE(LU_PL3D(NM))
+   status = nf90_enddef(LU_PL3D(NM))
+   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(1:IBAR,1:JBAR,1:KBAR,1)) 
+   status = nf90_put_var(LU_PL3D(NM),varid2,QQ(0:IBAR,1:JBAR,1:KBAR,2)) !u
+   status = nf90_put_var(LU_PL3D(NM),varid3,QQ(1:IBAR,0:JBAR,1:KBAR,3)) !v
+   status = nf90_put_var(LU_PL3D(NM),varid4,QQ(1:IBAR,1:JBAR,0:KBAR,4)) !w
+   status = nf90_put_var(LU_PL3D(NM),varid5,QQ(1:IBAR,1:JBAR,1:KBAR,5))
+   status = nf90_close(LU_PL3D(NM))
+#else
+   WRITE(LU_PL3D(NM)) IBP1,JBP1,KBP1
+   WRITE(LU_PL3D(NM)) ZERO,ZERO,ZERO,ZERO
+   WRITE(LU_PL3D(NM)) ((((QQ(I,J,K,IQ),I=0,IBAR),J=0,JBAR),K=0,KBAR),IQ=1,5)
+   CLOSE(LU_PL3D(NM))
+#endif
+   
    DO IQ = 1, 5
       PLOT3D_MIN = QQ(0,0,0,IQ)
       PLOT3D_MAX = PLOT3D_MIN

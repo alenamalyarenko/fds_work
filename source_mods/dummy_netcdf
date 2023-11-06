@@ -33,3 +33,11 @@
  .q.bnd    FN_PL3D(NM+NMESHES)
  .s3d.sz   FN_SMOKE3D(N+N_SMOKE3D,NM)
  .s3d      FN_SMOKE3D(N,NM)
+ 
+ 
+ 
+ 
+#include 'keys.h'
+
+#if defined global_mesh
+#endif

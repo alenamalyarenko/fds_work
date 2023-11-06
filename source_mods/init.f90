@@ -1,3 +1,5 @@
+#include 'keys.h'
+
 MODULE INIT
 
 ! Allocate numerous arrays and perform miscellaneous initializations
@@ -14,15 +16,30 @@ IMPLICIT NONE (TYPE,EXTERNAL)
 
 PRIVATE
 
+#if (defined init_t_in) && ( defined init_u_in)
+PUBLIC INITIALIZE_MESH_VARIABLES_1,INITIALIZE_MESH_VARIABLES_2,INITIALIZE_MESH_VARIABLES_3,INITIALIZE_GLOBAL_VARIABLES, &
+       OPEN_AND_CLOSE,INITIAL_NOISE,UVW_INIT,INITIALIZE_DEVICES,INITIALIZE_PROFILES,REASSIGN_WALL_CELLS,&
+       ADJUST_HT3D_WALL_CELLS,INITIALIZE_HT3D_WALL_CELLS, TEMP_INIT_NC, UVW_INIT_NC
+#else
+# if defined init_t_in
+PUBLIC INITIALIZE_MESH_VARIABLES_1,INITIALIZE_MESH_VARIABLES_2,INITIALIZE_MESH_VARIABLES_3,INITIALIZE_GLOBAL_VARIABLES, &
+       OPEN_AND_CLOSE,INITIAL_NOISE,UVW_INIT,INITIALIZE_DEVICES,INITIALIZE_PROFILES,REASSIGN_WALL_CELLS,&
+       ADJUST_HT3D_WALL_CELLS,INITIALIZE_HT3D_WALL_CELLS, TEMP_INIT_NC
+
+# else
 PUBLIC INITIALIZE_MESH_VARIABLES_1,INITIALIZE_MESH_VARIABLES_2,INITIALIZE_MESH_VARIABLES_3,INITIALIZE_GLOBAL_VARIABLES, &
        OPEN_AND_CLOSE,INITIAL_NOISE,UVW_INIT,INITIALIZE_DEVICES,INITIALIZE_PROFILES,REASSIGN_WALL_CELLS,&
        ADJUST_HT3D_WALL_CELLS,INITIALIZE_HT3D_WALL_CELLS
+# endif
+
+
+#endif
+
 
 CONTAINS
 
 
 SUBROUTINE INITIALIZE_MESH_VARIABLES_1(DT,NM)
-
 USE MEMORY_FUNCTIONS, ONLY: ALLOCATE_BOUNDARY_TYPES
 USE PHYSICAL_FUNCTIONS, ONLY: GET_VISCOSITY,GET_SPECIFIC_GAS_CONSTANT,GET_SPECIFIC_HEAT,LES_FILTER_WIDTH_FUNCTION,&
                               COMPUTE_WIND_COMPONENTS
@@ -4495,6 +4512,142 @@ ENDDO
 END SUBROUTINE UVW_INIT
 
 
+
+#if defined init_u_in
+SUBROUTINE UVW_INIT_NC(NM)
+USE COUPLED_FILES
+use netcdf
+USE MESH_POINTERS
+!USE READ_INPUT, ONLY: READ_IC
+INTEGER  :: I,J,K,II,JJ,KK,IW,IOR,LU_UVW,IERROR,IMIN,IMAX,JMIN,JMAX,KMIN,KMAX
+INTEGER, INTENT(IN) :: NM
+
+REAL, DIMENSION(21,21,21):: U0,V0,W0
+
+TYPE(WALL_TYPE), POINTER :: WC
+TYPE(BOUNDARY_COORD_TYPE), POINTER :: BC
+TYPE(BOUNDARY_PROP1_TYPE), POINTER :: B1
+!character(10) :: file_name
+
+integer:: ncid, varid1,varid2,varid3, status
+integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
+
+CALL POINT_TO_MESH(NM)
+
+
+   IMIN = 0
+   IMAX = IBAR
+   JMIN = 0
+   JMAX = JBAR
+   KMIN = 0
+   KMAX = KBAR
+ status=nf90_open(ICFile, nf90_nowrite, ncid)
+ 
+ status=nf90_inq_varid(ncid, 'U', varid1)
+ status=nf90_inq_varid(ncid, 'V', varid2)
+ status=nf90_inq_varid(ncid, 'W', varid3)
+                                          
+ status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+ status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+ status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+
+ status=nf90_close(ncid)
+
+
+
+! netcdf has to read from 1 to IBP1, but fds needs from 0 to IBAR 
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX
+            U(I,J,K)=U0(I+1,J+1,K+1)
+            V(I,J,K)=V0(I+1,J+1,K+1)
+            W(I,J,K)=W0(I+1,J+1,K+1)
+      ENDDO
+   ENDDO
+ENDDO
+!Print*,NM, GI1,GJ1,GK1, IBP1+1,JBP1+1, KBP1+1
+!Print*, NM, GI1,GJ1,GK1, U0(0,0,0), U0(1,1,0),U(0,0,0), U(1,1,0)
+US=U
+VS=V
+WS=W
+
+! Set normal velocity on external and internal boundaries (follows divg)
+
+!DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
+!   WC => WALL(IW)
+!   BC => BOUNDARY_COORD(WC%BC_INDEX)
+!   B1 => BOUNDARY_PROP1(WC%B1_INDEX)
+!   IOR = BC%IOR
+!   II  = BC%II
+!   JJ  = BC%JJ
+!   KK  = BC%KK
+!   SELECT CASE(IOR)
+!      CASE( 1) ; B1%U_NORMAL_S = -U(II,JJ,KK)
+!      CASE(-1) ; B1%U_NORMAL_S =  U(II-1,JJ,KK)
+!      CASE( 2) ; B1%U_NORMAL_S = -V(II,JJ,KK)
+!      CASE(-2) ; B1%U_NORMAL_S =  V(II,JJ-1,KK)
+!      CASE( 3) ; B1%U_NORMAL_S = -W(II,JJ,KK)
+!      CASE(-3) ; B1%U_NORMAL_S =  W(II,JJ,KK-1)
+!   END SELECT
+!   B1%U_NORMAL = B1%U_NORMAL_S
+!ENDDO
+
+END SUBROUTINE UVW_INIT_NC
+#endif
+
+#if defined init_t_in
+
+SUBROUTINE TEMP_INIT_NC(NM)
+USE COUPLED_FILES
+use netcdf
+USE MESH_POINTERS
+
+USE RADCONS, ONLY: UIIDIM
+INTEGER  :: I,J,K,II,JJ,KK,IW,IOR,LU_UVW,IERROR,IMIN,IMAX,JMIN,JMAX,KMIN,KMAX
+INTEGER, INTENT(IN) :: NM
+REAL(EB), DIMENSION(20,20,20):: TMP0
+
+!integer, parameter :: NDIMS = 3
+integer :: status, ncid, varid1
+
+  
+  
+CALL POINT_TO_MESH(NM)
+   IMIN = 1 ;    IMAX = IBAR
+   JMIN = 1 ;    JMAX = JBAR
+   KMIN = 1 ;    KMAX = KBAR
+   
+status=nf90_open(ICFile, nf90_nowrite, ncid)
+status=nf90_inq_varid(ncid, 'TMP', varid1)
+status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
+! if(status /= nf90_NoErr) call handle_err(status)
+status=nf90_close(ncid)
+
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX       
+            TMP(I,J,K)=TMP0(I,J,K)      
+      ENDDO
+   ENDDO
+ENDDO
+!Print*, NM, GI1,GJ1,GK1,TMP0(0,0,0),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
+! update density field
+
+DO K=KMIN,KMAX
+   DO J=JMIN,JMAX
+      DO I=IMIN,IMAX
+         RHO(I,J,K)  = P_0(K)/(TMP(I,J,K)*RSUM(I,J,K))
+         RHOS(I,J,K) = RHO(I,J,K)
+         IF (RADIATION) THEN
+            UII(I,J,K) = 4._EB*SIGMA*TMP(I,J,K)**4
+            UIID(I,J,K,1:UIIDIM) = UII(I,J,K)/REAL(UIIDIM,EB)
+         ENDIF
+      ENDDO
+   ENDDO
+ENDDO
+
+END SUBROUTINE TEMP_INIT_NC
+#endif
 
 
 END MODULE INIT

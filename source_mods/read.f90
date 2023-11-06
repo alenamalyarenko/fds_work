@@ -1,9 +1,8 @@
 #ifndef GITHASH_PP
 #define GITHASH_PP "unknown"
 #endif
-
 #include 'keys.h'
-
+#include 'coupled_files.h'
 !> \brief Subroutines that read the various NAMELIST lines in the FDS input file
 
 MODULE READ_INPUT
@@ -25,8 +24,11 @@ USE THERMO_PROPS
 
 IMPLICIT NONE (TYPE,EXTERNAL)
 PRIVATE
-
+#if defined init_file_in
+PUBLIC READ_DATA,READ_STOP,VERSION_INFO, READ_IC
+#else
 PUBLIC READ_DATA,READ_STOP,VERSION_INFO
+#endif
 
 CHARACTER(LABEL_LENGTH) :: ID,MB,DB,ODE_SOLVER
 CHARACTER(MESSAGE_LENGTH) :: MESSAGE,FYI
@@ -53,280 +55,6 @@ TYPE(REACTION_TYPE), POINTER :: RN=>NULL()
 LOGICAL :: RETURN_BEFORE_STOP_FILE=.FALSE., RETURN_BEFORE_SIM_MODE=.FALSE.
 
 CONTAINS
-
-
-
-
-!> \brief Read the WIND namelist line
-
-SUBROUTINE READ_WIND
-
-use netcdf
-USE MATH_FUNCTIONS, ONLY: GET_RAMP_INDEX,NORMAL
-USE PHYSICAL_FUNCTIONS, ONLY: MONIN_OBUKHOV_SIMILARITY
-REAL(EB) :: CORIOLIS_VECTOR(3)=0._EB,FORCE_VECTOR(3)=0._EB,L,ZZZ,ZETA,Z_0,SPEED,DIRECTION,&
-            Z_REF,U_STAR,THETA_0,THETA_STAR,TMP,U,THETA_REF,TMP_REF,P_REF,RHO_REF,ZSW,ZFW,&
-            LCC,DT_THETA,TAU_THETA,SIGMA_THETA,PRESSURE_GRADIENT_FORCE
-CHARACTER(LABEL_LENGTH) :: RAMP_PGF_T,RAMP_FVX_T,RAMP_FVY_T,RAMP_FVZ_T,RAMP_TMP0_Z,&
-                           RAMP_DIRECTION_T,RAMP_DIRECTION_Z,RAMP_SPEED_T,RAMP_SPEED_Z
-TYPE(RESERVED_RAMPS_TYPE), POINTER :: RRP,RRPX
-INTEGER, PARAMETER :: N_MO_PTS=51 ! number of Monin-Obukhov ramp points
-
-integer:: ncid, varid1,varid2,status
-integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
- 
- 
-NAMELIST /WIND/ CORIOLIS_VECTOR,DIRECTION,FORCE_VECTOR,FYI,GEOSTROPHIC_WIND,GROUND_LEVEL,INITIAL_SPEED,L,LAPSE_RATE,LATITUDE,&
-                PRESSURE_GRADIENT_FORCE,RAMP_DIRECTION_T,RAMP_DIRECTION_Z,&
-                RAMP_PGF_T,RAMP_FVX_T,RAMP_FVY_T,RAMP_FVZ_T,RAMP_SPEED_T,RAMP_SPEED_Z,RAMP_TMP0_Z,&
-                SIGMA_THETA,SPEED,STRATIFICATION,TAU_THETA,THETA_STAR,TMP_REF,U_STAR,U0,&
-                USE_ATMOSPHERIC_INTERPOLATION,V0,W0,Z_0,Z_REF
-
-! Default values
-
-DIRECTION               = 270._EB   ! westerly wind
-LAPSE_RATE              = 0._EB     ! K/m
-L                       = 0._EB     ! m
-PRESSURE_GRADIENT_FORCE = -1._EB    ! Pa/m
-RAMP_DIRECTION_T        = 'null'
-RAMP_DIRECTION_Z        = 'null'
-RAMP_SPEED_T            = 'null'
-RAMP_SPEED_Z            = 'null'
-RAMP_TMP0_Z             = 'null'
-RAMP_PGF_T              = 'null'
-RAMP_FVX_T              = 'null'
-RAMP_FVY_T              = 'null'
-RAMP_FVZ_T              = 'null'
-SIGMA_THETA             = -1._EB
-SPEED                   = -1._EB    ! m/s
-TAU_THETA               = 300._EB
-THETA_STAR              = 0._EB     ! K
-TMP_REF                 = -1._EB    ! C
-U_STAR                  = -1._EB    ! m/s
-U0                      = 0._EB     ! m/s
-V0                      = 0._EB     ! m/s
-W0                      = 0._EB     ! m/s
-Z_0                     = -1._EB    ! m
-Z_REF                   = 2._EB     ! m
-
-! Read the WIND line
-
-REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
-WIND_LOOP: DO
-   CALL CHECKREAD('WIND',LU_INPUT,IOS)  ; IF (STOP_STATUS==SETUP_STOP) RETURN
-   IF (IOS==1) EXIT WIND_LOOP
-   READ(LU_INPUT,WIND,END=23,ERR=24,IOSTAT=IOS)
-   24 IF (IOS>0) THEN ; CALL SHUTDOWN('ERROR: Problem with WIND line') ; RETURN ; ENDIF
-ENDDO WIND_LOOP
-23 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
-
-#ifdef temperature_init_in
- status=nf90_open('wind_n.nc', nf90_nowrite, ncid)
- 
-  !status= nf90_inquire(ncid, ndims_in, nvars_in, ngatts_in, unlimdimid_in) 
-  !print*,ndims_in, nvars_in, ngatts_in, unlimdimid_in
- 
- status=nf90_inq_varid(ncid, 'U0', varid1)
- status=nf90_inq_varid(ncid, 'V0', varid2)
- 
- status=nf90_get_var(ncid, varid1, U0)
- status=nf90_get_var(ncid, varid2, V0)
- status=nf90_close(ncid)
- print*, 'Wind check', U0,V0
-
-#endif
-
-! If nothing specified on SURF, then use 0.03 m as default
-
-IF (Z_0<-TWO_EPSILON_EB) Z_0 = 0.03_EB
-
-! Optional fluctuation of the prevailing wind DIRECTION, Theta'(t+dt) = R^2*Theta'(t) + Normal(0,sqrt(1-R^2)*SIGMA_THETA)
-
-IF (SIGMA_THETA>0._EB) THEN
-   N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
-   RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
-   ALLOCATE(RRP%INDEPENDENT_DATA(1001))
-   ALLOCATE(RRP%DEPENDENT_DATA(1001))
-   RRP%NUMBER_DATA_POINTS = 1001
-   RRP%INDEPENDENT_DATA(1) = T_BEGIN
-   RRP%DEPENDENT_DATA(1)   = 0._EB
-   DT_THETA = (T_END-T_BEGIN)/1000._EB
-   LCC = EXP(-DT_THETA/TAU_THETA)  ! Lagrangian Correlation Coefficient, R
-   DO I=2,1001
-      RRP%INDEPENDENT_DATA(I) = RRP%INDEPENDENT_DATA(I-1) + DT_THETA
-      RRP%DEPENDENT_DATA(I)   = LCC**2*RRP%DEPENDENT_DATA(I-1) + NORMAL(0._EB,SQRT(1._EB-LCC**2)*SIGMA_THETA)
-   ENDDO
-   RRP%DEPENDENT_DATA = DIRECTION + RRP%DEPENDENT_DATA
-   RAMP_DIRECTION_T = 'RSRVD FLUCTUATING WIND DIRECTION'
-   RRP%ID = RAMP_DIRECTION_T
-ENDIF
-
-! Determine the appropriate wind speed if the user specifies SPEED or U_STAR.
-
-IF (U_STAR>0._EB) SPEED = U_STAR*LOG((Z_REF-GROUND_LEVEL)/Z_0)/VON_KARMAN_CONSTANT
-
-IF (SPEED>0._EB .OR. INITIAL_SPEED>0._EB) THEN
-   IF (SPEED>0._EB) OPEN_WIND_BOUNDARY = .TRUE.
-   IF (RAMP_DIRECTION_T/='null' .OR. RAMP_DIRECTION_Z/='null') THEN
-      U0 = MAX(SPEED,INITIAL_SPEED)
-      V0 = MAX(SPEED,INITIAL_SPEED)
-   ELSE
-      U0 = -MAX(SPEED,INITIAL_SPEED)*SIN(DIRECTION*DEG2RAD)
-      V0 = -MAX(SPEED,INITIAL_SPEED)*COS(DIRECTION*DEG2RAD)
-   ENDIF
-ENDIF
-
-! Pressure gradient force
-
-IF (PRESSURE_GRADIENT_FORCE>0._EB) THEN
-   IF (RAMP_DIRECTION_T/='null') THEN
-      FVEC(1) = PRESSURE_GRADIENT_FORCE
-      FVEC(2) = PRESSURE_GRADIENT_FORCE
-   ELSE
-      FVEC(1) = -PRESSURE_GRADIENT_FORCE*SIN(DIRECTION*DEG2RAD)
-      FVEC(2) = -PRESSURE_GRADIENT_FORCE*COS(DIRECTION*DEG2RAD)
-   ENDIF
-ELSE
-   FVEC = FORCE_VECTOR
-ENDIF
-
-! Coriolis force
-
-OVEC = CORIOLIS_VECTOR
-IF (LATITUDE>-90.1_EB .AND. LATITUDE<90.1_EB) THEN
-   OVEC(1) = 0._EB
-   OVEC(2) = EARTH_OMEGA*COS(LATITUDE*DEG2RAD)
-   OVEC(3) = EARTH_OMEGA*SIN(LATITUDE*DEG2RAD)
-ENDIF
-
-! Velocity, force, and gravity ramps
-
-I_RAMP_DIRECTION_T = 0
-I_RAMP_DIRECTION_Z = 0
-I_RAMP_SPEED_T     = 0
-I_RAMP_SPEED_Z     = 0
-I_RAMP_TMP0_Z = 0
-I_RAMP_PGF_T= 0
-I_RAMP_FVX_T= 0
-I_RAMP_FVY_T= 0
-I_RAMP_FVZ_T= 0
-
-IF (RAMP_SPEED_T/='null') CALL GET_RAMP_INDEX(RAMP_SPEED_T,'TIME',I_RAMP_SPEED_T)
-IF (RAMP_SPEED_Z/='null') CALL GET_RAMP_INDEX(RAMP_SPEED_Z,'PROFILE',I_RAMP_SPEED_Z)
-IF (RAMP_DIRECTION_T/='null') CALL GET_RAMP_INDEX(RAMP_DIRECTION_T,'TIME',I_RAMP_DIRECTION_T)
-IF (RAMP_DIRECTION_Z/='null') CALL GET_RAMP_INDEX(RAMP_DIRECTION_Z,'PROFILE',I_RAMP_DIRECTION_Z)
-IF (RAMP_TMP0_Z/='null') CALL GET_RAMP_INDEX(RAMP_TMP0_Z,'PROFILE',I_RAMP_TMP0_Z)
-IF (RAMP_PGF_T/='null') CALL GET_RAMP_INDEX(RAMP_PGF_T,'TIME',I_RAMP_PGF_T)
-IF (RAMP_FVX_T/='null') CALL GET_RAMP_INDEX(RAMP_FVX_T,'TIME',I_RAMP_FVX_T)
-IF (RAMP_FVY_T/='null') CALL GET_RAMP_INDEX(RAMP_FVY_T,'TIME',I_RAMP_FVY_T)
-IF (RAMP_FVZ_T/='null') CALL GET_RAMP_INDEX(RAMP_FVZ_T,'TIME',I_RAMP_FVZ_T)
-
-IF (STRATIFICATION) THEN
-
-   IF (HVAC_SOLVE) THEN
-      ZSW = MIN(ZS_MIN-DZS_MAX,NODE_Z_MIN)
-      ZFW = MAX(ZF_MAX+DZF_MAX,NODE_Z_MAX)
-   ELSE
-      ZSW = ZS_MIN
-      ZFW = ZF_MAX
-   ENDIF
-
-   IF (RAMP_TMP0_Z=='null' .AND. ABS(L)<1.E-10_EB) THEN
-      N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
-      RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
-      ALLOCATE(RRP%INDEPENDENT_DATA(2))
-      ALLOCATE(RRP%DEPENDENT_DATA(2))
-      RRP%INDEPENDENT_DATA(1) = ZSW
-      RRP%INDEPENDENT_DATA(2) = ZFW
-      RRP%DEPENDENT_DATA(1)   = (TMPA+LAPSE_RATE*(ZSW-GROUND_LEVEL))/TMPA
-      RRP%DEPENDENT_DATA(2)   = (TMPA+LAPSE_RATE*(ZFW-GROUND_LEVEL))/TMPA
-      RRP%NUMBER_DATA_POINTS = 2
-      RAMP_TMP0_Z = 'RSRVD TEMPERATURE PROFILE'
-      RRP%ID = RAMP_TMP0_Z
-      CALL GET_RAMP_INDEX(RAMP_TMP0_Z,'PROFILE',I_RAMP_TMP0_Z)
-   ENDIF
-
-   IF (ABS(L)>1.E-10_EB) THEN
-      N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
-      RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
-      RRP%NUMBER_DATA_POINTS = N_MO_PTS
-      N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
-      RRPX => RESERVED_RAMPS(N_RESERVED_RAMPS)
-      RRPX%NUMBER_DATA_POINTS = N_MO_PTS
-      ALLOCATE(RRP%INDEPENDENT_DATA(N_MO_PTS))
-      ALLOCATE(RRP%DEPENDENT_DATA(N_MO_PTS))
-      ALLOCATE(RRPX%INDEPENDENT_DATA(N_MO_PTS))
-      ALLOCATE(RRPX%DEPENDENT_DATA(N_MO_PTS))
-      IF (U_STAR<0._EB) U_STAR = VON_KARMAN_CONSTANT*SPEED/LOG((Z_REF-GROUND_LEVEL)/Z_0)
-      IF (TMP_REF<0._EB) THEN
-         TMP_REF = TMPA
-      ELSE
-         TMP_REF = TMP_REF + TMPM  ! C to K
-      ENDIF
-      RHO_REF = 1.2_EB
-      P_REF = P_INF - RHO_REF*GRAV*(Z_REF-GROUND_LEVEL)
-      THETA_REF = TMP_REF*(P_INF/P_REF)**0.286_EB
-      IF (ABS(THETA_STAR)<1.E-10_EB) THEN
-         THETA_0 = THETA_REF/(1._EB+U_STAR**2*LOG((Z_REF-GROUND_LEVEL)/Z_0)/(GRAV*VON_KARMAN_CONSTANT**2*L))
-         THETA_STAR = U_STAR**2*THETA_0/(GRAV*VON_KARMAN_CONSTANT*L)
-      ELSE
-         THETA_0 = THETA_REF - THETA_STAR*LOG((Z_REF-GROUND_LEVEL)/Z_0)/VON_KARMAN_CONSTANT
-      ENDIF
-      TMPA = THETA_0  ! Make the ground temperature the new ambient temperature
-      DO I=1,N_MO_PTS
-         ZETA = ZSW + (I-1)*(ZFW-ZSW)/(REAL(N_MO_PTS,EB)-1._EB)
-         ZZZ  = Z_0*EXP(LOG((ZFW-GROUND_LEVEL)/Z_0)*(ZETA-ZSW)/(ZFW-ZSW))
-         CALL MONIN_OBUKHOV_SIMILARITY(ZZZ,Z_0,L,U_STAR,THETA_STAR,THETA_0,U,TMP)
-         RRP%INDEPENDENT_DATA(I) = GROUND_LEVEL + ZZZ
-         RRP%DEPENDENT_DATA(I)   = TMP/TMPA
-         RRPX%INDEPENDENT_DATA(I) = GROUND_LEVEL + ZZZ
-         IF (SPEED>TWO_EPSILON_EB) THEN
-            RRPX%DEPENDENT_DATA(I) = MAX(0._EB,U/SPEED)
-         ELSE
-            RRPX%DEPENDENT_DATA(I) = 0._EB
-         ENDIF
-      ENDDO
-      RAMP_TMP0_Z = 'RSRVD TEMPERATURE PROFILE'
-      CALL GET_RAMP_INDEX(RAMP_TMP0_Z,'PROFILE',I_RAMP_TMP0_Z)
-      RRP%ID = RAMP_TMP0_Z
-      RAMP_SPEED_Z = 'RSRVD VELOCITY PROFILE'
-      CALL GET_RAMP_INDEX(RAMP_SPEED_Z,'PROFILE',I_RAMP_SPEED_Z)
-      RRPX%ID = RAMP_SPEED_Z
-   ENDIF
-
-   ! Add a RAMP for the vertical profile of pressure (the values are computed in INIT)
-
-   N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
-   CALL GET_RAMP_INDEX('RSRVD PRESSURE PROFILE','PROFILE',I_RAMP_P0_Z)
-   RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
-   ALLOCATE(RRP%INDEPENDENT_DATA(2))
-   ALLOCATE(RRP%DEPENDENT_DATA(2))
-   RRP%INDEPENDENT_DATA(1) = ZSW
-   RRP%INDEPENDENT_DATA(2) = ZFW
-   RRP%DEPENDENT_DATA(1) = 0._EB     ! Dummy values to be filled in later
-   RRP%DEPENDENT_DATA(2) = 1._EB     ! Dummy values to be filled in later
-   RRP%NUMBER_DATA_POINTS = 2
-   RRP%ID = 'RSRVD PRESSURE PROFILE'
-
-ENDIF
-
-! Min value of temperature
-
-IF (LAPSE_RATE < 0._EB) TMPMIN = MIN(TMPMIN,TMPA+LAPSE_RATE*(ZFW-GROUND_LEVEL))
-
-! Set up pressure gradient force (FVEC) based on specified geostrophic wind components
-
-IF (ANY(ABS(GEOSTROPHIC_WIND)>TWO_EPSILON_EB)) THEN
-   IF (ALL(ABS(OVEC)<TWO_EPSILON_EB)) THEN
-      WRITE(MESSAGE,'(A)') 'ERROR: GEOSTROPHIC_WIND requires Coriolis force, set LATITUDE on WIND line'
-      CALL SHUTDOWN(MESSAGE) ; RETURN
-   ENDIF
-   FVEC(1) = - GEOSTROPHIC_WIND(2)*RHOA*2._EB*EARTH_OMEGA*SIN(LATITUDE*DEG2RAD)
-   FVEC(2) =   GEOSTROPHIC_WIND(1)*RHOA*2._EB*EARTH_OMEGA*SIN(LATITUDE*DEG2RAD)
-ENDIF
-
-END SUBROUTINE READ_WIND
-
 
 
 !> \brief Read the FDS input file
@@ -400,6 +128,12 @@ CALL READ_VENT    ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
 CALL READ_ZONE    ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
 CALL READ_HVAC    ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
 CALL READ_WIND    ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
+
+#if defined init_file_in
+!here we call it without the output 
+CALL READ_IC      ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
+#endif
+
 CALL PROC_SURF_1  ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
 CALL READ_INIT    ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
 CALL READ_DUMP    ; CALL CHECK_STOP_STATUS ; IF (STOP_STATUS/=NO_STOP) RETURN
@@ -1104,7 +838,7 @@ MESH_LOOP: DO N=1,NMESHES_READ
       ENDDO J_MULT_LOOP
    ENDDO K_MULT_LOOP
 
-!print*, 'ok1 before mesh def', NM2
+
 
 #if defined global_mesh
    NM3=0  
@@ -1127,14 +861,23 @@ MESH_LOOP: DO N=1,NMESHES_READ
             
             IF (NM3.eq.1) THEN
             ! we can find corner coordinates
-            M%GK1 = 0
-            M%GK2 = M%KBAR
-            M%GI1 = 0
-            M%GI2 = M%IBAR          
-            M%GJ1 = 0
-            M%GJ2 = M%JBAR
+            	! add +1 on each side for zero and IBP1
+            M%GK1 = 1
+            M%GK2 = 1+ M%KBAR
+            M%GI1 = 1
+            M%GI2 = 1+ M%IBAR          
+            M%GJ1 = 1
+            M%GJ2 = 1+ M%JBAR
               
             ENDIF
+            
+# if defined coupled_bc            
+            IF ((II.eq.0) .OR.(JJ.eq.0).OR.(KK.eq.0)) THEN
+             M%COUPLED=1
+            ELSE
+             M%COUPLED=0
+            ENDIF
+# endif            
             
        ENDDO I_MULT_LOOP2
       ENDDO J_MULT_LOOP2
@@ -1150,12 +893,12 @@ MESH_LOOP: DO N=1,NMESHES_READ
       pnt => MESHES(NM3)
       IF (NM3>1) THEN
 
-      i1=0
-      i2=0
-      j1=0
-      j2=0
-      k1=0
-      k2=0
+      i1=1
+      i2=1
+      j1=1
+      j2=1
+      k1=1
+      k2=1
 
        DO KK2=(MR%K_LOWER),pnt%MK  
         DO JJ2=(MR%J_LOWER),pnt%MJ
@@ -1170,33 +913,45 @@ MESH_LOOP: DO N=1,NMESHES_READ
            IF ((pnt2%MI .eq. pnt%MI ).AND.(pnt2%MJ .lt. pnt%MJ ))  THEN
            j1=j1 + pnt2%JBAR
            j2=j2 + pnt2%JBAR
+           !j1=j1 + pnt2%JBP1
+           !j2=j2 + pnt2%JBP1
            ENDIF
            IF ((pnt2%MI .eq. pnt%MI ).AND.(pnt2%MJ .eq. pnt%MJ ))  THEN
             j2 = j2 + pnt2%JBAR
+            !j2 = j2 + pnt2%JBP1
            ENDIF
            IF ((pnt2%MJ .eq. pnt%MJ ).AND.(pnt2%MI .lt. pnt%MI ))  THEN
             i1 = i1 + pnt2%IBAR
             i2 = i2 + pnt2%IBAR
+            !i1 = i1 + pnt2%IBP1
+            !i2 = i2 + pnt2%IBP1
            ENDIF
            IF ((pnt2%MJ .eq. pnt%MJ ).AND.(pnt2%MI .eq. pnt%MI ))  THEN
             i2 = i2 + pnt2%IBAR
+            !i2 = i2 + pnt2%IBP1
            ENDIF
            IF ((pnt2%MI .eq. pnt%MI ).AND. (pnt2%MJ .eq. pnt%MJ ).AND. &
                (pnt2%MK .lt. pnt%MK )) THEN
             k1 = k1 + pnt2%KBAR
             k2 = k2 + pnt2%KBAR
+            !k1 = k1 + pnt2%KBP1
+            !k2 = k2 + pnt2%KBP1
            ENDIF
            IF ((pnt2%MI .eq. pnt%MI ).AND. (pnt2%MJ .eq. pnt%MJ ).AND. &
                (pnt2%MK .eq. pnt%MK )) THEN
             k2 = k2 + pnt2%KBAR
+            !k2 = k2 + pnt2%KBP1
            ENDIF       
+           
+
+           
            
            pnt%GI1 = i1
            pnt%GI2 = i2              
            pnt%GJ1 = j1
            pnt%GJ2 = j2
            pnt%GK1 = k1
-           pnt%GK2 = k2                
+           pnt%GK2 = k2              
           ENDIF
          ENDDO
         ENDDO
@@ -1278,9 +1033,14 @@ DO NM=1,NMESHES
    ALLOCATE(M%NEIGHBORING_MESH(M%N_NEIGHBORING_MESHES))
    DO I=1,M%N_NEIGHBORING_MESHES
       M%NEIGHBORING_MESH(I) = NEIGHBOR_LIST(I)
+      !Print*, NM, NEIGHBOR_LIST(I)
    ENDDO
+  
 ENDDO
 DEALLOCATE(NEIGHBOR_LIST)
+
+
+
 
 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
 
@@ -2308,7 +2068,261 @@ IF (HVAC_MASS_TRANSPORT_CELL_L > 0._EB) HVAC_MASS_TRANSPORT = .TRUE.
 END SUBROUTINE READ_MISC
 
 
+!> \brief Read the WIND namelist line
 
+SUBROUTINE READ_WIND
+
+use netcdf
+USE MATH_FUNCTIONS, ONLY: GET_RAMP_INDEX,NORMAL
+USE PHYSICAL_FUNCTIONS, ONLY: MONIN_OBUKHOV_SIMILARITY
+REAL(EB) :: CORIOLIS_VECTOR(3)=0._EB,FORCE_VECTOR(3)=0._EB,L,ZZZ,ZETA,Z_0,SPEED,DIRECTION,&
+            Z_REF,U_STAR,THETA_0,THETA_STAR,TMP,U,THETA_REF,TMP_REF,P_REF,RHO_REF,ZSW,ZFW,&
+            LCC,DT_THETA,TAU_THETA,SIGMA_THETA,PRESSURE_GRADIENT_FORCE
+CHARACTER(LABEL_LENGTH) :: RAMP_PGF_T,RAMP_FVX_T,RAMP_FVY_T,RAMP_FVZ_T,RAMP_TMP0_Z,&
+                           RAMP_DIRECTION_T,RAMP_DIRECTION_Z,RAMP_SPEED_T,RAMP_SPEED_Z
+TYPE(RESERVED_RAMPS_TYPE), POINTER :: RRP,RRPX
+INTEGER, PARAMETER :: N_MO_PTS=51 ! number of Monin-Obukhov ramp points
+
+integer:: ncid, varid1,varid2,status
+integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
+ 
+ 
+NAMELIST /WIND/ CORIOLIS_VECTOR,DIRECTION,FORCE_VECTOR,FYI,GEOSTROPHIC_WIND,GROUND_LEVEL,INITIAL_SPEED,L,LAPSE_RATE,LATITUDE,&
+                PRESSURE_GRADIENT_FORCE,RAMP_DIRECTION_T,RAMP_DIRECTION_Z,&
+                RAMP_PGF_T,RAMP_FVX_T,RAMP_FVY_T,RAMP_FVZ_T,RAMP_SPEED_T,RAMP_SPEED_Z,RAMP_TMP0_Z,&
+                SIGMA_THETA,SPEED,STRATIFICATION,TAU_THETA,THETA_STAR,TMP_REF,U_STAR,U0,&
+                USE_ATMOSPHERIC_INTERPOLATION,V0,W0,Z_0,Z_REF
+
+! Default values
+
+DIRECTION               = 270._EB   ! westerly wind
+LAPSE_RATE              = 0._EB     ! K/m
+L                       = 0._EB     ! m
+PRESSURE_GRADIENT_FORCE = -1._EB    ! Pa/m
+RAMP_DIRECTION_T        = 'null'
+RAMP_DIRECTION_Z        = 'null'
+RAMP_SPEED_T            = 'null'
+RAMP_SPEED_Z            = 'null'
+RAMP_TMP0_Z             = 'null'
+RAMP_PGF_T              = 'null'
+RAMP_FVX_T              = 'null'
+RAMP_FVY_T              = 'null'
+RAMP_FVZ_T              = 'null'
+SIGMA_THETA             = -1._EB
+SPEED                   = -1._EB    ! m/s
+TAU_THETA               = 300._EB
+THETA_STAR              = 0._EB     ! K
+TMP_REF                 = -1._EB    ! C
+U_STAR                  = -1._EB    ! m/s
+U0                      = 0._EB     ! m/s
+V0                      = 0._EB     ! m/s
+W0                      = 0._EB     ! m/s
+Z_0                     = -1._EB    ! m
+Z_REF                   = 2._EB     ! m
+
+! Read the WIND line
+
+REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
+WIND_LOOP: DO
+   CALL CHECKREAD('WIND',LU_INPUT,IOS)  ; IF (STOP_STATUS==SETUP_STOP) RETURN
+   IF (IOS==1) EXIT WIND_LOOP
+   READ(LU_INPUT,WIND,END=23,ERR=24,IOSTAT=IOS)
+   24 IF (IOS>0) THEN ; CALL SHUTDOWN('ERROR: Problem with WIND line') ; RETURN ; ENDIF
+ENDDO WIND_LOOP
+23 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
+
+
+
+! If nothing specified on SURF, then use 0.03 m as default
+
+IF (Z_0<-TWO_EPSILON_EB) Z_0 = 0.03_EB
+
+! Optional fluctuation of the prevailing wind DIRECTION, Theta'(t+dt) = R^2*Theta'(t) + Normal(0,sqrt(1-R^2)*SIGMA_THETA)
+
+IF (SIGMA_THETA>0._EB) THEN
+   N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
+   RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
+   ALLOCATE(RRP%INDEPENDENT_DATA(1001))
+   ALLOCATE(RRP%DEPENDENT_DATA(1001))
+   RRP%NUMBER_DATA_POINTS = 1001
+   RRP%INDEPENDENT_DATA(1) = T_BEGIN
+   RRP%DEPENDENT_DATA(1)   = 0._EB
+   DT_THETA = (T_END-T_BEGIN)/1000._EB
+   LCC = EXP(-DT_THETA/TAU_THETA)  ! Lagrangian Correlation Coefficient, R
+   DO I=2,1001
+      RRP%INDEPENDENT_DATA(I) = RRP%INDEPENDENT_DATA(I-1) + DT_THETA
+      RRP%DEPENDENT_DATA(I)   = LCC**2*RRP%DEPENDENT_DATA(I-1) + NORMAL(0._EB,SQRT(1._EB-LCC**2)*SIGMA_THETA)
+   ENDDO
+   RRP%DEPENDENT_DATA = DIRECTION + RRP%DEPENDENT_DATA
+   RAMP_DIRECTION_T = 'RSRVD FLUCTUATING WIND DIRECTION'
+   RRP%ID = RAMP_DIRECTION_T
+ENDIF
+
+! Determine the appropriate wind speed if the user specifies SPEED or U_STAR.
+
+IF (U_STAR>0._EB) SPEED = U_STAR*LOG((Z_REF-GROUND_LEVEL)/Z_0)/VON_KARMAN_CONSTANT
+
+IF (SPEED>0._EB .OR. INITIAL_SPEED>0._EB) THEN
+   IF (SPEED>0._EB) OPEN_WIND_BOUNDARY = .TRUE.
+   IF (RAMP_DIRECTION_T/='null' .OR. RAMP_DIRECTION_Z/='null') THEN
+      U0 = MAX(SPEED,INITIAL_SPEED)
+      V0 = MAX(SPEED,INITIAL_SPEED)
+   ELSE
+      U0 = -MAX(SPEED,INITIAL_SPEED)*SIN(DIRECTION*DEG2RAD)
+      V0 = -MAX(SPEED,INITIAL_SPEED)*COS(DIRECTION*DEG2RAD)
+   ENDIF
+ENDIF
+
+! Pressure gradient force
+
+IF (PRESSURE_GRADIENT_FORCE>0._EB) THEN
+   IF (RAMP_DIRECTION_T/='null') THEN
+      FVEC(1) = PRESSURE_GRADIENT_FORCE
+      FVEC(2) = PRESSURE_GRADIENT_FORCE
+   ELSE
+      FVEC(1) = -PRESSURE_GRADIENT_FORCE*SIN(DIRECTION*DEG2RAD)
+      FVEC(2) = -PRESSURE_GRADIENT_FORCE*COS(DIRECTION*DEG2RAD)
+   ENDIF
+ELSE
+   FVEC = FORCE_VECTOR
+ENDIF
+
+! Coriolis force
+
+OVEC = CORIOLIS_VECTOR
+IF (LATITUDE>-90.1_EB .AND. LATITUDE<90.1_EB) THEN
+   OVEC(1) = 0._EB
+   OVEC(2) = EARTH_OMEGA*COS(LATITUDE*DEG2RAD)
+   OVEC(3) = EARTH_OMEGA*SIN(LATITUDE*DEG2RAD)
+ENDIF
+
+! Velocity, force, and gravity ramps
+
+I_RAMP_DIRECTION_T = 0
+I_RAMP_DIRECTION_Z = 0
+I_RAMP_SPEED_T     = 0
+I_RAMP_SPEED_Z     = 0
+I_RAMP_TMP0_Z = 0
+I_RAMP_PGF_T= 0
+I_RAMP_FVX_T= 0
+I_RAMP_FVY_T= 0
+I_RAMP_FVZ_T= 0
+
+IF (RAMP_SPEED_T/='null') CALL GET_RAMP_INDEX(RAMP_SPEED_T,'TIME',I_RAMP_SPEED_T)
+IF (RAMP_SPEED_Z/='null') CALL GET_RAMP_INDEX(RAMP_SPEED_Z,'PROFILE',I_RAMP_SPEED_Z)
+IF (RAMP_DIRECTION_T/='null') CALL GET_RAMP_INDEX(RAMP_DIRECTION_T,'TIME',I_RAMP_DIRECTION_T)
+IF (RAMP_DIRECTION_Z/='null') CALL GET_RAMP_INDEX(RAMP_DIRECTION_Z,'PROFILE',I_RAMP_DIRECTION_Z)
+IF (RAMP_TMP0_Z/='null') CALL GET_RAMP_INDEX(RAMP_TMP0_Z,'PROFILE',I_RAMP_TMP0_Z)
+IF (RAMP_PGF_T/='null') CALL GET_RAMP_INDEX(RAMP_PGF_T,'TIME',I_RAMP_PGF_T)
+IF (RAMP_FVX_T/='null') CALL GET_RAMP_INDEX(RAMP_FVX_T,'TIME',I_RAMP_FVX_T)
+IF (RAMP_FVY_T/='null') CALL GET_RAMP_INDEX(RAMP_FVY_T,'TIME',I_RAMP_FVY_T)
+IF (RAMP_FVZ_T/='null') CALL GET_RAMP_INDEX(RAMP_FVZ_T,'TIME',I_RAMP_FVZ_T)
+
+IF (STRATIFICATION) THEN
+
+   IF (HVAC_SOLVE) THEN
+      ZSW = MIN(ZS_MIN-DZS_MAX,NODE_Z_MIN)
+      ZFW = MAX(ZF_MAX+DZF_MAX,NODE_Z_MAX)
+   ELSE
+      ZSW = ZS_MIN
+      ZFW = ZF_MAX
+   ENDIF
+
+   IF (RAMP_TMP0_Z=='null' .AND. ABS(L)<1.E-10_EB) THEN
+      N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
+      RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
+      ALLOCATE(RRP%INDEPENDENT_DATA(2))
+      ALLOCATE(RRP%DEPENDENT_DATA(2))
+      RRP%INDEPENDENT_DATA(1) = ZSW
+      RRP%INDEPENDENT_DATA(2) = ZFW
+      RRP%DEPENDENT_DATA(1)   = (TMPA+LAPSE_RATE*(ZSW-GROUND_LEVEL))/TMPA
+      RRP%DEPENDENT_DATA(2)   = (TMPA+LAPSE_RATE*(ZFW-GROUND_LEVEL))/TMPA
+      RRP%NUMBER_DATA_POINTS = 2
+      RAMP_TMP0_Z = 'RSRVD TEMPERATURE PROFILE'
+      RRP%ID = RAMP_TMP0_Z
+      CALL GET_RAMP_INDEX(RAMP_TMP0_Z,'PROFILE',I_RAMP_TMP0_Z)
+   ENDIF
+
+   IF (ABS(L)>1.E-10_EB) THEN
+      N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
+      RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
+      RRP%NUMBER_DATA_POINTS = N_MO_PTS
+      N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
+      RRPX => RESERVED_RAMPS(N_RESERVED_RAMPS)
+      RRPX%NUMBER_DATA_POINTS = N_MO_PTS
+      ALLOCATE(RRP%INDEPENDENT_DATA(N_MO_PTS))
+      ALLOCATE(RRP%DEPENDENT_DATA(N_MO_PTS))
+      ALLOCATE(RRPX%INDEPENDENT_DATA(N_MO_PTS))
+      ALLOCATE(RRPX%DEPENDENT_DATA(N_MO_PTS))
+      IF (U_STAR<0._EB) U_STAR = VON_KARMAN_CONSTANT*SPEED/LOG((Z_REF-GROUND_LEVEL)/Z_0)
+      IF (TMP_REF<0._EB) THEN
+         TMP_REF = TMPA
+      ELSE
+         TMP_REF = TMP_REF + TMPM  ! C to K
+      ENDIF
+      RHO_REF = 1.2_EB
+      P_REF = P_INF - RHO_REF*GRAV*(Z_REF-GROUND_LEVEL)
+      THETA_REF = TMP_REF*(P_INF/P_REF)**0.286_EB
+      IF (ABS(THETA_STAR)<1.E-10_EB) THEN
+         THETA_0 = THETA_REF/(1._EB+U_STAR**2*LOG((Z_REF-GROUND_LEVEL)/Z_0)/(GRAV*VON_KARMAN_CONSTANT**2*L))
+         THETA_STAR = U_STAR**2*THETA_0/(GRAV*VON_KARMAN_CONSTANT*L)
+      ELSE
+         THETA_0 = THETA_REF - THETA_STAR*LOG((Z_REF-GROUND_LEVEL)/Z_0)/VON_KARMAN_CONSTANT
+      ENDIF
+      TMPA = THETA_0  ! Make the ground temperature the new ambient temperature
+      DO I=1,N_MO_PTS
+         ZETA = ZSW + (I-1)*(ZFW-ZSW)/(REAL(N_MO_PTS,EB)-1._EB)
+         ZZZ  = Z_0*EXP(LOG((ZFW-GROUND_LEVEL)/Z_0)*(ZETA-ZSW)/(ZFW-ZSW))
+         CALL MONIN_OBUKHOV_SIMILARITY(ZZZ,Z_0,L,U_STAR,THETA_STAR,THETA_0,U,TMP)
+         RRP%INDEPENDENT_DATA(I) = GROUND_LEVEL + ZZZ
+         RRP%DEPENDENT_DATA(I)   = TMP/TMPA
+         RRPX%INDEPENDENT_DATA(I) = GROUND_LEVEL + ZZZ
+         IF (SPEED>TWO_EPSILON_EB) THEN
+            RRPX%DEPENDENT_DATA(I) = MAX(0._EB,U/SPEED)
+         ELSE
+            RRPX%DEPENDENT_DATA(I) = 0._EB
+         ENDIF
+      ENDDO
+      RAMP_TMP0_Z = 'RSRVD TEMPERATURE PROFILE'
+      CALL GET_RAMP_INDEX(RAMP_TMP0_Z,'PROFILE',I_RAMP_TMP0_Z)
+      RRP%ID = RAMP_TMP0_Z
+      RAMP_SPEED_Z = 'RSRVD VELOCITY PROFILE'
+      CALL GET_RAMP_INDEX(RAMP_SPEED_Z,'PROFILE',I_RAMP_SPEED_Z)
+      RRPX%ID = RAMP_SPEED_Z
+   ENDIF
+
+   ! Add a RAMP for the vertical profile of pressure (the values are computed in INIT)
+
+   N_RESERVED_RAMPS = N_RESERVED_RAMPS + 1
+   CALL GET_RAMP_INDEX('RSRVD PRESSURE PROFILE','PROFILE',I_RAMP_P0_Z)
+   RRP => RESERVED_RAMPS(N_RESERVED_RAMPS)
+   ALLOCATE(RRP%INDEPENDENT_DATA(2))
+   ALLOCATE(RRP%DEPENDENT_DATA(2))
+   RRP%INDEPENDENT_DATA(1) = ZSW
+   RRP%INDEPENDENT_DATA(2) = ZFW
+   RRP%DEPENDENT_DATA(1) = 0._EB     ! Dummy values to be filled in later
+   RRP%DEPENDENT_DATA(2) = 1._EB     ! Dummy values to be filled in later
+   RRP%NUMBER_DATA_POINTS = 2
+   RRP%ID = 'RSRVD PRESSURE PROFILE'
+
+ENDIF
+
+! Min value of temperature
+
+IF (LAPSE_RATE < 0._EB) TMPMIN = MIN(TMPMIN,TMPA+LAPSE_RATE*(ZFW-GROUND_LEVEL))
+
+! Set up pressure gradient force (FVEC) based on specified geostrophic wind components
+
+IF (ANY(ABS(GEOSTROPHIC_WIND)>TWO_EPSILON_EB)) THEN
+   IF (ALL(ABS(OVEC)<TWO_EPSILON_EB)) THEN
+      WRITE(MESSAGE,'(A)') 'ERROR: GEOSTROPHIC_WIND requires Coriolis force, set LATITUDE on WIND line'
+      CALL SHUTDOWN(MESSAGE) ; RETURN
+   ENDIF
+   FVEC(1) = - GEOSTROPHIC_WIND(2)*RHOA*2._EB*EARTH_OMEGA*SIN(LATITUDE*DEG2RAD)
+   FVEC(2) =   GEOSTROPHIC_WIND(1)*RHOA*2._EB*EARTH_OMEGA*SIN(LATITUDE*DEG2RAD)
+ENDIF
+
+END SUBROUTINE READ_WIND
 
 
 !> \brief Read the DUMP namelist line, parameters associated with output files
@@ -2353,6 +2367,7 @@ ELSE
    SUPPRESS_DIAGNOSTICS = .FALSE.
 ENDIF
 
+
 DT_BNDF      = -1._EB                  ; RAMP_BNDF    = 'null' ; DT_BNDF_SPECIFIED    = DT_BNDF
 DT_CPU       =  HUGE(EB)               ; RAMP_CPU     = 'null' ; DT_CPU_SPECIFIED     = DT_CPU
 DT_CTRL      = -1._EB                  ; RAMP_CTRL    = 'null' ; DT_CTRL_SPECIFIED    = DT_CTRL
@@ -2376,6 +2391,7 @@ DT_UVW       =  HUGE(EB)               ; RAMP_UVW     = 'null' ; DT_UVW_SPECIFIE
 ! Read the DUMP line
 
 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
+
 DUMP_LOOP: DO
    CALL CHECKREAD('DUMP',LU_INPUT,IOS)  ; IF (STOP_STATUS==SETUP_STOP) RETURN
    IF (IOS==1) EXIT DUMP_LOOP
@@ -11176,6 +11192,7 @@ MESH_LOOP_1: DO NM=1,NMESHES
                VT%IOR = IOR
                VT%ORDINAL = N_EXPLICIT
 
+
                ! Activate and Deactivate logic
 
                VT%ACTIVATED = .TRUE.
@@ -11605,6 +11622,7 @@ NAMELIST /INIT/ BULK_DENSITY_FACTOR,BULK_DENSITY_FILE,CELL_CENTERED,CROWN_BASE_H
                 RADIUS,RAMP_PART,RAMP_Q,SHAPE,SPEC_ID,TEMPERATURE,TREE_HEIGHT,UNIFORM,UVW,VOLUME_FRACTION,XB,XYZ
 N_INIT = 0
 N_INIT_READ = 0
+
 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
 
 COUNT_LOOP: DO
@@ -13799,6 +13817,7 @@ PROC_DEVC_LOOP: DO N=1,N_DEVC
             CALL SHUTDOWN(MESSAGE) ; RETURN
          ENDIF
 
+         DV%SETPOINT = PROPERTY(DV%PROP_INDEX)%ACTIVATION_TEMPERATURE
          DV%TMP_L    = PROPERTY(DV%PROP_INDEX)%INITIAL_TEMPERATURE
 
       CASE ('THERMOCOUPLE')
@@ -15394,6 +15413,45 @@ H_V_1 = H_V_H2O(I) + (T_R-REAL(I,EB))*(H_V_H2O(I+1)-H_V_H2O(I))
 H_V_H2O = H_V_H2O + H_V - H_V_1
 
 END SUBROUTINE CALC_H2O_HV
+!> \brief Read the IC namelist line
 
+
+#if defined init_file_in
+SUBROUTINE READ_IC !(file_name)
+
+USE COUPLED_FILES
+use netcdf
+INTEGER:: IOS
+REAL(EB) :: THETA_0,TMP,U,THETA_REF,TMP_REF,P_REF,RHO_REF,ZSW,ZFW
+!CHARACTER(10):: FILE_NAME_IC
+!character(10), Intent(out), Optional :: file_name
+integer:: ncid, varid1,varid2,status
+integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
+# if defined coupled_bc 
+NAMELIST /ICCD/   ICFile , OBFile
+# else
+NAMELIST /ICCD/   ICFile 
+# endif
+! Default values
+!FILE                   = 'my_test.nc'   ! empty
+U0                      = 0._EB     ! m/s
+V0                      = 0._EB     ! m/s
+W0                      = 0._EB     ! m/s
+
+! Read the IC line
+
+REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
+IC_LOOP: DO
+   CALL CHECKREAD('ICCD',LU_INPUT,IOS)  ; !IF (STOP_STATUS==SETUP_STOP) RETURN
+   IF (IOS==1) EXIT IC_LOOP
+   READ(LU_INPUT,ICCD,END=230,ERR=240,IOSTAT=IOS)
+    240 IF (IOS>0) THEN ; CALL SHUTDOWN('ERROR: Problem with IC line') ; RETURN ; ENDIF
+ENDDO IC_LOOP
+230 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
+
+ 
+
+END SUBROUTINE READ_IC
+#endif
 
 END MODULE READ_INPUT

@@ -150,10 +150,12 @@ TYPE MESH_TYPE
    INTEGER, ALLOCATABLE, DIMENSION(:) :: RGB               !< Color indices of the mesh for Smokeview
    
 #if defined global_mesh
-   REAL(EB) :: MI, MJ, MK
-   REAL(EB) :: GI1, GI2, GJ1, GJ2, GK1, GK2
+   INTEGER :: MI, MJ, MK
+   INTEGER :: GI1, GI2, GJ1, GJ2, GK1, GK2
 #endif   
-
+#if defined coupled_bc
+   INTEGER:: COUPLED
+#endif
    ! Mesh coordinate variables
 
    REAL(EB) :: DXI                               !< \f$ \delta \xi = (x_I-x_0)/I \f$
@@ -392,7 +394,7 @@ INTEGER, POINTER :: N_NEIGHBORING_MESHES
 INTEGER, POINTER, DIMENSION(:) :: NEIGHBORING_MESH
 
 #if defined global_mesh
-REAL(EB), POINTER :: MI,MJ,MK,GI1,GI2,GJ1,GJ2,GK1,GK2
+INTEGER, POINTER :: MI,MJ,MK,GI1,GI2,GJ1,GJ2,GK1,GK2
 #endif
 
 INTEGER, POINTER, DIMENSION(:) :: RGB
