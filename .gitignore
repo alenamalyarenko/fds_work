@@ -3,3 +3,4 @@
 *.mod
 *.nc
 *.exe
+/build_maui/fds_impi_intel_linux_nc
