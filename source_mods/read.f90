@@ -7261,6 +7261,7 @@ NAMELIST /SURF/ ADIABATIC,AREA_MULTIPLIER,BACKING,BURN_AWAY,BURN_DURATION,&
                 VEG_LSET_ROS_00,VEG_LSET_ROS_BACK,VEG_LSET_ROS_FLANK,VEG_LSET_ROS_HEAD,VEG_LSET_SIGMA,&
                 VEG_LSET_SURF_LOAD,VEG_LSET_TAN2,VEG_LSET_WIND_EXP,&
                 VEL,VEL_BULK,VEL_GRAD,VEL_PART,VEL_T,VOLUME_FLOW,WIDTH,XYZ,Z0,Z_0
+               
 
 ! Count the SURF lines in the input file
 
@@ -7746,6 +7747,8 @@ READ_SURF_LOOP: DO N=0,N_SURF
       RGB(2) = 0
       RGB(3) = 255
    ENDIF
+
+   
    SF%RENODE_DELTA_T       = RENODE_DELTA_T
    SF%RGB                  = RGB
    SF%ROUGHNESS            = ROUGHNESS
@@ -7829,7 +7832,7 @@ READ_SURF_LOOP: DO N=0,N_SURF
            TRIM(ID)=='PERIODIC'           .OR. &
            TRIM(ID)=='HVAC'               .OR. &
            TRIM(ID)=='MASSLESS TRACER'    .OR. &
-           TRIM(ID)=='DROPLET'            .OR. &
+           TRIM(ID)=='DROPLET'            .OR. &           
            TRIM(ID)=='MASSLESS TARGET')        ) THEN
       WRITE (MESSAGE,'(A,A,A)') 'ERROR: Problem with SURF: ',TRIM(SF%ID),'. Cannot set predefined SURF as DEFAULT'
       CALL SHUTDOWN(MESSAGE) ; RETURN
@@ -11182,12 +11185,21 @@ MESH_LOOP_1: DO NM=1,NMESHES
                IF ((MB/='null' .OR.  PBX>-1.E5_EB .OR. PBY>-1.E5_EB .OR. PBZ>-1.E5_EB) .AND. SURF_ID=='OPEN') VT%TYPE_INDICATOR=-2
                IF (SURF_ID=='PERIODIC FLOW ONLY') VT%SURF_INDEX = PERIODIC_FLOW_ONLY_SURF_INDEX
 
+#if defined coupled_bc
+               IF (SURF_ID=='COUPLED')                            VT%TYPE_INDICATOR =  3
+#endif   
+
                VT%BOUNDARY_TYPE = SOLID_BOUNDARY
                IF (VT%SURF_INDEX==OPEN_SURF_INDEX)               VT%BOUNDARY_TYPE = OPEN_BOUNDARY
                IF (VT%SURF_INDEX==MIRROR_SURF_INDEX)             VT%BOUNDARY_TYPE = MIRROR_BOUNDARY
                IF (VT%SURF_INDEX==PERIODIC_SURF_INDEX)           VT%BOUNDARY_TYPE = PERIODIC_BOUNDARY
                IF (VT%SURF_INDEX==PERIODIC_FLOW_ONLY_SURF_INDEX) VT%BOUNDARY_TYPE = PERIODIC_BOUNDARY
                IF (VT%SURF_INDEX==HVAC_SURF_INDEX)               VT%BOUNDARY_TYPE = HVAC_BOUNDARY
+
+#if defined coupled_bc
+               IF (VT%SURF_INDEX==COUPLED_SURF_INDEX)            VT%BOUNDARY_TYPE = COUPLED_BOUNDARY
+#endif   
+
 
                VT%IOR = IOR
                VT%ORDINAL = N_EXPLICIT

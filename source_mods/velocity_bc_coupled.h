@@ -184,84 +184,14 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
             IWPI = CELL(ICPP)%WALL_INDEX(-IS2)
          ENDIF
 
-         ! If both adjacent wall cells are undefined, cycle out of the loop.
 
-         IF (IWM==0 .AND. IWP==0) CYCLE ORIENTATION_LOOP
 
-         ! If there is a solid wall separating the two adjacent wall cells, cycle out of the loop.
 
-         IF ((WALL(IWMI)%BOUNDARY_TYPE==SOLID_BOUNDARY .AND. SURFACE(WALL(IWM)%SURF_INDEX)%VELOCITY_BC_INDEX/=FREE_SLIP_BC) .OR. &
-             (WALL(IWPI)%BOUNDARY_TYPE==SOLID_BOUNDARY .AND. SURFACE(WALL(IWP)%SURF_INDEX)%VELOCITY_BC_INDEX/=FREE_SLIP_BC)) &
-            CYCLE ORIENTATION_LOOP
 
-         ! If only one adjacent wall cell is defined, use its properties.
 
-         IF (IWM>0) THEN
-            WCM => WALL(IWM)
-         ELSE
-            WCM => WALL(IWP)
-         ENDIF
 
-         IF (IWP>0) THEN
-            WCP => WALL(IWP)
-         ELSE
-            WCP => WALL(IWM)
-         ENDIF
 
-         WCM_B1 => BOUNDARY_PROP1(WCM%B1_INDEX)
-         WCP_B1 => BOUNDARY_PROP1(WCP%B1_INDEX)
-
-         ! If both adjacent wall cells are NULL, cycle out.
-
-         BOUNDARY_TYPE_M = WCM%BOUNDARY_TYPE
-         BOUNDARY_TYPE_P = WCP%BOUNDARY_TYPE
-
-         IF (BOUNDARY_TYPE_M==NULL_BOUNDARY .AND. BOUNDARY_TYPE_P==NULL_BOUNDARY) CYCLE ORIENTATION_LOOP
-
-         ! Set up synthetic eddy method
-
-         SYNTHETIC_EDDY_METHOD = .FALSE.
-         IF (IWM>0 .AND. IWP>0) THEN
-            IF (WCM%VENT_INDEX==WCP%VENT_INDEX) THEN
-               IF (WCM%VENT_INDEX>0) THEN
-                  VT=>VENTS(WCM%VENT_INDEX)
-                  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
-               ENDIF
-            ENDIF
-         ENDIF
-
-         VEL_EDDY = 0._EB
-         SYNTHETIC_EDDY_IF_1: IF (SYNTHETIC_EDDY_METHOD) THEN
-            IS_SELECT_1: SELECT CASE(IS) ! unsigned vent orientation
-               CASE(1) ! yz plane
-                  SELECT CASE(IEC) ! edge orientation
-                     CASE(2)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_EDDY(JJ,KK)+VT%U_EDDY(JJ,KK+1))
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_EDDY(JJ,KK)+VT%W_EDDY(JJ,KK+1))
-                     CASE(3)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_EDDY(JJ,KK)+VT%V_EDDY(JJ+1,KK))
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_EDDY(JJ,KK)+VT%U_EDDY(JJ+1,KK))
-                  END SELECT
-               CASE(2) ! zx plane
-                  SELECT CASE(IEC)
-                     CASE(3)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,KK)+VT%V_EDDY(II+1,KK))
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_EDDY(II,KK)+VT%U_EDDY(II+1,KK))
-                     CASE(1)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_EDDY(II,KK)+VT%W_EDDY(II,KK+1))
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,KK)+VT%V_EDDY(II,KK+1))
-                  END SELECT
-               CASE(3) ! xy plane
-                  SELECT CASE(IEC)
-                     CASE(1)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_EDDY(II,JJ)+VT%W_EDDY(II,JJ+1))
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,JJ)+VT%V_EDDY(II,JJ+1))
-                     CASE(2)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_EDDY(II,JJ)+VT%U_EDDY(II+1,JJ))
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_EDDY(II,JJ)+VT%W_EDDY(II+1,JJ))
-                  END SELECT
-            END SELECT IS_SELECT_1
-         ENDIF SYNTHETIC_EDDY_IF_1
+         
 
          ! OPEN boundary conditions, both varieties, with and without a wind
 
@@ -342,14 +272,6 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
 
             ENDIF WIND_NO_WIND_IF
 
-            IF (CC_IBM) CALL GET_OPENBC_TANGENTIAL_CUTFACE_VEL(APPLY_TO_ESTIMATED_VARIABLES,UPWIND_BOUNDARY,&
-                                                               INFLOW_BOUNDARY,IEC,II,JJ,KK,IOR,UU,VV,WW)
-
-            IF (IWM/=0 .AND. IWP/=0) THEN
-               CYCLE EDGE_LOOP  ! Do no further processing of this edge if both cell faces are OPEN
-            ELSE
-               CYCLE ORIENTATION_LOOP
-            ENDIF
 
          ENDIF OPEN_AND_WIND_BC
 
