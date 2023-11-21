@@ -24,5 +24,16 @@ cp ../source_mods/mesh.f90  ../Source/
 cp ../source_mods/read.f90  ../Source/
 cp ../source_mods/velo.f90  ../Source/
 
+cp ../source_mods/ccib.f90  ../Source/
+cp ../source_mods/cons.f90  ../Source/
+cp ../source_mods/divg.f90  ../Source/
+cp ../source_mods/fire.f90  ../Source/
+cp ../source_mods/geom.f90  ../Source/
+cp ../source_mods/mass.f90  ../Source/
+cp ../source_mods/pres.f90  ../Source/
+cp ../source_mods/radi.f90  ../Source/
+cp ../source_mods/soot.f90  ../Source/
+cp ../source_mods/turb.f90  ../Source/
+cp ../source_mods/wall.f90  ../Source/
 
 FFLAGS="$FFLAGS -fpp" FCOMPL="ifort" obj="fds" make  -j 8 impi_intel_linux_nc
