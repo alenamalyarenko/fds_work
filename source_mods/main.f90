@@ -2505,7 +2505,9 @@ DO WHILE (ANY(SETUP_PRESSURE_ZONES_INDEX==0))
    ! For each mesh, go around the exterior boundary looking for OPEN or INTERPOLATED boundaries.
    ! For the OPEN boundaries, propagate a PRESSURE_ZONE value of 0 into the interior of the mesh.
    ! For the INTERPOLATED boundaries (NOM/=0), get the PRESSURE_ZONE value from the neighboring mesh and propagate it internally.
-
+#if defined coupled_bc
+   ! We probaly need to do something here?
+#endif   
    MESH_LOOP: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
 
       M => MESHES(NM)
@@ -4298,7 +4300,5 @@ WRITE(COMPILE_DATE,'(A)')  GCOMPILE_DATE(INDEX(GCOMPILE_DATE,':')+2:LEN_TRIM(GCO
 END SUBROUTINE GET_INFO
 
 
-#if defined coupled_bc
-# include 'velocity_bc_coupled.h'
-#endif
+
 END PROGRAM FDS

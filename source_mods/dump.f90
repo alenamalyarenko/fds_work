@@ -3767,6 +3767,15 @@ SURFLOOP: DO N=0,N_SURF
       WRITE(LU_OUTPUT,'(A)')      '     Passive Vent to Atmosphere'
       CYCLE SURFLOOP
    ENDIF
+   
+#if defined coupled_bc
+   IF (N==COUPLED_SURF_INDEX) THEN
+      WRITE(LU_OUTPUT,'(A)')      '     Coupled Vent to OBFile'
+      CYCLE SURFLOOP
+   ENDIF   
+#endif      
+   
+   
    IF (N==MIRROR_SURF_INDEX) THEN
       WRITE(LU_OUTPUT,'(A)')      '     Symmetry Plane'
       CYCLE SURFLOOP

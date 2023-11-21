@@ -1,3 +1,5 @@
+#include 'keys.h'
+
 !> \brief Collection of velocity routines.
 !> Computes the velocity flux terms, baroclinic torque correction terms, and performs the CFL check.
 
@@ -18,6 +20,9 @@ TYPE(BOUNDARY_PROP2_TYPE), POINTER :: B2
 TYPE(SURFACE_TYPE), POINTER :: SF
 
 PUBLIC VELOCITY_PREDICTOR,VELOCITY_CORRECTOR,NO_FLUX,BAROCLINIC_CORRECTION,MATCH_VELOCITY,MATCH_VELOCITY_FLUX,&
+#if defined coupled_bc
+      VELOCITY_BC_COUPLED, &
+#endif
        VELOCITY_BC,COMPUTE_VISCOSITY,VISCOSITY_BC,VELOCITY_FLUX,VELOCITY_FLUX_CYLINDRICAL
 
 
@@ -1810,6 +1815,9 @@ ENDIF
 T_USED(4)=T_USED(4)+CURRENT_TIME()-T_NOW
 END SUBROUTINE VELOCITY_CORRECTOR
 
+#if defined coupled_bc
+# include 'velocity_bc_coupled.h'
+#endif
 
 !> \brief Assert tangential velocity boundary conditions
 !> \param T Current time (s)
