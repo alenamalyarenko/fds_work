@@ -1903,7 +1903,10 @@ VENT_LOOP: DO NV=1,N_VENT
    VT%W_EDDY = 0._EB
    SF => SURFACE(VT%SURF_INDEX)
 
-   IF ( .NOT. (VT%BOUNDARY_TYPE==OPEN_BOUNDARY  &      
+   IF ( .NOT. (VT%BOUNDARY_TYPE==OPEN_BOUNDARY  &
+#if defined coupled_bc
+       .AND. VT%BOUNDARY_TYPE==COUPLED_BOUNDARY &
+#endif         
        .AND. OPEN_WIND_BOUNDARY)) THEN
       IF (ABS(SF%T_IGN-T_BEGIN)<=SPACING(SF%T_IGN) .AND. SF%RAMP(TIME_VELO)%INDEX>=1) THEN
          TSI = T
@@ -1922,7 +1925,10 @@ VENT_LOOP: DO NV=1,N_VENT
             
             ! determine advection velocity based on eddy position
             PROFILE_FACTOR = 1._EB
-            IF ( VT%BOUNDARY_TYPE==OPEN_BOUNDARY  &                
+            IF ( VT%BOUNDARY_TYPE==OPEN_BOUNDARY  &
+#if defined coupled_bc
+                .AND. VT%BOUNDARY_TYPE==COUPLED_BOUNDARY &
+#endif                 
             .AND. OPEN_WIND_BOUNDARY ) THEN
                ZZ=CELLSK(MIN(CELLSK_HI,MAX(CELLSK_LO,FLOOR((VT%Z_EDDY(NE)-ZS)*RDZINT))))
                KK=FLOOR(ZZ+1._EB)
@@ -1967,7 +1973,10 @@ VENT_LOOP: DO NV=1,N_VENT
 
             ! determine advection velocity based on eddy position
             PROFILE_FACTOR = 1._EB
-            IF ( VT%BOUNDARY_TYPE==OPEN_BOUNDARY  &    
+            IF ( VT%BOUNDARY_TYPE==OPEN_BOUNDARY  &
+#if defined coupled_bc
+                 .AND. VT%BOUNDARY_TYPE==COUPLED_BOUNDARY &
+#endif     
             .AND. OPEN_WIND_BOUNDARY ) THEN
                ZZ=CELLSK(MIN(CELLSK_HI,MAX(CELLSK_LO,FLOOR((VT%Z_EDDY(NE)-ZS)*RDZINT))))
                KK=FLOOR(ZZ+1._EB)
@@ -2012,7 +2021,10 @@ VENT_LOOP: DO NV=1,N_VENT
 
             ! determine advection velocity based on eddy position
             PROFILE_FACTOR = 1._EB
-            IF ( VT%BOUNDARY_TYPE==OPEN_BOUNDARY &  
+            IF ( VT%BOUNDARY_TYPE==OPEN_BOUNDARY & 
+#if defined coupled_bc
+                .AND. VT%BOUNDARY_TYPE==COUPLED_BOUNDARY &
+#endif     
             .AND. OPEN_WIND_BOUNDARY ) THEN
                ZZ=CELLSK(MIN(CELLSK_HI,MAX(CELLSK_LO,FLOOR((VT%Z_EDDY(NE)-ZS)*RDZINT))))
                KK=FLOOR(ZZ+1._EB)

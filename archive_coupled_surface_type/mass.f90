@@ -118,8 +118,13 @@ SPECIES_LOOP: DO N=1,N_TOTAL_SCALARS
 
       ! Overwrite first off-wall advective flux if flow is away from the wall and if the face is not also a wall cell
 
-      OFF_WALL_IF_2: IF (WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY &  
+      OFF_WALL_IF_2: IF (WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY & 
+#if defined coupled_bc
+                     .AND. WC%BOUNDARY_TYPE/=COUPLED_BOUNDARY  &
+#endif   
                      .AND. WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) THEN
+
+
          OFF_WALL_SELECT_2: SELECT CASE(IOR)
             CASE( 1) OFF_WALL_SELECT_2
                !      ghost          FX/UU(II+1)

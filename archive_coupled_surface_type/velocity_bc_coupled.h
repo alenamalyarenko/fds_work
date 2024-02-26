@@ -77,7 +77,7 @@ VENT_LOOP: DO N=1,N_VENT
    !VT => NM%VENTS(N)
 !   Print*, N, 'ch3'
    
-   IF (VENTS(N)%BOUNDARY_TYPE==OPEN_BOUNDARY) THEN
+   IF (VENTS(N)%BOUNDARY_TYPE==COUPLED_BOUNDARY) THEN
 !   	Print*,N,  'ch4'
    	Print*, VENTS(N)%IOR
    	IF (VENTS(N)%IOR==1) THEN

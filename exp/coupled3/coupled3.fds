@@ -1,4 +1,4 @@
-&HEAD CHID='Coupled2'/
+&HEAD CHID='Coupled3'/
 
 # GRID
 # NX NY NZ (counted from zero, so there's NX+1 tacer cells) 
@@ -8,42 +8,29 @@
 
 
 
-#For mean IC field:
-# TIME
-&TIME T_END=900,LOCK_TIME_STEP=F, DT=1 /
-
-#character(10)
-&ICCD ICFile='ic_pal6.nc', OBFile='bc_pal8.nc' /
-
 
 #For instanteneous IC field:
 # TIME
-#&TIME T_END=60,LOCK_TIME_STEP=T, DT=0.01 /
+&TIME T_END=10,LOCK_TIME_STEP=T, DT=0.01 /
 
 #character(10)
-#&ICCD ICFile='ic_pal8.nc', OBFile='bc_pal8.nc' /
+#&ICCD ICFile='ic_pal9.nc', OBFile='bc_pal9.nc' /
+&ICCD ICFile='ic_pal9.nc' /
+
 
 # Boundary Conditions:
-#&VENT MB='XMIN', SURF_ID='COUPLED' /
+#  VT%N_EDDY
+#  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
 
-#&VENT MB='XMAX', SURF_ID='COUPLED' /
-#&VENT XB=320,320,0,320,0,180,  SURF_ID='COUPLED' /
-#&VENT MB='YMIN', SURF_ID='OPEN' /
-#&VENT MB='YMAX', SURF_ID='OPEN' /
+&VENT MB='XMIN', SURF_ID='OPEN',N_EDDY=-1 /
+&VENT MB='XMAX', SURF_ID='OPEN',N_EDDY=-1 /
 
-
-
-&VENT MB='ZMAX', SURF_ID='OPEN' /
-&VENT MB='XMIN', SURF_ID='OPEN'/
-&VENT MB='XMAX', SURF_ID='OPEN' /
-&VENT MB='YMIN', SURF_ID='OPEN'/
+&VENT MB='YMIN', SURF_ID='OPEN' /
 &VENT MB='YMAX', SURF_ID='OPEN' /
-
-#&VENT MB='ZMIN', SURF_ID='GROUND' /
-#&SURF ID='GROUND', FREE_SLIP=T /
+&VENT MB='ZMAX', SURF_ID='OPEN' /
 
 
-&WIND SPEED=4.8, DIRECTION=270., L=-500., Z_0=0.03 /
+
 
 
 # OUTPUT FREQ
@@ -67,8 +54,7 @@
 # heat flux : total ( convective  + radiation )
 # butning rate - g/s / m2 
 
-#&DUMP DT_PL3D=10, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
-&DUMP DT_PL3D=60,  WRITE_XYZ=T /
+&DUMP DT_PL3D=1, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
 
 
 

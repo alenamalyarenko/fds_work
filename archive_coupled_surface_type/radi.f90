@@ -3863,7 +3863,11 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
          IF (WC%BOUNDARY_TYPE==NULL_BOUNDARY) CYCLE
          B1 => BOUNDARY_PROP1(WC%B1_INDEX)
          BC    => BOUNDARY_COORD(WC%BC_INDEX)
-         IF (WC%BOUNDARY_TYPE == OPEN_BOUNDARY) THEN     
+#if defined coupled_bc
+         IF (WC%BOUNDARY_TYPE == OPEN_BOUNDARY .OR. WC%BOUNDARY_TYPE == COUPLED_BOUNDARY) THEN   
+#else
+         IF (WC%BOUNDARY_TYPE == OPEN_BOUNDARY) THEN   
+#endif   
             OUTRAD_W(IW) = BBFA*RPI*SIGMA*TMPA**4
          ELSE
             IF (WIDE_BAND_MODEL) BBF = BLACKBODY_FRACTION(WL_LOW(IBND),WL_HIGH(IBND),B1%TMP_F)
@@ -3935,6 +3939,10 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
          DO IW=1,N_EXTERNAL_WALL_CELLS
             WC => WALL(IW)
             IF (WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) CYCLE
+#if defined coupled_bc
+            IF (WC%BOUNDARY_TYPE/=COUPLED_BOUNDARY) CYCLE   
+#endif               
+            
             BR => BOUNDARY_RADIA(WC%BR_INDEX)
             BR%BAND(IBND)%ILW(ANGLE_INC_COUNTER) = 0._EB
          ENDDO
@@ -3976,7 +3984,12 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
                            IL(II,JJ,KK) = BBFA*RPI_SIGMA*TMP_EXTERIOR**4
                         ELSE
                            IL(II,JJ,KK) = BBFA*RPI_SIGMA*TMPA4
-                        ENDIF                                                
+                        ENDIF
+#if defined coupled_bc
+! this needs to be fixed   
+#endif   
+                        
+                        
                      CASE (MIRROR_BOUNDARY)
                         BR%BAND(IBND)%ILW(N) = BR%BAND(IBND)%ILW(DLM(N,ABS(IOR)))
                         IL(II,JJ,KK) = BR%BAND(IBND)%ILW(N)
@@ -3995,7 +4008,10 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
                         CELL_ILW(IC,ABS(IOR)) = BR%BAND(IBND)%ILW(N)
                   END SELECT
                ELSEIF (CYLINDRICAL) THEN
-                  IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY) CYCLE WALL_LOOP1               
+                  IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY) CYCLE WALL_LOOP1
+#if defined coupled_bc
+! this needs to be fixed   
+#endif                     
                   IL(II,JJ,KK) = BR%BAND(IBND)%ILW(N)
                ENDIF
             ENDDO WALL_LOOP1
@@ -4258,7 +4274,10 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
             WALL_LOOP2: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
                WC => WALL(IW)
                IF (WC%BOUNDARY_TYPE==NULL_BOUNDARY) CYCLE WALL_LOOP2
-               IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY) CYCLE WALL_LOOP2                 
+               IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY) CYCLE WALL_LOOP2
+#if defined coupled_bc
+               IF (WC%BOUNDARY_TYPE==COUPLED_BOUNDARY) CYCLE WALL_LOOP2
+#endif                  
                BC => BOUNDARY_COORD(WC%BC_INDEX)
                BR => BOUNDARY_RADIA(WC%BR_INDEX)
                IOR = BC%IOR
@@ -4274,7 +4293,10 @@ BAND_LOOP: DO IBND = 1,NUMBER_SPECTRAL_BANDS
             !$OMP END DO
 
             !$OMP DO SCHEDULE(GUIDED)
-            WALL_LOOP3: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS             
+            WALL_LOOP3: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
+#if defined coupled_bc
+!this needs to be fixed   
+#endif               
                WC => WALL(IW)
                IF (WC%BOUNDARY_TYPE/=OPEN_BOUNDARY)   CYCLE WALL_LOOP3
                BC => BOUNDARY_COORD(WC%BC_INDEX)
@@ -4443,7 +4465,10 @@ IF (UPDATE_INTENSITY) THEN
    UII = SUM(UIID, DIM = 4)
 
    DO IW=1,N_EXTERNAL_WALL_CELLS
-      WC => WALL(IW)        
+      WC => WALL(IW)
+#if defined coupled_bc
+!this needs to be fixed   
+#endif           
       IF (WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) CYCLE
       B1 => BOUNDARY_PROP1(WC%B1_INDEX)
       BR => BOUNDARY_RADIA(WC%BR_INDEX)

@@ -594,12 +594,7 @@ M%W_GHOST = 0._EB
 
 VENT_LOOP: DO N=1,M%N_VENT
    VT => M%VENTS(N)
-#if defined coupled_bc   
-   EDDY_IF: IF (VT%N_EDDY>0).OR.(VT%N_EDDY==-1) THEN
-#else
    EDDY_IF: IF (VT%N_EDDY>0) THEN
-   
-#endif   
       SELECT CASE(ABS(VT%IOR))
          CASE(1)
             ALLOCATE(VT%U_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
@@ -2532,35 +2527,35 @@ NBC = FISHPAK_BC_NEUMANN_NEUMANN
 
 VENT_LOOP: DO N=1,M%N_VENT
    VT => M%VENTS(N)
-!#if defined coupled_bc
-!   IF (VT%BOUNDARY_TYPE == COUPLED_BOUNDARY ) THEN
-!  	 IF (VT%I1==0 .AND. VT%I2==0) THEN
-!  	    IF (LBC==FISHPAK_BC_NEUMANN_NEUMANN)   LBC = FISHPAK_BC_DIRICHLET_NEUMANN
-!  	    IF (LBC==FISHPAK_BC_NEUMANN_DIRICHLET) LBC = FISHPAK_BC_DIRICHLET_DIRICHLET
-!  	 ENDIF
-!  	 IF (VT%I1==M%IBAR .AND. VT%I2==M%IBAR) THEN
-!  	    IF (LBC==FISHPAK_BC_NEUMANN_NEUMANN)   LBC = FISHPAK_BC_NEUMANN_DIRICHLET
-!  	    IF (LBC==FISHPAK_BC_DIRICHLET_NEUMANN) LBC = FISHPAK_BC_DIRICHLET_DIRICHLET
-!  	 ENDIF
-!  	 IF (VT%J1==0 .AND. VT%J2==0) THEN
-!  	    IF (MBC==FISHPAK_BC_NEUMANN_NEUMANN)   MBC = FISHPAK_BC_DIRICHLET_NEUMANN
-!  	    IF (MBC==FISHPAK_BC_NEUMANN_DIRICHLET) MBC = FISHPAK_BC_DIRICHLET_DIRICHLET
-!  	 ENDIF
-!  	 IF (VT%J1==M%JBAR .AND. VT%J2==M%JBAR) THEN
-!  	    IF (MBC==FISHPAK_BC_NEUMANN_NEUMANN)   MBC = FISHPAK_BC_NEUMANN_DIRICHLET
-!  	    IF (MBC==FISHPAK_BC_DIRICHLET_NEUMANN) MBC = FISHPAK_BC_DIRICHLET_DIRICHLET
-!  	 ENDIF
-!  	 IF (VT%K1==0 .AND. VT%K2==0) THEN
-!  	    IF (NBC==FISHPAK_BC_NEUMANN_NEUMANN)   NBC = FISHPAK_BC_DIRICHLET_NEUMANN
-!  	    IF (NBC==FISHPAK_BC_NEUMANN_DIRICHLET) NBC = FISHPAK_BC_DIRICHLET_DIRICHLET
-!  	 ENDIF
-!  	 IF (VT%K1==M%KBAR .AND. VT%K2==M%KBAR) THEN
-!  	    IF (NBC==FISHPAK_BC_NEUMANN_NEUMANN)   NBC = FISHPAK_BC_NEUMANN_DIRICHLET
-!  	    IF (NBC==FISHPAK_BC_DIRICHLET_NEUMANN) NBC = FISHPAK_BC_DIRICHLET_DIRICHLET
-!  	 ENDIF
-!     CYCLE VENT_LOOP   
-!   ENDIF 
-!#endif      
+#if defined coupled_bc
+   IF (VT%BOUNDARY_TYPE == COUPLED_BOUNDARY ) THEN
+  	 IF (VT%I1==0 .AND. VT%I2==0) THEN
+  	    IF (LBC==FISHPAK_BC_NEUMANN_NEUMANN)   LBC = FISHPAK_BC_DIRICHLET_NEUMANN
+  	    IF (LBC==FISHPAK_BC_NEUMANN_DIRICHLET) LBC = FISHPAK_BC_DIRICHLET_DIRICHLET
+  	 ENDIF
+  	 IF (VT%I1==M%IBAR .AND. VT%I2==M%IBAR) THEN
+  	    IF (LBC==FISHPAK_BC_NEUMANN_NEUMANN)   LBC = FISHPAK_BC_NEUMANN_DIRICHLET
+  	    IF (LBC==FISHPAK_BC_DIRICHLET_NEUMANN) LBC = FISHPAK_BC_DIRICHLET_DIRICHLET
+  	 ENDIF
+  	 IF (VT%J1==0 .AND. VT%J2==0) THEN
+  	    IF (MBC==FISHPAK_BC_NEUMANN_NEUMANN)   MBC = FISHPAK_BC_DIRICHLET_NEUMANN
+  	    IF (MBC==FISHPAK_BC_NEUMANN_DIRICHLET) MBC = FISHPAK_BC_DIRICHLET_DIRICHLET
+  	 ENDIF
+  	 IF (VT%J1==M%JBAR .AND. VT%J2==M%JBAR) THEN
+  	    IF (MBC==FISHPAK_BC_NEUMANN_NEUMANN)   MBC = FISHPAK_BC_NEUMANN_DIRICHLET
+  	    IF (MBC==FISHPAK_BC_DIRICHLET_NEUMANN) MBC = FISHPAK_BC_DIRICHLET_DIRICHLET
+  	 ENDIF
+  	 IF (VT%K1==0 .AND. VT%K2==0) THEN
+  	    IF (NBC==FISHPAK_BC_NEUMANN_NEUMANN)   NBC = FISHPAK_BC_DIRICHLET_NEUMANN
+  	    IF (NBC==FISHPAK_BC_NEUMANN_DIRICHLET) NBC = FISHPAK_BC_DIRICHLET_DIRICHLET
+  	 ENDIF
+  	 IF (VT%K1==M%KBAR .AND. VT%K2==M%KBAR) THEN
+  	    IF (NBC==FISHPAK_BC_NEUMANN_NEUMANN)   NBC = FISHPAK_BC_NEUMANN_DIRICHLET
+  	    IF (NBC==FISHPAK_BC_DIRICHLET_NEUMANN) NBC = FISHPAK_BC_DIRICHLET_DIRICHLET
+  	 ENDIF
+     CYCLE VENT_LOOP   
+   ENDIF 
+#endif      
    
    
    
@@ -3014,7 +3009,11 @@ VENT_SEARCH_LOOP: DO N=1,M%N_VENT
 
    VT => M%VENTS(N)
    IF (OBST_INDEX>0) THEN
-      IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY)           CYCLE VENT_SEARCH_LOOP          
+      IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY)           CYCLE VENT_SEARCH_LOOP
+#if defined coupled_bc
+      IF (VT%BOUNDARY_TYPE==COUPLED_BOUNDARY)        CYCLE VENT_SEARCH_LOOP     
+#endif         
+    
       IF (.NOT.M%OBSTRUCTION(OBST_INDEX)%ALLOW_VENT) CYCLE VENT_SEARCH_LOOP
       IF (VT%OBST_INDEX>0 .AND. VT%OBST_INDEX/=OBST_INDEX) CYCLE VENT_SEARCH_LOOP
    ENDIF
@@ -3575,7 +3574,15 @@ PROCESS_VENT: IF (WC%VENT_INDEX>0) THEN
       IF (VT%BOUNDARY_TYPE==OPEN_BOUNDARY) THEN
          WC%BOUNDARY_TYPE = OPEN_BOUNDARY
          WC%SURF_INDEX    = OPEN_SURF_INDEX
-      ENDIF     
+      ENDIF
+#if defined coupled_bc
+      IF (VT%BOUNDARY_TYPE==COUPLED_BOUNDARY) THEN
+         WC%BOUNDARY_TYPE = COUPLED_BOUNDARY
+         WC%SURF_INDEX    = COUPLED_SURF_INDEX
+      ENDIF   
+#endif         
+      
+      
    ENDIF
 
 ENDIF PROCESS_VENT
@@ -4285,6 +4292,15 @@ IF (IW<=N_EXTERNAL_WALL_CELLS .AND. REMOVE) THEN
       WC%SURF_INDEX    = OPEN_SURF_INDEX
       CELL(IC)%SOLID   = .FALSE.
    ENDIF
+#if defined coupled_bc
+   IF (WC%SURF_INDEX_ORIG==COUPLED_SURF_INDEX) THEN
+      WC%BOUNDARY_TYPE = COUPLED_BOUNDARY
+      WC%SURF_INDEX    = COUPLED_SURF_INDEX
+      CELL(IC)%SOLID   = .FALSE.
+   ENDIF   
+#endif      
+   
+   
    IF (WC%SURF_INDEX_ORIG==INTERPOLATED_SURF_INDEX) THEN
       WC%BOUNDARY_TYPE = INTERPOLATED_BOUNDARY
       WC%SURF_INDEX    = INTERPOLATED_SURF_INDEX
@@ -4573,21 +4589,20 @@ CALL POINT_TO_MESH(NM)
 
 
    IMIN = 0
-   IMAX = IBP1
+   IMAX = IBAR
    JMIN = 0
-   JMAX = JBP1
+   JMAX = JBAR
    KMIN = 0
-   KMAX = KBP1
-   
+   KMAX = KBAR
  status=nf90_open(ICFile, nf90_nowrite, ncid)
  
  status=nf90_inq_varid(ncid, 'U', varid1)
  status=nf90_inq_varid(ncid, 'V', varid2)
  status=nf90_inq_varid(ncid, 'W', varid3)
                                           
- status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR+2, JBAR+2, KBAR+2 /) ) 
- status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR+2, JBAR+2, KBAR+2 /) ) 
- status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR+2, JBAR+2, KBAR+2 /) ) 
+ status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+ status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+ status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
 
  status=nf90_close(ncid)
 
@@ -4611,24 +4626,24 @@ WS=W
 
 ! Set normal velocity on external and internal boundaries (follows divg)
 
-DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
-   WC => WALL(IW)
-   BC => BOUNDARY_COORD(WC%BC_INDEX)
-   B1 => BOUNDARY_PROP1(WC%B1_INDEX)
-   IOR = BC%IOR
-   II  = BC%II
-   JJ  = BC%JJ
-   KK  = BC%KK
-   SELECT CASE(IOR)
-      CASE( 1) ; B1%U_NORMAL_S = -U(II,JJ,KK)
-      CASE(-1) ; B1%U_NORMAL_S =  U(II-1,JJ,KK)
-      CASE( 2) ; B1%U_NORMAL_S = -V(II,JJ,KK)
-      CASE(-2) ; B1%U_NORMAL_S =  V(II,JJ-1,KK)
-      CASE( 3) ; B1%U_NORMAL_S = -W(II,JJ,KK)
-      CASE(-3) ; B1%U_NORMAL_S =  W(II,JJ,KK-1)
-   END SELECT
-   B1%U_NORMAL = B1%U_NORMAL_S
-ENDDO
+!DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
+!   WC => WALL(IW)
+!   BC => BOUNDARY_COORD(WC%BC_INDEX)
+!   B1 => BOUNDARY_PROP1(WC%B1_INDEX)
+!   IOR = BC%IOR
+!   II  = BC%II
+!   JJ  = BC%JJ
+!   KK  = BC%KK
+!   SELECT CASE(IOR)
+!      CASE( 1) ; B1%U_NORMAL_S = -U(II,JJ,KK)
+!      CASE(-1) ; B1%U_NORMAL_S =  U(II-1,JJ,KK)
+!      CASE( 2) ; B1%U_NORMAL_S = -V(II,JJ,KK)
+!      CASE(-2) ; B1%U_NORMAL_S =  V(II,JJ-1,KK)
+!      CASE( 3) ; B1%U_NORMAL_S = -W(II,JJ,KK)
+!      CASE(-3) ; B1%U_NORMAL_S =  W(II,JJ,KK-1)
+!   END SELECT
+!   B1%U_NORMAL = B1%U_NORMAL_S
+!ENDDO
 
 END SUBROUTINE UVW_INIT_NC
 #endif
@@ -4648,28 +4663,23 @@ REAL(EB), DIMENSION(20,20,20):: TMP0
 !integer, parameter :: NDIMS = 3
 integer :: status, ncid, varid1
 
-!attemptes to initialise 0 to IBP1 (ibar+2 grid cells)  
+  
   
 CALL POINT_TO_MESH(NM)
-   IMIN = 0 ;    IMAX = IBP1
-   JMIN = 0 ;    JMAX = JBP1
-   KMIN = 0 ;    KMAX = KBP1
-   
-! nf90_get_var starts counting from 1. 
-! so we're using GI1, GJ1, GK1 (1,21,41)
-
+   IMIN = 1 ;    IMAX = IBAR
+   JMIN = 1 ;    JMAX = JBAR
+   KMIN = 1 ;    KMAX = KBAR
    
 status=nf90_open(ICFile, nf90_nowrite, ncid)
 status=nf90_inq_varid(ncid, 'TMP', varid1)
-status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR+2, JBAR+2, KBAR+2 /) ) 
+status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
 ! if(status /= nf90_NoErr) call handle_err(status)
 status=nf90_close(ncid)
 
-!these indeces are from TMP - fds counting
 DO K=KMIN,KMAX
    DO J=JMIN,JMAX
       DO I=IMIN,IMAX       
-            TMP(I,J,K)=TMP0(I+1,J+1,K+1)      
+            TMP(I,J,K)=TMP0(I,J,K)      
       ENDDO
    ENDDO
 ENDDO

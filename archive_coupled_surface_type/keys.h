@@ -7,8 +7,8 @@
 # define init_u_in
 # define output_nc
 
-# undef coupled_bc
+# define coupled_bc
 
-# define plot_3d_out
+# undef plot_3d_out
 # undef plot_hrr_out
 #endif

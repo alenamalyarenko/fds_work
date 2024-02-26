@@ -90,6 +90,9 @@ INTEGER, PARAMETER :: INTERPOLATED_BOUNDARY=6      !< Flag for SF\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: PERIODIC_BOUNDARY=7          !< Flag for SF\%BOUNDARY_TYPE, VT\%BOUNDARY_TYPE, WC\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: HVAC_BOUNDARY=42             !< Flag for SF\%THERMAL_BC_INDEX, SF\%SPECIES_BC_INDEX, VT\%BOUNDARY_TYPE
 
+#if defined coupled_bc
+INTEGER, PARAMETER :: COUPLED_BOUNDARY=10              !< Flag for SF\%BOUNDARY_TYPE, VT\%BOUNDARY_TYPE, WC\%BOUNDARY_TYPE   
+#endif   
 
 INTEGER, PARAMETER :: FISHPAK_BC_PERIODIC=0            !< Flag for FISHPAK_BC(I) I=1,3: Period BC for Poisson solver
 INTEGER, PARAMETER :: FISHPAK_BC_DIRICHLET_DIRICHLET=1 !< Flag for FISHPAK_BC(I) I=1,3: Dirichlet at both sides
@@ -253,10 +256,6 @@ LOGICAL :: NO_PRESSURE_ZONES=.FALSE.                !< Flag to suppress pressure
 LOGICAL :: CTRL_DIRECT_FORCE=.FALSE.                !< Allow adjustable direct force via CTRL logic
 LOGICAL :: REACTING_THIN_OBSTRUCTIONS=.FALSE.       !< Thin obstructions that off-gas are present
 LOGICAL :: SMOKE3D_16=.FALSE.                       !< Output 3D smoke values using 16 bit integers
-
-#if defined coupled
-LOGICAL :: COUPLED_BOUNDARY=.TRUE.               !< this is a coupled run
-#endif
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: CHANGE_TIME_STEP_INDEX      !< Flag to indicate if a mesh needs to change time step
 INTEGER, ALLOCATABLE, DIMENSION(:) :: SETUP_PRESSURE_ZONES_INDEX  !< Flag to indicate if a mesh needs to keep searching for ZONEs
@@ -558,7 +557,9 @@ INTEGER :: N_SURF,N_SURF_RESERVED,N_MATL,MIRROR_SURF_INDEX,OPEN_SURF_INDEX,INTER
            INERT_SURF_INDEX=0,PERIODIC_SURF_INDEX,PERIODIC_FLOW_ONLY_SURF_INDEX,HVAC_SURF_INDEX=-1,&
            MASSLESS_TRACER_SURF_INDEX, MASSLESS_TARGET_SURF_INDEX,DROPLET_SURF_INDEX,VEGETATION_SURF_INDEX,NWP_MAX
            
-            
+#if defined coupled_bc
+INTEGER :: COUPLED_SURF_INDEX   
+#endif              
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: AAS,BBS,DDS,DDT,DX_S,RDX_S,RDXN_S,DX_WGT_S, &
                                        RHO_S,Q_S,TWO_DX_KAPPA_S,X_S_NEW,R_S,MF_FRAC,REGRID_FACTOR,R_S_NEW
 REAL(EB), ALLOCATABLE, TARGET, DIMENSION(:) :: CCS

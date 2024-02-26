@@ -7284,7 +7284,11 @@ COUNT_SURF_LOOP: DO
 ENDDO COUNT_SURF_LOOP
 
 ! Allocate the SURFACE derived type, leaving space for SURF entries not defined explicitly by the user
+#if defined coupled_bc
+N_SURF_RESERVED = 10
+#else
 N_SURF_RESERVED = 9
+#endif
 ALLOCATE(SURFACE(0:N_SURF+N_SURF_RESERVED),STAT=IZERO)
 CALL ChkMemErr('READ','SURFACE',IZERO)
 
@@ -7319,6 +7323,10 @@ MASSLESS_TRACER_SURF_INDEX   = N_SURF + 6
 DROPLET_SURF_INDEX           = N_SURF + 7
 MASSLESS_TARGET_SURF_INDEX   = N_SURF + 8
 PERIODIC_FLOW_ONLY_SURF_INDEX= N_SURF + 9
+           
+#if defined coupled_bc
+COUPLED_SURF_INDEX= N_SURF + 10
+#endif
 
 
 N_SURF = N_SURF + N_SURF_RESERVED
@@ -7334,6 +7342,9 @@ SURFACE(DROPLET_SURF_INDEX)%ID           = 'DROPLET'
 SURFACE(MASSLESS_TARGET_SURF_INDEX)%ID   = 'MASSLESS TARGET'
 SURFACE(PERIODIC_FLOW_ONLY_SURF_INDEX)%ID= 'PERIODIC FLOW ONLY'
 
+#if defined coupled_bc
+SURFACE(COUPLED_SURF_INDEX)%ID              = 'COUPLED'
+#endif
 
 SURFACE(0)%USER_DEFINED                               = .FALSE.
 SURFACE(N_SURF-N_SURF_RESERVED+1:N_SURF)%USER_DEFINED = .FALSE.
@@ -11194,6 +11205,9 @@ MESH_LOOP_1: DO NM=1,NMESHES
                IF ((MB/='null' .OR.  PBX>-1.E5_EB .OR. PBY>-1.E5_EB .OR. PBZ>-1.E5_EB) .AND. SURF_ID=='OPEN') VT%TYPE_INDICATOR=-2
                IF (SURF_ID=='PERIODIC FLOW ONLY') VT%SURF_INDEX = PERIODIC_FLOW_ONLY_SURF_INDEX
 
+#if defined coupled_bc
+               IF (SURF_ID=='COUPLED')                            VT%TYPE_INDICATOR =  3
+#endif   
 
                VT%BOUNDARY_TYPE = SOLID_BOUNDARY
                IF (VT%SURF_INDEX==OPEN_SURF_INDEX)               VT%BOUNDARY_TYPE = OPEN_BOUNDARY
@@ -11201,6 +11215,10 @@ MESH_LOOP_1: DO NM=1,NMESHES
                IF (VT%SURF_INDEX==PERIODIC_SURF_INDEX)           VT%BOUNDARY_TYPE = PERIODIC_BOUNDARY
                IF (VT%SURF_INDEX==PERIODIC_FLOW_ONLY_SURF_INDEX) VT%BOUNDARY_TYPE = PERIODIC_BOUNDARY
                IF (VT%SURF_INDEX==HVAC_SURF_INDEX)               VT%BOUNDARY_TYPE = HVAC_BOUNDARY
+
+#if defined coupled_bc
+               IF (VT%SURF_INDEX==COUPLED_SURF_INDEX)            VT%BOUNDARY_TYPE = COUPLED_BOUNDARY
+#endif   
 
 
                VT%IOR = IOR
@@ -11461,7 +11479,28 @@ MESH_LOOP_2: DO NM=1,NMESHES
                CALL BLOCK_CELL(NM,I1+1,  I2,J1+1,  J2,KBP1,KBP1,0,0)
          END SELECT
       ENDIF
-       
+      
+#if defined coupled_bc
+
+      IF (VT%BOUNDARY_TYPE==COUPLED_BOUNDARY) THEN
+         SELECT CASE(VT%IOR)
+            CASE( 1)
+               CALL BLOCK_CELL(NM,   0,   0,J1+1,  J2,K1+1,  K2,0,0)
+            CASE(-1)
+               CALL BLOCK_CELL(NM,IBP1,IBP1,J1+1,  J2,K1+1,  K2,0,0)
+            CASE( 2)
+               CALL BLOCK_CELL(NM,I1+1,  I2,   0,   0,K1+1,  K2,0,0)
+            CASE(-2)
+               CALL BLOCK_CELL(NM,I1+1,  I2,JBP1,JBP1,K1+1,  K2,0,0)
+            CASE( 3)
+               CALL BLOCK_CELL(NM,I1+1,  I2,J1+1,  J2,   0,   0,0,0)
+            CASE(-3)
+               CALL BLOCK_CELL(NM,I1+1,  I2,J1+1,  J2,KBP1,KBP1,0,0)
+         END SELECT
+      ENDIF
+
+#endif      
+      
 
       ! Check UVW
 

@@ -182,7 +182,12 @@ SPECIES_GT_1_IF: IF (N_TOTAL_SCALARS>1) THEN
                   CASE( 3); RHO_D_DZDZ(IIG,JJG,KKG-1,N) = 0._EB
                   CASE(-3); RHO_D_DZDZ(IIG,JJG,KKG,N)   = 0._EB
                END SELECT
-               CASE(OPEN_BOUNDARY,INTERPOLATED_BOUNDARY)                             
+#if defined coupled_bc
+               CASE(OPEN_BOUNDARY,INTERPOLATED_BOUNDARY, COUPLED_BOUNDARY)
+#else
+               CASE(OPEN_BOUNDARY,INTERPOLATED_BOUNDARY)
+#endif                  
+            
                B1 => BOUNDARY_PROP1(WC%B1_INDEX)
                EWC => EXTERNAL_WALL(IW)
                IF (EWC%NIC>1) THEN
@@ -328,6 +333,9 @@ SPECIES_GT_1_IF: IF (N_TOTAL_SCALARS>1) THEN
          WC => WALL(IW)
          IF (WC%BOUNDARY_TYPE==NULL_BOUNDARY .OR. &
              WC%BOUNDARY_TYPE==OPEN_BOUNDARY .OR. &
+#if defined coupled_bc
+             WC%BOUNDARY_TYPE==COUPLED_BOUNDARY .OR. &   
+#endif   
              WC%BOUNDARY_TYPE==INTERPOLATED_BOUNDARY) CYCLE WALL_LOOP_2
          BC => BOUNDARY_COORD(WC%BC_INDEX)
          B1 => BOUNDARY_PROP1(WC%B1_INDEX)
@@ -518,14 +526,25 @@ CORRECTION_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
    JJG = BC%JJG
    KKG = BC%KKG
 
-
+#if defined coupled_bc
+   IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY.OR.WC%BOUNDARY_TYPE==COUPLED_BOUNDARY ) THEN
+      B1%K_G = 0.5_EB*(KP(IIG,JJG,KKG)+KP(II,JJ,KK))
+      CYCLE CORRECTION_LOOP
+   ELSE
+      B1%K_G = KP(IIG,JJG,KKG)
+   ENDIF   
+#else   
    IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY) THEN
       B1%K_G = 0.5_EB*(KP(IIG,JJG,KKG)+KP(II,JJ,KK))
       CYCLE CORRECTION_LOOP
    ELSE
       B1%K_G = KP(IIG,JJG,KKG)
    ENDIF  
- 
+#endif   
+   
+   
+   
+   
    IOR = BC%IOR
    SELECT CASE(IOR)
       CASE( 1)
@@ -862,7 +881,10 @@ WALL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
 
    ! overwrite first off-wall advective flux if flow is away from the wall and if the face is not also a wall cell
 
-   IF (WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY  &   
+   IF (WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY  &
+#if defined coupled_bc
+    .AND. WC%BOUNDARY_TYPE/=COUPLED_BOUNDARY  &
+#endif      
     .AND. WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) THEN
 
       OFF_WALL_SELECT_1: SELECT CASE(IOR)
@@ -1016,6 +1038,10 @@ WALL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
    ! Overwrite first off-wall advective flux if flow is away from the wall and if the face is not also a wall cell
 
    OFF_WALL_IF_2: IF (WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY  &
+#if defined coupled_bc
+    .AND. WC%BOUNDARY_TYPE/=COUPLED_BOUNDARY  &
+#endif     
+   
    .AND. WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) THEN
 
       OFF_WALL_SELECT_2: SELECT CASE(IOR)
@@ -1128,7 +1154,10 @@ CONNECTED_ZONES(:,:,NM) = .FALSE.
 
 DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
    WC=>WALL(IW)
-   IF (WC%BOUNDARY_TYPE/=NULL_BOUNDARY &  
+   IF (WC%BOUNDARY_TYPE/=NULL_BOUNDARY & 
+#if defined coupled_bc
+   .AND. WC%BOUNDARY_TYPE/=COUPLED_BOUNDARY &
+#endif   
    .AND. WC%BOUNDARY_TYPE/=OPEN_BOUNDARY .AND. WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY) CYCLE
    BC => BOUNDARY_COORD(WC%BC_INDEX)
    IF (CELL(CELL_INDEX(BC%IIG,BC%JJG,BC%KKG))%SOLID) CYCLE
@@ -1139,7 +1168,9 @@ DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
       CONNECTED_ZONES(IPZ,IOPZ,NM) = .TRUE.
    ENDIF
    
-   
+#if defined coupled_bc
+   !something needs to be done here?...
+#endif      
    IF (WC%BOUNDARY_TYPE==OPEN_BOUNDARY) THEN
       CONNECTED_ZONES(0,IPZ,NM) = .TRUE.
       CONNECTED_ZONES(IPZ,0,NM) = .TRUE.
@@ -1230,8 +1261,20 @@ PREDICT_NORMALS: IF (PREDICTOR) THEN
                CASE(-2); B1%U_NORMAL_S =  V(BC%II,BC%JJ-1,BC%KK)
                CASE( 3); B1%U_NORMAL_S = -W(BC%II,BC%JJ,BC%KK)
                CASE(-3); B1%U_NORMAL_S =  W(BC%II,BC%JJ,BC%KK-1)
-            END SELECT           
+            END SELECT   
+#if defined coupled_bc               
+         CASE(COUPLED_BOUNDARY)
+            SELECT CASE(BC%IOR)
+               CASE( 1); B1%U_NORMAL_S = -U(BC%II,BC%JJ,BC%KK)
+               CASE(-1); B1%U_NORMAL_S =  U(BC%II-1,BC%JJ,BC%KK)
+               CASE( 2); B1%U_NORMAL_S = -V(BC%II,BC%JJ,BC%KK)
+               CASE(-2); B1%U_NORMAL_S =  V(BC%II,BC%JJ-1,BC%KK)
+               CASE( 3); B1%U_NORMAL_S = -W(BC%II,BC%JJ,BC%KK)
+               CASE(-3); B1%U_NORMAL_S =  W(BC%II,BC%JJ,BC%KK-1)      
+            END SELECT
+#endif               
                
+
 
       END SELECT WALL_CELL_TYPE
 
@@ -1448,7 +1491,12 @@ BC_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
                DP(BC%II,BC%JJ,BC%KK) = DP(BC%II,BC%JJ,BC%KK) - UN_P*RDZ(BC%KK)
          END SELECT
       CASE (OPEN_BOUNDARY,MIRROR_BOUNDARY,INTERPOLATED_BOUNDARY)
-         DP(BC%II,BC%JJ,BC%KK) = DP(BC%IIG,BC%JJG,BC%KKG)                   
+         DP(BC%II,BC%JJ,BC%KK) = DP(BC%IIG,BC%JJG,BC%KKG)
+#if defined coupled_bc
+      CASE (COUPLED_BOUNDARY)
+         DP(BC%II,BC%JJ,BC%KK) = DP(BC%IIG,BC%JJG,BC%KKG)   
+#endif            
+         
    END SELECT
 ENDDO BC_LOOP
 

@@ -165,6 +165,10 @@ IF (Q_EXISTS) THEN
    DO IW=1,N_EXTERNAL_WALL_CELLS
       WC => WALL(IW)
       IF (WC%BOUNDARY_TYPE/=INTERPOLATED_BOUNDARY .AND. WC%BOUNDARY_TYPE/=OPEN_BOUNDARY) CYCLE
+#if defined coupled_bc
+      !I don't think this matters   
+#endif   
+
       BC => BOUNDARY_COORD(WC%BC_INDEX)
       Q(BC%II,BC%JJ,BC%KK) = Q(BC%IIG,BC%JJG,BC%KKG)
    ENDDO
