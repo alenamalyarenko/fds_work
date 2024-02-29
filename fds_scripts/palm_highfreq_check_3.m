@@ -1,4 +1,4 @@
-cd ('/mnt/data2/data2/FDS/PALM_outputs/')
+% cd ('/mnt/data2/data2/FDS/PALM_outputs/')
 %%
 filename='DATA_3D_NETCDF_N03';
 %%
@@ -90,7 +90,7 @@ end
 
 %%
 
-filename_out='pal9.nc';
+filename_out='bc_pal9.nc';
 nccreate(filename_out,'UE',"Dimensions",{"y",62,"z",22,"time",6000},"FillValue","disable")
 ncwrite(filename_out,'UE',UE)
 
