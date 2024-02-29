@@ -1,0 +1,259 @@
+# Makefile for Fire Dynamics Simulator (FDS)
+
+# To use this makefile, select the appropriate compiler and OS from the list below. For example, to
+# compile the parallel version (MPI) of FDS under Linux using the Intel compilers type:
+#
+# make impi_intel_linux
+
+# A make utility for windows may be downloaded from http://gnuwin32.sourceforge.net/packages/make.htm
+
+# The variable VPATH defines where the source code is relative to the current directory
+
+VPATH = ../Source
+
+# set compiler type
+
+I_IFORT=ifx
+ifdef INTEL_IFORT
+   I_IFORT=$(INTEL_IFORT)
+endif
+
+NETCDF_LIB= -I/usr/local/netcdf-ifort/4.6.1/include -I/usr/local/netcdf-ifort/4.6.1/include -L/usr/local/netcdf-ifort/4.6.1/lib -lnetcdff -L/usr/lib -I/usr/include: -lnetcdf -lnetcdf -lm 
+
+
+
+ifeq ($(shell echo "check_quotes"),"check_quotes")
+# windows
+  GIT_HASH := $(shell ..\Scripts\githash)
+  GIT_STAT := $(shell ..\Scripts\gitstat)
+  GIT_DATE := $(shell ..\Scripts\gitlog)
+  GIT_BRANCH := $(shell ..\Scripts\gitbranch)
+  BUILD_DATE := $(shell date /t) $(shell time /t)
+else
+# linux/osx
+  SHELL:=/bin/bash
+  GIT_HASH := $(shell git describe --long --abbrev=7)
+  ifeq ("$(shell git diff --shortstat $(VPATH)/*.f90)","")
+    GIT_STAT :=
+  else
+    GIT_STAT := -dirty
+  endif
+  GIT_DATE := $(shell git log -1 --format=%cd)
+  GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+  BUILD_DATE := $(shell date "+%b %d, %Y  %T")
+# The preprocessor used by xlf uses comma as separation between preprocessing commands.
+# Commas needs to be escaped if they are to be used as part of a value in a preprocessing variable.
+  BUILD_DATE_XLF := $(shell date "+%b %d\, %Y  %T")
+endif
+
+GITINFO_BASE=-DGITHASH_PP=\"$(GIT_HASH)$(GIT_STAT)-$(GIT_BRANCH)\" -DGITDATE_PP=\""$(GIT_DATE)\""
+GITINFO=-fpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
+GITINFOGNU=-cpp $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
+GITINFOXLF=-qsuffix=cpp=f90 '-WF,-DGITHASH_PP=\"$(GIT_HASH)\",-DGITDATE_PP=\"$(GIT_DATE)\",-DBUILDDATE_PP=\"$(BUILD_DATE_XLF)\"'
+GITINFOPGI=-Mpreprocess $(GITINFO_BASE) -DBUILDDATE_PP=\""$(BUILD_DATE)\""
+GFORTRAN_OPTIONS=
+
+ifeq ($(shell echo "check_quotes"),"check_quotes")
+# windows
+  INTELMPI_COMPVERSION := $(shell ..\Scripts\intel_compversion $(INTEL_IFORT))
+  GNU_COMPVERSION := $(shell ..\Scripts\gnu_compversion)
+else
+# linux/osx
+  INTELMPI_COMPVERSION := $(shell ../Scripts/intelmpi_compversion.sh $(INTEL_IFORT))
+  OPENMPI_COMPVERSION := $(shell ../Scripts/openmpi_compversion.sh)
+  GNU_COMPVERSION := $(shell ../Scripts/gnu_compversion.sh)
+  ifeq ($(shell ../Scripts/gnu_compmajorversion.sh),10)
+    GFORTRAN_OPTIONS=-fallow-argument-mismatch
+  endif
+endif
+
+INTELMPI_COMPINFO=-DCOMPVER_PP=\"$(INTELMPI_COMPVERSION)\"
+OPENMPI_COMPINFO=-DCOMPVER_PP=\"$(OPENMPI_COMPVERSION)\"
+GNU_COMPINFO=-DCOMPVER_PP=\"$(GNU_COMPVERSION)\"
+
+FFLAGSMKL_INTEL =  $(NETCDF_LIB) 
+LFLAGSMKL_INTEL =
+FFLAGSMKL_OPENMPI =
+LFLAGSMKL_OPENMPI =
+FFLAGSMKL_CUSTOM = 
+LFLAGSMKL_CUSTOM =
+ifdef MKLROOT # This assumes the MKL library is available.
+ifeq ($(shell echo "check_quotes"),"check_quotes")
+# windows
+ifeq ($(shell ..\Scripts\havemkl),1)
+# Use cluster_sparse_solver with intelmpi blacs
+  FFLAGSMKL_INTEL = -DWITH_MKL /I"$(MKLROOT)"\include
+  LFLAGSMKL_INTEL = "$(MKLROOT)"\lib\intel64\mkl_intel_lp64.lib "$(MKLROOT)"\lib\intel64\mkl_sequential.lib "$(MKLROOT)"\lib\intel64\mkl_core.lib "$(MKLROOT)"\lib\intel64\mkl_blacs_intelmpi_lp64.lib
+  LFLAGSMKL_INTEL_OPENMP = "$(MKLROOT)"\lib\intel64\mkl_intel_lp64.lib "$(MKLROOT)"\lib\intel64\mkl_intel_thread.lib "$(MKLROOT)"\lib\intel64\mkl_core.lib "$(MKLROOT)"\lib\intel64\mkl_blacs_intelmpi_lp64.lib
+endif
+else
+# linux
+ifneq ("$(wildcard ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a)","")
+# Use cluster_sparse_solver with intelmpi blacs
+  FFLAGSMKL_INTEL = -DWITH_MKL -I"${MKLROOT}/include"
+  LFLAGSMKL_INTEL = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_sequential.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -lpthread -lm -ldl
+  LFLAGSMKL_INTEL_OPENMP = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_intelmpi_lp64.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
+endif
+ifneq ("$(wildcard ${MKLROOT}/lib/intel64/libmkl_blacs_openmpi_lp64.a)","")
+# Use cluster_sparse_solver with openmpi blacs
+  FFLAGSMKL_OPENMPI = -DWITH_MKL -I$(MKLROOT)/include
+  LFLAGSMKL_OPENMPI = -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_intel_thread.a ${MKLROOT}/lib/intel64/libmkl_blacs_openmpi_lp64.a -Wl,--end-group -lpthread -lm -ldl
+  FFLAGSMKL_GNU_OPENMPI = -DWITH_MKL -I$(MKLROOT)/include
+  LFLAGSMKL_GNU_OPENMPI =  -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_gf_lp64.a ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a ${MKLROOT}/lib/intel64/libmkl_blacs_openmpi_lp64.a -Wl,--end-group -lgomp -lpthread -lm -ldl
+endif
+ifneq ("$(wildcard ${MKLROOT}/lib/libmkl_blacs_custom_lp64.a)","")
+# Use cluster_sparse_solver with custom blacs
+  FFLAGSMKL_CUSTOM = -DWITH_MKL -I$(MKLROOT)/include
+# MKL_LIBS needs to occur 3 times in order to avoid unresolved external reference warnings
+  MKL_LIBS_OPENMP = ${MKLROOT}/lib/libmkl_intel_lp64.a ${MKLROOT}/lib/libmkl_core.a ${MKLROOT}/lib/libmkl_intel_thread.a ${MKLROOT}/lib/libmkl_blacs_custom_lp64.a
+  MKL_LIBS = ${MKLROOT}/lib/libmkl_intel_lp64.a ${MKLROOT}/lib/libmkl_core.a ${MKLROOT}/lib/libmkl_sequential.a ${MKLROOT}/lib/libmkl_blacs_custom_lp64.a
+  LFLAGSMKL_CUSTOM_OPENMP = ${MKL_LIBS_OPENMP} ${MKL_LIBS_OPENMP} ${MKL_LIBS_OPENMP} -lpthread -lm -ldl
+  LFLAGSMKL_CUSTOM = ${MKL_LIBS} ${MKL_LIBS} ${MKL_LIBS} -lpthread -lm -ldl
+  FFLAGSMKL_GNU_CUSTOM = -DWITH_MKL -I$(MKLROOT)/include
+  LFLAGSMKL_GNU_CUSTOM =  ${MKLROOT}/lib/libmkl_intel_lp64.a ${MKLROOT}/lib/libmkl_sequential.a ${MKLROOT}/lib/libmkl_core.a ${MKLROOT}/lib/libmkl_blacs_custom_lp64.a -lpthread -lm -ldl
+endif
+endif # OS test
+endif # MKLROOT test
+
+obj_mpi = prec.o cons.o prop.o devc.o type.o data.o mesh.o func.o gsmv.o smvv.o rcal.o turb.o soot.o \
+          pois.o geom.o ccib.o radi.o part.o vege.o ctrl.o hvac.o mass.o \
+          wall.o fire.o velo.o pres.o init.o dump.o read.o divg.o main.o
+
+objwin_mpi = $(obj_mpi:.o=.obj)
+
+# General Purpose Rules
+
+no_target:
+	@echo \******** You did not specify a make target \********
+	@echo Please read the comments at the top of the makefile
+
+setup:
+%.o : %.mod
+
+setup_win:
+%.obj : %.mod
+
+.SUFFIXES: .f90 .o .obj
+
+.f90.o:
+	$(FCOMPL) -c $(FFLAGS) $<
+.f90.obj:
+	$(FCOMPL) -c $(FFLAGS) $<
+
+# Files which have OpenMP compiler directives are compiled using the FOPENMPFLAG and can be enabled/disabled on a per-file basis.
+
+divg.o: FFLAGS += $(FOPENMPFLAGS)
+func.o: FFLAGS += $(FOPENMPFLAGS)
+mass.o: FFLAGS += $(FOPENMPFLAGS)
+pois.o: FFLAGS += $(FOPENMPFLAGS)
+pres.o: FFLAGS += $(FOPENMPFLAGS)
+turb.o: FFLAGS += $(FOPENMPFLAGS)
+velo.o: FFLAGS += $(FOPENMPFLAGS)
+radi.o: FFLAGS += $(FOPENMPFLAGS)
+main.o: FFLAGS += $(FOPENMPFLAGS)
+
+divg.obj: FFLAGS += $(FOPENMPFLAGS)
+func.obj: FFLAGS += $(FOPENMPFLAGS)
+mass.obj: FFLAGS += $(FOPENMPFLAGS)
+pois.obj: FFLAGS += $(FOPENMPFLAGS)
+pres.obj: FFLAGS += $(FOPENMPFLAGS)
+turb.obj: FFLAGS += $(FOPENMPFLAGS)
+velo.obj: FFLAGS += $(FOPENMPFLAGS)
+radi.obj: FFLAGS += $(FOPENMPFLAGS)
+main.obj: FFLAGS += $(FOPENMPFLAGS)
+
+# Windows Intel Fortran Compiler and Intel MPI
+
+#*** Note: the script, Build\Scripts\setup_intel_compilers.bat, must be run before running make with this target
+
+
+# Linux Intel Fortran Compiler and Intel MPI
+
+ 
+
+impi_intel_linux_uc : FFLAGS = -m64 -fc=$(I_IFORT) -O2 -ipo -no-wrap-margin $(GITINFO) $(INTELMPI_COMPINFO) $(FFLAGSMKL_INTEL) -DUSE_IFPORT  $(NETCDF_LIB)
+impi_intel_linux_uc : LFLAGSMKL = $(LFLAGSMKL_INTEL)  
+impi_intel_linux_uc : FCOMPL = mpiifort
+impi_intel_linux_uc : obj = fds_impi_intel_linux_uc
+impi_intel_linux_uc : setup $(obj_mpi)
+	$(FCOMPL) $(FFLAGS) -o $(obj) $(obj_mpi) $(LFLAGSMKL)  
+
+
+
+# *** Object Dependencies ***
+
+prec.o :
+imkl.o :
+cons.o : prec.o
+prop.o : prec.o
+devc.o : prec.o
+type.o : prec.o cons.o imkl.o
+data.o : prec.o func.o cons.o prop.o
+rcal.o : func.o prec.o cons.o
+mesh.o : prec.o type.o
+func.o : prec.o cons.o type.o mesh.o devc.o
+gsmv.o : prec.o func.o cons.o mesh.o
+smvv.o : geom.o prec.o func.o cons.o data.o
+turb.o : prec.o func.o cons.o mesh.o
+soot.o : prec.o mesh.o cons.o func.o turb.o
+pois.o : prec.o cons.o
+geom.o : gsmv.o func.o prec.o cons.o type.o mesh.o turb.o imkl.o data.o
+ccib.o : gsmv.o func.o prec.o cons.o type.o mesh.o turb.o geom.o
+radi.o : func.o prec.o cons.o type.o mesh.o rcal.o geom.o
+part.o : func.o prec.o cons.o type.o mesh.o devc.o data.o geom.o soot.o
+vege.o : func.o prec.o cons.o type.o mesh.o geom.o
+ctrl.o : prec.o cons.o type.o mesh.o func.o
+hvac.o : func.o prec.o cons.o type.o mesh.o ctrl.o data.o
+mass.o : func.o prec.o cons.o type.o mesh.o turb.o soot.o geom.o ccib.o
+wall.o : func.o prec.o cons.o type.o mesh.o hvac.o mass.o soot.o geom.o ccib.o
+fire.o : func.o prec.o cons.o type.o mesh.o mass.o soot.o radi.o
+velo.o : func.o prec.o cons.o type.o mesh.o turb.o geom.o ccib.o
+pres.o : func.o prec.o cons.o type.o mesh.o pois.o velo.o geom.o ccib.o imkl.o
+init.o : func.o prec.o cons.o type.o mesh.o devc.o radi.o pois.o data.o pres.o geom.o
+dump.o : func.o prec.o cons.o type.o mesh.o devc.o smvv.o turb.o data.o radi.o soot.o geom.o ccib.o fire.o
+read.o : func.o prec.o cons.o type.o mesh.o devc.o ctrl.o radi.o hvac.o data.o geom.o mass.o soot.o prop.o
+divg.o : func.o prec.o cons.o type.o mesh.o mass.o ccib.o
+main.o : func.o prec.o cons.o type.o mesh.o devc.o smvv.o mass.o divg.o velo.o wall.o fire.o radi.o part.o vege.o dump.o read.o init.o pres.o pois.o ctrl.o turb.o hvac.o data.o geom.o ccib.o soot.o prop.o
+
+prec.obj :
+imkl.obj :
+cons.obj : prec.obj
+prop.obj : prec.obj
+devc.obj : prec.obj
+type.obj : prec.obj cons.obj imkl.obj
+data.obj : prec.obj func.obj cons.obj prop.obj
+rcal.obj : func.obj prec.obj cons.obj
+mesh.obj : prec.obj type.obj
+func.obj : prec.obj cons.obj type.obj mesh.obj devc.obj
+gsmv.obj : prec.obj func.obj cons.obj mesh.obj
+smvv.obj : geom.obj prec.obj func.obj cons.obj data.obj
+turb.obj : prec.obj func.obj cons.obj mesh.obj
+soot.obj : prec.obj mesh.obj cons.obj func.obj turb.obj
+pois.obj : prec.obj cons.obj
+geom.obj : gsmv.obj func.obj prec.obj cons.obj type.obj mesh.obj turb.obj imkl.obj data.obj
+ccib.obj : gsmv.obj func.obj prec.obj cons.obj type.obj mesh.obj turb.obj geom.obj
+radi.obj : func.obj prec.obj cons.obj type.obj mesh.obj rcal.obj geom.obj
+part.obj : func.obj prec.obj cons.obj type.obj mesh.obj devc.obj data.obj geom.obj soot.obj
+vege.obj : func.obj prec.obj cons.obj type.obj mesh.obj geom.obj
+ctrl.obj : prec.obj cons.obj type.obj mesh.obj func.obj
+hvac.obj : func.obj prec.obj cons.obj type.obj mesh.obj ctrl.obj data.obj
+mass.obj : func.obj prec.obj cons.obj type.obj mesh.obj turb.obj soot.obj geom.obj ccib.obj
+wall.obj : func.obj prec.obj cons.obj type.obj mesh.obj hvac.obj mass.obj soot.obj geom.obj ccib.obj
+fire.obj : func.obj prec.obj cons.obj type.obj mesh.obj mass.obj soot.obj radi.obj
+velo.obj : func.obj prec.obj cons.obj type.obj mesh.obj turb.obj geom.obj ccib.obj
+pres.obj : func.obj prec.obj cons.obj type.obj mesh.obj pois.obj velo.obj geom.obj ccib.obj imkl.obj
+init.obj : func.obj prec.obj cons.obj type.obj mesh.obj devc.obj pois.obj data.obj pres.obj geom.obj
+dump.obj : func.obj prec.obj cons.obj type.obj mesh.obj devc.obj smvv.obj turb.obj data.obj radi.obj soot.obj geom.obj ccib.obj fire.obj
+read.obj : func.obj prec.obj cons.obj type.obj mesh.obj devc.obj ctrl.obj radi.obj hvac.obj data.obj geom.obj mass.obj soot.obj prop.obj
+divg.obj : func.obj prec.obj cons.obj type.obj mesh.obj mass.obj ccib.obj
+main.obj : func.obj prec.obj cons.obj type.obj mesh.obj devc.obj smvv.obj mass.obj divg.obj velo.obj wall.obj fire.obj radi.obj part.obj vege.obj dump.obj read.obj init.obj pres.obj pois.obj ctrl.obj turb.obj hvac.obj data.obj geom.obj ccib.obj soot.obj prop.obj
+
+#*** Clean Target to remove Object and Module files ***
+
+.PHONY : clean
+clean:
+	-rm -f *.o *.mod *.obj
+
+.PHONY : winclean
+winclean:
+	-erase *.mod *.obj
