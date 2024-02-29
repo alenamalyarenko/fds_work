@@ -5,5 +5,7 @@
 *.nc
 *.exe
 fds_impi_intel_linux_nc
+fds_impi_intel_linux_uc
+/test_runs_local
 
 
