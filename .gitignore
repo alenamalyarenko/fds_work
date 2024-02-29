@@ -8,4 +8,8 @@ fds_impi_intel_linux_nc
 fds_impi_intel_linux_uc
 /test_runs_local
 
+DATA_3D_NETCDF_N03
+DATA_1D_PR_NETCDF_N03
+DATA_MASK_NETCDF_N03_M01
+
 
