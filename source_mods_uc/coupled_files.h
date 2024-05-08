@@ -1,12 +1,12 @@
 #if defined coupled
 MODULE COUPLED_FILES
 PUBLIC 
-#if defined init_file_in
-CHARACTER(10) :: ICFile
+#if defined init_file_in 
+CHARACTER(13) :: ICFile
 #endif
 
 #if defined coupled_bc
-CHARACTER(10) :: OBFile  
+CHARACTER(13) :: OBFile  
 #endif  
 !OBNuFile,  OBSuFile,  OBEuFile,  OBWuFile,  
 !OBNvFile,  OBSvFile,  OBEvFile,  OBWvFile,   

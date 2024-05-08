@@ -3,9 +3,6 @@
 !> \details Each MPI process stores a copy of the parameters within this module. It cannot be
 !> assumed that these values are the same for each MPI process.
 #include 'keys.h'
-
-
-
 MODULE GLOBAL_CONSTANTS
 
 
@@ -13,6 +10,11 @@ USE PRECISION_PARAMETERS
 USE MPI_F08
 USE ISO_FORTRAN_ENV, ONLY: ERROR_UNIT
 IMPLICIT NONE (TYPE,EXTERNAL)
+
+
+#if defined coupled
+LOGICAL :: COUPLED_BOUNDARY=.TRUE.               !< this is a coupled run
+#endif
 
 ! constants used by smokeview for drawing surfaces
 
@@ -59,9 +61,12 @@ INTEGER, PARAMETER :: THERMALLY_THICK=3          !< Flag for SF\%THERMAL_BC_INDE
 INTEGER, PARAMETER :: INFLOW_OUTFLOW=4           !< Flag for SF\%THERMAL_BC_INDEX: OPEN boundary
 INTEGER, PARAMETER :: INTERPOLATED_BC=6          !< Flag for SF\%THERMAL_BC_INDEX: Interface between two meshes
 
-INTEGER, PARAMETER :: DEFAULT_HTC_MODEL=0                  !< Flag for SF\%HEAT_TRANSFER_MODEL
-INTEGER, PARAMETER :: LOGLAW_HTC_MODEL=1                   !< Flag for SF\%HEAT_TRANSFER_MODEL
-INTEGER, PARAMETER :: RAYLEIGH_HTC_MODEL=3                 !< Flag for SF\%HEAT_TRANSFER_MODEL
+INTEGER, PARAMETER :: DEFAULT_HTC_MODEL=0          !< Flag for SF\%HEAT_TRANSFER_MODEL
+INTEGER, PARAMETER :: LOGLAW_HTC_MODEL=1           !< Flag for SF\%HEAT_TRANSFER_MODEL
+INTEGER, PARAMETER :: RAYLEIGH_HTC_MODEL=3         !< Flag for SF\%HEAT_TRANSFER_MODEL
+INTEGER, PARAMETER :: IMPINGING_JET_HTC_MODEL=4    !< Flag for SF\%HEAT_TRANSFER_MODEL
+INTEGER, PARAMETER :: FM_HTC_MODEL=5               !< Flag for SF\%HEAT_TRANSFER_MODEL
+INTEGER, PARAMETER :: UGENT_HTC_MODEL=6            !< Flag for SF\%HEAT_TRANSFER_MODEL
 
 INTEGER, PARAMETER :: WALL_MODEL_BC=2              !< Flag for SF\%VELOCITY_BC_INDEX
 INTEGER, PARAMETER :: FREE_SLIP_BC=3               !< Flag for SF\%VELOCITY_BC_INDEX
@@ -89,7 +94,6 @@ INTEGER, PARAMETER :: MIRROR_BOUNDARY=3            !< Flag for SF\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: INTERPOLATED_BOUNDARY=6      !< Flag for SF\%BOUNDARY_TYPE, VT\%BOUNDARY_TYPE, WC\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: PERIODIC_BOUNDARY=7          !< Flag for SF\%BOUNDARY_TYPE, VT\%BOUNDARY_TYPE, WC\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: HVAC_BOUNDARY=42             !< Flag for SF\%THERMAL_BC_INDEX, SF\%SPECIES_BC_INDEX, VT\%BOUNDARY_TYPE
-
 
 INTEGER, PARAMETER :: FISHPAK_BC_PERIODIC=0            !< Flag for FISHPAK_BC(I) I=1,3: Period BC for Poisson solver
 INTEGER, PARAMETER :: FISHPAK_BC_DIRICHLET_DIRICHLET=1 !< Flag for FISHPAK_BC(I) I=1,3: Dirichlet at both sides
@@ -145,6 +149,7 @@ INTEGER, PARAMETER :: OBST_CYLINDER_TYPE=2             !< Flag for OB\%SHAPE_TYP
 INTEGER, PARAMETER :: OBST_CONE_TYPE=3                 !< Flag for OB\%SHAPE_TYPE
 INTEGER, PARAMETER :: OBST_BOX_TYPE=4                  !< Flag for OB\%SHAPE_TYPE
 
+
 INTEGER :: FUEL_INDEX=0                    !< Index for FUEL in SIMPLE_CHEMISTRY model
 INTEGER :: O2_INDEX=0                      !< Index for O2 in SIMPLE_CHEMISTRY model
 INTEGER :: N2_INDEX=0                      !< Index for N2 in SIMPLE_CHEMISTRY model
@@ -162,6 +167,8 @@ INTEGER :: MOISTURE_INDEX=0                !< Index for MATL MOISTURE
 
 INTEGER :: STOP_STATUS=NO_STOP             !< Indicator of whether and why to stop the job
 INTEGER :: INPUT_FILE_LINE_NUMBER=0        !< Indicator of what line in the input file is being read
+
+INTEGER :: RND_SEED=0                      !< User RANDOM_SEED
 
 ! Miscellaneous logical constants
 
@@ -220,6 +227,8 @@ LOGICAL :: OVERWRITE=.TRUE.                 !< Overwrite old output files
 LOGICAL :: INIT_HRRPUV=.FALSE.              !< Assume an initial spatial distribution of HRR per unit volume
 LOGICAL :: SYNTHETIC_EDDY_METHOD=.FALSE.
 LOGICAL :: UVW_RESTART=.FALSE.              !< Initialize velocity field with values from a file
+LOGICAL :: TMP_RESTART=.FALSE.              !< Initialize temperature field with values from a file
+LOGICAL :: SPEC_RESTART=.FALSE.             !< Initialize tracked species field with values from a file
 LOGICAL :: PARTICLE_CFL=.FALSE.             !< Include particle velocity as a constraint on time step
 LOGICAL :: RTE_SOURCE_CORRECTION=.TRUE.     !< Apply a correction to the radiation source term to achieve desired rad fraction
 LOGICAL :: OBST_CREATED_OR_REMOVED=.FALSE.  !< An obstruction has just been created or removed and wall cells must be reassigned
@@ -253,10 +262,8 @@ LOGICAL :: NO_PRESSURE_ZONES=.FALSE.                !< Flag to suppress pressure
 LOGICAL :: CTRL_DIRECT_FORCE=.FALSE.                !< Allow adjustable direct force via CTRL logic
 LOGICAL :: REACTING_THIN_OBSTRUCTIONS=.FALSE.       !< Thin obstructions that off-gas are present
 LOGICAL :: SMOKE3D_16=.FALSE.                       !< Output 3D smoke values using 16 bit integers
-
-#if defined coupled
-LOGICAL :: COUPLED_BOUNDARY=.TRUE.               !< this is a coupled run
-#endif
+LOGICAL :: CHECK_BOUNDARY_ONE_D_ARRAYS=.FALSE.      !< Flag that indicates that ONE_D array dimensions need to be checked
+LOGICAL :: TENSOR_DIFFUSIVITY=.FALSE.               !< If true, use experimental tensor diffusivity model for spec and tmp
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: CHANGE_TIME_STEP_INDEX      !< Flag to indicate if a mesh needs to change time step
 INTEGER, ALLOCATABLE, DIMENSION(:) :: SETUP_PRESSURE_ZONES_INDEX  !< Flag to indicate if a mesh needs to keep searching for ZONEs
@@ -271,6 +278,7 @@ INTEGER :: N_TERRAIN_IMAGES=0                                             !< Num
 CHARACTER(FORMULA_LENGTH), DIMENSION(MAX_TERRAIN_IMAGES) :: TERRAIN_IMAGE !< Name of external terrain image
 CHARACTER(CHID_LENGTH) :: CHID                                            !< Job ID
 CHARACTER(CHID_LENGTH) :: RESTART_CHID                                    !< Job ID for a restarted case
+CHARACTER(FILE_LENGTH) :: RESULTS_DIR                                     !< Custom directory for output
 
 ! Dates, version numbers, revision numbers
 
@@ -336,7 +344,6 @@ REAL(EB) :: NORTH_BEARING=0._EB                !< North bearing for terrain map
 REAL(EB) :: LATITUDE=10000._EB                 !< Latitude for geostrophic calculation
 REAL(EB) :: GEOSTROPHIC_WIND(2)=0._EB          !< Wind vector (m/s)
 REAL(EB) :: DY_MIN_BLOWING=1.E-8_EB            !< Parameter in liquid evaporation algorithm (m)
-REAL(EB) :: MINIMUM_FILM_THICKNESS=1.E-5_EB    !< Minimum thickness of liquid film on a solid surface (m)
 REAL(EB) :: SOOT_DENSITY=1800._EB              !< Density of solid soot (kg/m3)
 REAL(EB) :: HVAC_MASS_TRANSPORT_CELL_L=-1._EB  !< Global cell size for HVAC mass transport (m)
 
@@ -376,6 +383,7 @@ REAL(EB) :: RELAXATION_FACTOR=1._EB                         !< Factor used to re
 REAL(EB) :: MPI_TIMEOUT=600._EB                             !< Time to wait for MPI messages to be received (s)
 REAL(EB) :: DT_END_MINIMUM=TWO_EPSILON_EB                   !< Smallest possible final time step (s)
 REAL(EB) :: DT_END_FILL=1.E-6_EB
+INTEGER  :: DIAGNOSTICS_INTERVAL                            !< Number of time steps between diagnostic outputs
 
 ! Combustion parameters
 
@@ -459,17 +467,19 @@ REAL(EB) :: C_MIN=1._EB       !< Minimum value of RAD_Q_SUM/KFST4_SUM
 ! Ramping parameters
 
 CHARACTER(LABEL_LENGTH), POINTER, DIMENSION(:) :: RAMP_ID,RAMP_TYPE
-INTEGER :: I_RAMP_GX,I_RAMP_GY,I_RAMP_GZ,&
+INTEGER :: MAX_RAMPS=100,I_RAMP_GX,I_RAMP_GY,I_RAMP_GZ,&
            I_RAMP_PGF_T,I_RAMP_FVX_T,I_RAMP_FVY_T,I_RAMP_FVZ_T,N_RAMP=0,I_RAMP_TMP0_Z=0,I_RAMP_P0_Z=0,&
            I_RAMP_SPEED_T=0,I_RAMP_SPEED_Z=0,I_RAMP_DIRECTION_T=0,I_RAMP_DIRECTION_Z=0
-INTEGER, PARAMETER :: TIME_HEAT=-1,TIME_VELO=-2,TIME_TEMP=-3,TIME_EFLUX=-4,TIME_PART=-5,TANH_RAMP=-2,TSQR_RAMP=-1,&
-                      VELO_PROF_X=-6,VELO_PROF_Y=-7,VELO_PROF_Z=-8,TIME_TGF=-9,TIME_TGB=-10,TIME_TB=-11,N_SURF_RAMPS=11
+INTEGER, PARAMETER :: MAX_QDOTPP_REF=10                    !< Maximum number of REFERENCE_HEAT_FLUX curves for Spyro
+INTEGER, PARAMETER :: TIME_HEAT=-11,TIME_VELO=-2,TIME_TEMP=-3,TIME_EFLUX=-4,TIME_PART=-5,TANH_RAMP=-2,TSQR_RAMP=-1,&
+                      VELO_PROF_X=-6,VELO_PROF_Y=-7,VELO_PROF_Z=-8,TIME_TGF=-9,TIME_TGB=-10,TIME_TB=-1,&
+                      N_SURF_RAMPS=11+MAX_QDOTPP_REF-1
 
 ! TABLe parameters
 
 CHARACTER(LABEL_LENGTH) :: TABLE_ID(1000)
 INTEGER :: N_TABLE=0,TABLE_TYPE(1000)
-INTEGER, PARAMETER :: SPRAY_PATTERN=1,PART_RADIATIVE_PROPERTY=2,POINTWISE_INSERTION=3,TABLE_2D_TYPE=4
+INTEGER, PARAMETER :: SPRAY_PATTERN=1,PART_RADIATIVE_PROPERTY=2,POINTWISE_INSERTION=3
 
 ! Variables related to meshes
 
@@ -505,7 +515,11 @@ REAL(EB), ALLOCATABLE, DIMENSION(:) :: TP_AA                     !< Upper off-di
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: TP_BB                     !< Lower off-diagonal of tri-diagonal matrix for tunnel pressure
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: TP_CC                     !< Right hand side of 1-D tunnel pressure linear system
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: TP_DD                     !< Diagonal of tri-diagonal matrix for tunnel pressure solver
-REAL(EB), ALLOCATABLE, DIMENSION(:) :: H_BAR                     !< Pressure solution of 1-D tunnel pressure solver
+REAL(EB), ALLOCATABLE, DIMENSION(:) :: TP_RDXN                   !< Reciprocal of the distance between tunnel precon points
+REAL(EB), ALLOCATABLE, TARGET, DIMENSION(:) :: H_BAR             !< Pressure solution of 1-D tunnel pressure solver, predictor step
+REAL(EB), ALLOCATABLE, TARGET, DIMENSION(:) :: H_BAR_S           !< Pressure solution of 1-D tunnel pressure solver, corrector step
+REAL(EB), ALLOCATABLE, TARGET, DIMENSION(:) :: DUDT_BAR          !< Average du/dt for 1-D tunnel pressure solver, predictor step
+REAL(EB), ALLOCATABLE, TARGET, DIMENSION(:) :: DUDT_BAR_S        !< Average du/dt for 1-D tunnel pressure solver, corrector step
 INTEGER, ALLOCATABLE, DIMENSION(:) :: COUNTS_TP                  !< Counter for MPI calls used for 1-D tunnel pressure solver
 INTEGER, ALLOCATABLE, DIMENSION(:) :: DISPLS_TP                  !< Displacements for MPI calls used for 1-D tunnel pressure solver
 INTEGER, ALLOCATABLE, DIMENSION(:) :: I_OFFSET                   !< Spatial index of tunnel
@@ -531,22 +545,19 @@ INTEGER                              :: LU_ERR=ERROR_UNIT,LU_END=2,LU_GIT=3,LU_S
                                         LU_CATF=9
 INTEGER                              :: LU_MASS,LU_HRR,LU_STEPS,LU_NOTREADY,LU_VELOCITY_ERROR,LU_CFL,LU_LINE=-1,LU_CUTCELL
 INTEGER                              :: LU_HISTOGRAM,LU_HVAC
-INTEGER                              :: LU_GEOC=-1,LU_TGA,LU_INFO,LU_DEVC_CTRL=-1
+INTEGER                              :: LU_GEOC=-1,LU_TGA,LU_INFO,LU_DEVC_CTRL=-1,LU_RDIR
 INTEGER, ALLOCATABLE, DIMENSION(:)   :: LU_PART,LU_PROF,LU_XYZ,LU_TERRAIN,LU_PL3D,LU_DEVC,LU_STATE,LU_CTRL,LU_CORE,LU_RESTART
 INTEGER, ALLOCATABLE, DIMENSION(:)   :: LU_VEG_OUT,LU_GEOM,LU_CFACE_GEOM
 INTEGER                              :: LU_GEOM_TRAN
-INTEGER, ALLOCATABLE, DIMENSION(:,:) :: LU_SLCF,LU_SLCF_GEOM,LU_BNDF,LU_BNDF_GEOM,LU_BNDG,LU_ISOF,LU_ISOF2, &
+INTEGER, ALLOCATABLE, DIMENSION(:,:) :: LU_SLCF,LU_SLCF_GEOM,LU_BNDF,LU_BNDG,LU_ISOF,LU_ISOF2, &
                                         LU_SMOKE3D,LU_RADF
 INTEGER                              :: DEVC_COLUMN_LIMIT=254,CTRL_COLUMN_LIMIT=254
 
-CHARACTER(250)                             :: FN_INPUT='null'
-CHARACTER(80)                              :: FN_STOP='null',FN_CPU,FN_CFL,FN_OUTPUT='null'
-CHARACTER(80)                              :: FN_MASS,FN_HRR,FN_STEPS,FN_SMV,FN_END,FN_ERR,FN_NOTREADY,FN_VELOCITY_ERROR,FN_GIT
-CHARACTER(80)                              :: FN_LINE,FN_HISTOGRAM,FN_CUTCELL,FN_TGA,FN_DEVC_CTRL,FN_HVAC
-CHARACTER(80), ALLOCATABLE, DIMENSION(:)   :: FN_PART,FN_PROF,FN_XYZ,FN_TERRAIN,FN_PL3D,FN_DEVC,FN_STATE,FN_CTRL,FN_CORE,FN_RESTART
-CHARACTER(80), ALLOCATABLE, DIMENSION(:)   :: FN_VEG_OUT,FN_GEOM, FN_CFACE_GEOM
-CHARACTER(80), ALLOCATABLE, DIMENSION(:,:) :: FN_SLCF,FN_SLCF_GEOM,FN_BNDF,FN_BNDF_GEOM,FN_BNDG, &
-                                              FN_ISOF,FN_ISOF2,FN_SMOKE3D,FN_RADF
+CHARACTER(FN_LENGTH) :: FN_INPUT='null',FN_STOP='null',FN_CPU,FN_CFL,FN_OUTPUT='null',FN_MASS,FN_HRR,FN_STEPS,FN_SMV,FN_END, &
+                        FN_ERR,FN_NOTREADY,FN_VELOCITY_ERROR,FN_GIT,FN_LINE,FN_HISTOGRAM,FN_CUTCELL,FN_TGA,FN_DEVC_CTRL,FN_HVAC
+CHARACTER(FN_LENGTH), ALLOCATABLE, DIMENSION(:) :: FN_PART,FN_PROF,FN_XYZ,FN_TERRAIN,FN_PL3D,FN_DEVC,FN_STATE,FN_CTRL,FN_CORE, &
+                                                   FN_RESTART,FN_VEG_OUT,FN_GEOM,FN_CFACE_GEOM
+CHARACTER(FN_LENGTH), ALLOCATABLE, DIMENSION(:,:) :: FN_SLCF,FN_SLCF_GEOM,FN_BNDF,FN_BNDG,FN_ISOF,FN_ISOF2,FN_SMOKE3D,FN_RADF
 
 CHARACTER(9) :: FMT_R
 LOGICAL :: OUT_FILE_OPENED=.FALSE.
@@ -557,11 +568,8 @@ CHARACTER(LABEL_LENGTH) :: MATL_NAME(1:1000)
 INTEGER :: N_SURF,N_SURF_RESERVED,N_MATL,MIRROR_SURF_INDEX,OPEN_SURF_INDEX,INTERPOLATED_SURF_INDEX,DEFAULT_SURF_INDEX=0, &
            INERT_SURF_INDEX=0,PERIODIC_SURF_INDEX,PERIODIC_FLOW_ONLY_SURF_INDEX,HVAC_SURF_INDEX=-1,&
            MASSLESS_TRACER_SURF_INDEX, MASSLESS_TARGET_SURF_INDEX,DROPLET_SURF_INDEX,VEGETATION_SURF_INDEX,NWP_MAX
-           
-            
-REAL(EB), ALLOCATABLE, DIMENSION(:) :: AAS,BBS,DDS,DDT,DX_S,RDX_S,RDXN_S,DX_WGT_S, &
+REAL(EB), ALLOCATABLE, DIMENSION(:) :: AAS,BBS,CCS,DDS,DDT,DX_S,RDX_S,RDXN_S,DX_WGT_S,DELTA_TMP, &
                                        RHO_S,Q_S,TWO_DX_KAPPA_S,X_S_NEW,R_S,MF_FRAC,REGRID_FACTOR,R_S_NEW
-REAL(EB), ALLOCATABLE, TARGET, DIMENSION(:) :: CCS
 INTEGER,  ALLOCATABLE, DIMENSION(:) :: LAYER_INDEX,CELL_COUNT,CELL_COUNT_INTEGERS,CELL_COUNT_LOGICALS
 INTEGER,  ALLOCATABLE, DIMENSION(:) :: EDGE_COUNT
 
@@ -649,8 +657,6 @@ REAL(EB) :: CPU_TIME_START                          !< CPU_TIME when FDS starts
 INTEGER :: OPENMP_AVAILABLE_THREADS = 1         !< OpenMP parameter
 LOGICAL :: USE_OPENMP               = .FALSE.   !< OpenMP parameter
 
-INTEGER :: N_CSVF=0  !< Number of external velocity (.csv) files
-
 INTEGER :: N_FACE=0,N_GEOM=0
 
 LOGICAL :: STORE_CUTCELL_DIVERGENCE = .FALSE.
@@ -723,6 +729,14 @@ REAL(EB) :: TGA_FINAL_TEMPERATURE=800._EB  !< Final Temperature (C) to use for s
 
 LOGICAL :: IBLANK_SMV=.TRUE.  !< Parameter passed to smokeview (in .smv file) to control generation of blockages
 
+! External file control
+CHARACTER(250) :: EXTERNAL_FILENAME
+LOGICAL :: READ_EXTERNAL = .FALSE.
+INTEGER :: LU_EXTERNAL
+REAL(EB) :: DT_EXTERNAL=0._EB, T_EXTERNAL
+REAL(EB), ALLOCATABLE, DIMENSION(:) :: EXTERNAL_RAMP
+LOGICAL(EB), ALLOCATABLE, DIMENSION(:) :: EXTERNAL_CTRL
+
 END MODULE GLOBAL_CONSTANTS
 
 
@@ -735,12 +749,12 @@ IMPLICIT NONE (TYPE,EXTERNAL)
 
 INTEGER :: RAMP_BNDF_INDEX=0  !< Ramp index for boundary file time series
 INTEGER :: RAMP_CTRL_INDEX=0  !< Ramp index for control file time series
-INTEGER :: RAMP_CPU_INDEX=0   !< Ramp index for CPU file time series
+INTEGER :: RAMP_CPU_INDEX =0  !< Ramp index for CPU file time series
 INTEGER :: RAMP_DEVC_INDEX=0  !< Ramp index for device file time series
 INTEGER :: RAMP_FLSH_INDEX=0  !< Ramp index for flush time series
 INTEGER :: RAMP_GEOM_INDEX=0  !< Ramp index for geometry output
 INTEGER :: RAMP_HRR_INDEX =0  !< Ramp index for hrr file time series
-INTEGER :: RAMP_HVAC_INDEX =0 !< Ramp index for hvac file time series
+INTEGER :: RAMP_HVAC_INDEX=0  !< Ramp index for hvac file time series
 INTEGER :: RAMP_ISOF_INDEX=0  !< Ramp index for isosurface file time series
 INTEGER :: RAMP_MASS_INDEX=0  !< Ramp index for mass file time series
 INTEGER :: RAMP_PART_INDEX=0  !< Ramp index for particle file time series
@@ -752,21 +766,24 @@ INTEGER :: RAMP_SLCF_INDEX=0  !< Ramp index for slice file time series
 INTEGER :: RAMP_SL3D_INDEX=0  !< Ramp index for 3D slice file time series
 INTEGER :: RAMP_SM3D_INDEX=0  !< Ramp index for smoke3d file time series
 INTEGER :: RAMP_UVW_INDEX =0  !< Ramp index for velocity file time series
+INTEGER :: RAMP_TMP_INDEX =0  !< Ramp index for temperature file time series
+INTEGER :: RAMP_SPEC_INDEX=0  !< Ramp index for species file time series
 REAL(EB), ALLOCATABLE, DIMENSION(:) :: BNDF_CLOCK, CPU_CLOCK,CTRL_CLOCK,DEVC_CLOCK,FLSH_CLOCK,GEOM_CLOCK, HRR_CLOCK,HVAC_CLOCK,&
                                        ISOF_CLOCK,MASS_CLOCK,PART_CLOCK,PL3D_CLOCK,PROF_CLOCK,RADF_CLOCK,RSRT_CLOCK,&
-                                       SLCF_CLOCK,SL3D_CLOCK,SM3D_CLOCK,UVW_CLOCK
+                                       SLCF_CLOCK,SL3D_CLOCK,SM3D_CLOCK,UVW_CLOCK ,TMP_CLOCK ,SPEC_CLOCK
 INTEGER, ALLOCATABLE, DIMENSION(:) :: BNDF_COUNTER, CPU_COUNTER,CTRL_COUNTER,DEVC_COUNTER,FLSH_COUNTER,GEOM_COUNTER, HRR_COUNTER,&
                                       HVAC_COUNTER,ISOF_COUNTER,MASS_COUNTER,PART_COUNTER,PL3D_COUNTER,PROF_COUNTER,RADF_COUNTER,&
-                                      RSRT_COUNTER,SLCF_COUNTER,SL3D_COUNTER,SM3D_COUNTER,UVW_COUNTER
+                                      RSRT_COUNTER,SLCF_COUNTER,SL3D_COUNTER,SM3D_COUNTER,UVW_COUNTER ,TMP_COUNTER ,SPEC_COUNTER
 REAL(EB) :: TURB_INIT_CLOCK=-1.E10_EB
 REAL(EB) :: MMS_TIMER=1.E10_EB
 REAL(EB) :: DT_SLCF,DT_BNDF,DT_DEVC,DT_PL3D,DT_PART,DT_RESTART,DT_ISOF,DT_HRR,DT_HVAC,DT_MASS,DT_PROF,DT_CTRL,&
-            DT_FLUSH,DT_SL3D,DT_GEOM,DT_CPU,DT_RADF,DT_SMOKE3D,DT_UVW
-REAL(EB) :: DT_SLCF_SPECIFIED=-1._EB ,DT_BNDF_SPECIFIED=-1._EB   ,DT_DEVC_SPECIFIED=-1._EB,DT_PL3D_SPECIFIED=-1._EB,&
-            DT_PART_SPECIFIED=-1._EB ,DT_RESTART_SPECIFIED=-1._EB,DT_ISOF_SPECIFIED=-1._EB,DT_HRR_SPECIFIED=-1._EB,&
-            DT_HVAC_SPECIFIED=-1._EB ,DT_MASS_SPECIFIED=-1._EB   ,DT_PROF_SPECIFIED=-1._EB,DT_CTRL_SPECIFIED=-1._EB,&
-            DT_FLUSH_SPECIFIED=-1._EB,DT_SL3D_SPECIFIED=-1._EB   ,DT_GEOM_SPECIFIED=-1._EB,DT_CPU_SPECIFIED=-1._EB,&
-            DT_RADF_SPECIFIED=-1._EB ,DT_SMOKE3D_SPECIFIED=-1._EB,DT_UVW_SPECIFIED=-1._EB
+            DT_FLUSH,DT_SL3D,DT_GEOM,DT_CPU,DT_RADF,DT_SMOKE3D,DT_UVW ,DT_TMP,DT_SPEC
+REAL(EB) :: DT_SLCF_SPECIFIED =-1._EB,DT_BNDF_SPECIFIED   =-1._EB,DT_DEVC_SPECIFIED=-1._EB,DT_PL3D_SPECIFIED=-1._EB,&
+            DT_PART_SPECIFIED =-1._EB,DT_RESTART_SPECIFIED=-1._EB,DT_ISOF_SPECIFIED=-1._EB,DT_HRR_SPECIFIED =-1._EB,&
+            DT_HVAC_SPECIFIED =-1._EB,DT_MASS_SPECIFIED   =-1._EB,DT_PROF_SPECIFIED=-1._EB,DT_CTRL_SPECIFIED=-1._EB,&
+            DT_FLUSH_SPECIFIED=-1._EB,DT_SL3D_SPECIFIED   =-1._EB,DT_GEOM_SPECIFIED=-1._EB,DT_CPU_SPECIFIED =-1._EB,&
+            DT_RADF_SPECIFIED =-1._EB,DT_SMOKE3D_SPECIFIED=-1._EB,DT_UVW_SPECIFIED =-1._EB,DT_TMP_SPECIFIED =-1._EB,&
+            DT_SPEC_SPECIFIED =-1._EB
 
 END MODULE OUTPUT_CLOCKS
 

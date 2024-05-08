@@ -171,7 +171,7 @@ main.obj: FFLAGS += $(FOPENMPFLAGS)
 
  
 
-impi_intel_linux_uc : FFLAGS = -m64 -fc=$(I_IFORT) -O2 -ipo -no-wrap-margin $(GITINFO) $(INTELMPI_COMPINFO) $(FFLAGSMKL_INTEL) -DUSE_IFPORT  $(NETCDF_LIB)
+impi_intel_linux_uc : FFLAGS = -m64 -fc=$(I_IFORT) -O2 -cpp -ipo -no-wrap-margin $(GITINFO) $(INTELMPI_COMPINFO) $(FFLAGSMKL_INTEL) -DUSE_IFPORT  $(NETCDF_LIB)
 impi_intel_linux_uc : LFLAGSMKL = $(LFLAGSMKL_INTEL)  
 impi_intel_linux_uc : FCOMPL = mpiifort
 impi_intel_linux_uc : obj = fds_impi_intel_linux_uc
@@ -250,10 +250,10 @@ main.obj : func.obj prec.obj cons.obj type.obj mesh.obj devc.obj smvv.obj mass.o
 
 #*** Clean Target to remove Object and Module files ***
 
-.PHONY : clean
-clean:
-	-rm -f *.o *.mod *.obj
+#.PHONY : clean
+#clean:
+#	-rm -f *.o *.mod *.obj
 
-.PHONY : winclean
-winclean:
-	-erase *.mod *.obj
+#.PHONY : winclean
+#winclean:
+#	-erase *.mod *.obj
