@@ -231,7 +231,7 @@ impi_intel_linux : obj = fds_impi_intel_linux
 impi_intel_linux : setup $(obj_mpi)
 	$(FCOMPL) $(FFLAGS) -o $(obj) $(obj_mpi) $(LFLAGSMKL)
 
-impi_intel_linux_nc : FFLAGS = -m64 -O2 -ipo -no-wrap-margin $(GITINFO) $(INTELMPI_COMPINFO) $(FFLAGSMKL_INTEL) -DUSE_IFPORT
+impi_intel_linux_nc : FFLAGS = -m64 -O2 -g -ipo -no-wrap-margin $(GITINFO) $(INTELMPI_COMPINFO) $(FFLAGSMKL_INTEL) -DUSE_IFPORT
 impi_intel_linux_nc : LFLAGSMKL = $(LFLAGSMKL_INTEL) -L/$NETCDF_DIR/lib -I/$NETCDF_DIR/include -lnetcdf -lnetcdff
 impi_intel_linux_nc : FCOMPL = ftn
 impi_intel_linux_nc : obj = fds_impi_intel_linux_nc

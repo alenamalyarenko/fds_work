@@ -658,7 +658,7 @@ MAIN_LOOP: DO
 #if defined coupled
      ! Apply Temp open boundary conditions
      !IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply temp bc')
-      CALL TEMP_BC_COUPLED(T,NM)
+     !CALL TEMP_BC_COUPLED(T,NM)
 #endif       
 
       ! Calculate convective and diffusive terms of the velocity equation.

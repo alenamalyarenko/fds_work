@@ -1,8 +1,8 @@
-# define plot_3d_out
-# undef plot_hrr_out
-# define output_nc
+#define plot_3d_out
+#undef plot_hrr_out
+#define output_nc
 
-#undef coupled
+#define coupled
 
 #if defined coupled
 # define global_mesh

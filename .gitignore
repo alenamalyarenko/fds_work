@@ -7,7 +7,7 @@
 *.nc
 *.exe
 fds_impi_intel_linux_nc
-fds_impi_intel_linux_uc
+fds_impi_intel_linux
 /test_runs_local
 
 DATA_3D_NETCDF_N03
