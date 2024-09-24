@@ -1,6 +1,7 @@
 /fds
 
 /Source
+/data_from_nesi
 *.o
 *.mod
 *.nc
