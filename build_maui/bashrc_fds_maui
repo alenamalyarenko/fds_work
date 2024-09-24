@@ -1,0 +1,11 @@
+module purge
+module load modules
+module load NeSI
+module load slurm
+module load PrgEnv-intel
+module load CrayIntel
+module load cray-netcdf
+module load craype-x86-skylake
+module load cray-mpich
+module load eproxy/2.0.24-7.0.4.1_2.15__g45aade1.ari 
+

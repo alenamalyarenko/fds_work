@@ -1,0 +1,62 @@
+&HEAD CHID='Coupled6_4'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+&MESH IJK=10,10,120, XB=0.0,20.0,  0.0,20.0,  0,120,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=20, DY=20, DZ=120., I_UPPER=4, J_UPPER=4, K_UPPER=0/
+#
+
+
+
+#For instanteneous IC field:
+# TIME
+
+&TIME T_END=7200,LOCK_TIME_STEP=F, DT=1 /
+
+#&TIME T_END=60, DT=1 /
+
+
+#character(13)
+#&ICCD ICFile='ic_test_01.nc', OBFile='bc_test_02.nc' /
+
+&WIND SPEED=10, Z_REF=20, DIRECTION=180., L=-100., Z_0=0.03 /
+
+# Boundary Conditions:
+#  VT%N_EDDY
+#  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
+
+
+#&VENT MB='XMIN', SURF_ID='OPEN'/
+#&VENT MB='XMAX', SURF_ID='OPEN'/
+#&VENT MB='YMIN', SURF_ID='OPEN'/
+#&VENT MB='YMAX', SURF_ID='OPEN'/
+
+
+&VENT MB='ZMAX', SURF_ID='OPEN',TMP_EXTERIOR=20 /
+
+#south - coupled
+&VENT XB=0.,100.,0.,0.,0.,120.,SURF_ID='OPEN',TMP_EXTERIOR=20/ 
+#north
+&VENT XB=0.,100.,100.,100.,0.,120.,SURF_ID='OPEN',TMP_EXTERIOR=20.1/
+
+#east
+#&VENT XB=200.,200.,0.,200.,0.,120.,SURF_ID='OPEN'/
+
+#west
+#&VENT XB=0.,0.,0.,200.,0.,120.,SURF_ID='OPEN'/
+
+
+
+&VENT XB=0.,100.,0.,100.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.1 /
+
+&DUMP DT_PL3D=60, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+
+
+&MISC VERBOSE=T, TMPA=20/
+
+
+
+
+&TAIL /
