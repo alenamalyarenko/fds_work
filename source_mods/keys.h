@@ -1,5 +1,6 @@
-#define plot_3d_out
-
+#undef plot_3d_out
+#undef plot_hrr_out
+#define output_nc
 
 #undef coupled
 
@@ -10,5 +11,4 @@
 # define init_u_in
 # define coupled_bc
 
-# undef plot_hrr_out
 #endif
