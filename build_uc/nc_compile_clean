@@ -10,18 +10,18 @@ echo "cleaned old stuff"
 cp ../../fds/Source/* ../Source/
 
 
-#cp ../source_mods_uc/keys.h                  ../Source/
-#cp ../source_mods_uc/coupled_files.h         ../Source/
+cp ../source_mods_uc/keys.h                  ../Source/
+cp ../source_mods_uc/coupled_files.h         ../Source/
 #cp ../source_mods_uc/velocity_bc_coupled.h   ../Source/
 
-#cp ../source_mods_uc/velo.f90  ../Source/
-#cp ../source_mods_uc/read.f90  ../Source/
-#cp ../source_mods_uc/mesh.f90  ../Source/
-#cp ../source_mods_uc/main.f90  ../Source/
-#cp ../source_mods_uc/cons.f90  ../Source/
+cp ../source_mods_uc/velo.f90  ../Source/
+cp ../source_mods_uc/read.f90  ../Source/
+cp ../source_mods_uc/mesh.f90  ../Source/
+cp ../source_mods_uc/main.f90  ../Source/
+cp ../source_mods_uc/cons.f90  ../Source/
 
-#cp ../source_mods_uc/dump.f90  ../Source/
-#cp ../source_mods_uc/init.f90  ../Source/
+cp ../source_mods_uc/dump.f90  ../Source/
+cp ../source_mods_uc/init.f90  ../Source/
 
 
 FFLAGS="$FFLAGS -fpp" FCOMPL="ifort" obj="fds" make  -j 8 impi_intel_linux_uc
