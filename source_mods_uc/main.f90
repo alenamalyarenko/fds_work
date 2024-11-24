@@ -771,13 +771,13 @@ MAIN_LOOP: DO
 
    VELOCITY_BC_LOOP: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
       IF (SYNTHETIC_EDDY_METHOD) CALL SYNTHETIC_TURBULENCE(DT,T,NM)
-      CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.TRUE.)
 #if defined coupled_bc
-      ! Apply UVW open boundary conditions - 1
-      ! use velocity_bc
+      ! Apply UVW to U_eddy variables to be used in the main velocity_bc
       IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc predictor')
-      CALL VELOCITY_BC_COUPLED(T,NM, APPLY_TO_ESTIMATED_VARIABLES=.TRUE.)
-#endif      
+      CALL VELOCITY_BC_COUPLED(T,NM)
+#endif  
+      CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.TRUE.)
+    
    ENDDO VELOCITY_BC_LOOP
 
    !================================================================================================================================
@@ -956,13 +956,11 @@ MAIN_LOOP: DO
    ! Apply velocity boundary conditions, and update values of HRR, DEVC, etc.
 
    VELOCITY_BC_LOOP_2: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
-      CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
 #if defined coupled_bc
-     ! Apply UVW open boundary conditions - 2
-     ! use velocity_bc
      ! IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc corrector')
-      CALL VELOCITY_BC_COUPLED(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
-#endif        
+      CALL VELOCITY_BC_COUPLED(T,NM)
+#endif     
+      CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
       CALL UPDATE_GLOBAL_OUTPUTS(T,DT,NM)
    ENDDO VELOCITY_BC_LOOP_2
 

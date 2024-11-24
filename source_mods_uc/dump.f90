@@ -90,6 +90,14 @@ CHARACTER(80) :: FN_UVW,FN_MMS,FN_SPECTRUM,FN_TMP,FN_SPEC
 
 TNOW = CURRENT_TIME()
 
+#if defined write_init
+! init cond dump
+IF (T==0) THEN
+   CALL DUMP_SLCF(T,DT,NM,1)
+ENDIF
+#endif
+
+
 IF (T>=PART_CLOCK(PART_COUNTER(NM)) .AND. PARTICLE_FILE) THEN
    CALL DUMP_PART(T,NM)
    DO WHILE(PART_COUNTER(NM)<SIZE(PART_CLOCK)-1)
@@ -947,6 +955,8 @@ M%QQ2=0._FB
 
 WRITE_XYZ_FILE: IF (WRITE_XYZ) THEN
 #if defined output_nc
+!ALLOCATE(M%QQf(0:IBP1,0:JBP1,0:KBP1,5),STAT=IZERO)
+!CALL ChkMemErr('DUMP','QQ',IZERO)
     status= nf90_create(FN_XYZ(NM),NF90_CLOBBER,LU_XYZ(NM))
 #else    
     OPEN(LU_XYZ(NM),FILE=FN_XYZ(NM),FORM='UNFORMATTED',STATUS='REPLACE')
@@ -5737,8 +5747,9 @@ INTEGER :: DEBUG
 INTEGER :: IERROR
 
 
-INTEGER::status, dimid1,dimid2,dimid3, dimid1c,dimid2c,dimid3c 
+INTEGER::status, dimid1,dimid2,dimid3, dimid1c,dimid2c,dimid3c,dimid1c2,dimid2c2,dimid3c2, NF_NOERR
 INTEGER:: varid1, varid2,varid3,varid4,varid5
+INTEGER:: varid12, varid22,varid32,varid42
 
 ! Return if there are no slices to process and this is not a Plot3D dump
 
@@ -5942,7 +5953,7 @@ QUANTITY_LOOP: DO IQ=1,NQT
       IF (OUTPUT_QUANTITY(IND)%CELL_POSITION==CELL_FACE .AND. OUTPUT_QUANTITY(IND)%IOR==1) I_INC = 0
       IF (OUTPUT_QUANTITY(IND)%CELL_POSITION==CELL_FACE .AND. OUTPUT_QUANTITY(IND)%IOR==2) J_INC = 0
 
-      DO J=J1,J2
+      DO J=J1,J2 
          DO I=I1,I2
             QQ(I,J,K1,IQQ) = REAL(0.25_EB*(QUANTITY(I,J      ,K1)+QUANTITY(I+I_INC,J      ,K1)+&
                                            QUANTITY(I,J+J_INC,K1)+QUANTITY(I+I_INC,J+J_INC,K1)),FB)
@@ -5966,7 +5977,8 @@ QUANTITY_LOOP: DO IQ=1,NQT
             DO I=II1,II2
             !xxx need to change the following code to use face centered interpolation
             ! (perhaps copy some variant of node centered interpolation code above)
-               QQ(I,J,K,IQQ) = REAL(QUANTITY(I,J,K),FB)
+               QQ(I,J,K,IQQ) = REAL(QUANTITY(I,J,K),FB)             
+               
             ENDDO
          ENDDO
       ENDDO
@@ -6129,12 +6141,59 @@ QUANTITY_LOOP: DO IQ=1,NQT
       ENDIF
    ENDIF
 
+!#if defined output_nc  
+!! calculate face-centered values
+!      select case(IQ)
+!        case(1) !temp     
+!         DO J=1,JBP1
+!          DO I=1,IBP1
+!           DO K=1,KBP1
+!            QQ_f(I,J,KK,IQ) = REAL(0.5_EB*(QUANTITY(I,J,K)+QUANTITY(I,J-1,K)),FB)
+!           ENDDO
+!          ENDDO	 
+!         ENDDO
+!         
+!        case(2) !u
+!         DO J=1,JBP1
+!          DO I=1,IBP1
+!           DO K=1,KBP1
+!            QQ_f(I,J,KK,IQ) = REAL(0.25_EB*(QUANTITY(I,J,K)+QUANTITY(I,J-1,K)+&
+!                                             QUANTITY(I-1,J,K)+QUANTITY(I-1,J-1,K)),FB)
+!           ENDDO
+!          ENDDO	 
+!         ENDDO
+!         
+!        case(3) !v
+!         DO J=0,JBAR
+!          DO I=1,IBP1
+!           DO K=1,KBP1
+!            QQ_f(I,J,KK,IQ) = REAL((QUANTITY(I,J,K)),FB)
+!           ENDDO
+!          ENDDO	 
+!         ENDDO
+!         
+!        case(4) !w
+!         
+!        case(5) !hrr
+!         DO J=1,JBP1
+!          DO I=1,IBP1
+!           DO K=1,KBP1
+!            QQ_f(I,J,KK,IQ) = REAL(0.5_EB*(QUANTITY(I,J,K)+QUANTITY(I,J-1,K)),FB)
+!           ENDDO
+!          ENDDO	 
+!         ENDDO
+!         
+!#endif   
+   
+
 ENDDO QUANTITY_LOOP
 
 ! Write out the PLOT3D ``q'' file
 
 IF (PLOT3D) THEN
 #if defined output_nc   
+
+
    status = nf90_create(FN_PL3D(NM), NF90_CLOBBER, LU_PL3D(NM))
    status = nf90_def_dim(LU_PL3D(NM),"x",IBP1,dimid1)
    status = nf90_def_dim(LU_PL3D(NM),"y",JBP1,dimid2)
@@ -6144,6 +6203,10 @@ IF (PLOT3D) THEN
    status = nf90_def_dim(LU_PL3D(NM),"yc",JBAR,dimid2c)
    status = nf90_def_dim(LU_PL3D(NM),"zc",KBAR,dimid3c)
    
+   status = nf90_def_dim(LU_PL3D(NM),"xc2",IBAR+2,dimid1c2)
+   status = nf90_def_dim(LU_PL3D(NM),"yc2",JBAR+2,dimid2c2)
+   status = nf90_def_dim(LU_PL3D(NM),"zc2",KBAR+2,dimid3c2)
+   
    
    status = nf90_def_var(LU_PL3D(NM),"temp",   NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid1)
    status = nf90_def_var(LU_PL3D(NM),"u",      NF90_FLOAT, (/dimid1,dimid2c,dimid3c/),varid2)
@@ -6151,14 +6214,31 @@ IF (PLOT3D) THEN
    status = nf90_def_var(LU_PL3D(NM),"w",      NF90_FLOAT, (/dimid1c,dimid2c,dimid3/),varid4)
    status = nf90_def_var(LU_PL3D(NM),"hrrpuv", NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid5)
    
+   status = nf90_def_var(LU_PL3D(NM),"temp_a",   NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid12)
+   status = nf90_def_var(LU_PL3D(NM),"u_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid22)
+   status = nf90_def_var(LU_PL3D(NM),"v_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid32)
+   status = nf90_def_var(LU_PL3D(NM),"w_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid42)
+
+   
+   
    status = nf90_enddef(LU_PL3D(NM))
    status = nf90_put_var(LU_PL3D(NM),varid1,QQ(1:IBAR,1:JBAR,1:KBAR,1)) 
    status = nf90_put_var(LU_PL3D(NM),varid2,QQ(0:IBAR,1:JBAR,1:KBAR,2)) !u
    status = nf90_put_var(LU_PL3D(NM),varid3,QQ(1:IBAR,0:JBAR,1:KBAR,3)) !v
    status = nf90_put_var(LU_PL3D(NM),varid4,QQ(1:IBAR,1:JBAR,0:KBAR,4)) !w
    status = nf90_put_var(LU_PL3D(NM),varid5,QQ(1:IBAR,1:JBAR,1:KBAR,5))
+   
+   status = nf90_put_var(LU_PL3D(NM),varid12,QQ(0:IBP1,0:JBP1,0:KBP1,1)) 
+   status = nf90_put_var(LU_PL3D(NM),varid22,QQ(0:IBP1,0:JBP1,0:KBP1,2)) !u
+   status = nf90_put_var(LU_PL3D(NM),varid32,QQ(0:IBP1,0:JBP1,0:KBP1,3)) !v
+   status = nf90_put_var(LU_PL3D(NM),varid42,QQ(0:IBP1,0:JBP1,0:KBP1,4)) !w 
+   
    status = nf90_close(LU_PL3D(NM))   
    
+   !IF (STATUS .NE. NF_NOERR) then
+   !   print *, trim(nf90_strerror(status))
+   !   stop "Stopped"
+   !end if
    
 #else !normal output  
 
