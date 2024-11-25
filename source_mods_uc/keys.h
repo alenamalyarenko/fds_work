@@ -1,10 +1,11 @@
 #define plot_3d_out
 #undef plot_hrr_out
 #define output_nc
+
 #define write_init
 #define output_full_variable
 
-#undef coupled
+#define coupled
 
 #if defined coupled
 # define global_mesh

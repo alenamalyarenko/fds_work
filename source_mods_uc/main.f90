@@ -773,7 +773,7 @@ MAIN_LOOP: DO
       IF (SYNTHETIC_EDDY_METHOD) CALL SYNTHETIC_TURBULENCE(DT,T,NM)
 #if defined coupled_bc
       ! Apply UVW to U_eddy variables to be used in the main velocity_bc
-      IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc predictor')
+      !IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc predictor')
       CALL VELOCITY_BC_COUPLED(T,NM)
 #endif  
       CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.TRUE.)

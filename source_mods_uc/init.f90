@@ -617,7 +617,7 @@ VENT_LOOP: DO N=1,M%N_VENT
             CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
             ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
-      END SELECT
+      END SELECT   
       ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
       CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
       ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
@@ -640,6 +640,59 @@ VENT_LOOP: DO N=1,M%N_VENT
       VT%CV_EDDY=0._EB
       VT%CW_EDDY=0._EB
    ENDIF EDDY_IF
+   
+#if defined coupled_bc
+EDDY_IF2: IF (VT%N_EDDY<0) THEN
+      SELECT CASE(ABS(VT%IOR))
+         CASE(1)
+            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+            ALLOCATE(VT%U_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+            ALLOCATE(VT%V_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+            ALLOCATE(VT%W_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+         CASE(2)
+          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
+            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+         CASE(3)
+         Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
+            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+      END SELECT   
+      ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
+      ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','Y_EDDY',IZERO)
+      ALLOCATE(VT%Z_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','Z_EDDY',IZERO)
+      ALLOCATE(VT%CU_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','CU_EDDY',IZERO)
+      ALLOCATE(VT%CV_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','CV_EDDY',IZERO)
+      ALLOCATE(VT%CW_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','CW_EDDY',IZERO)
+      VT%U_EDDY=0._EB
+      VT%V_EDDY=0._EB
+      VT%W_EDDY=0._EB
+      VT%X_EDDY=0._EB
+      VT%Y_EDDY=0._EB
+      VT%Z_EDDY=0._EB
+      VT%CU_EDDY=0._EB
+      VT%CV_EDDY=0._EB
+      VT%CW_EDDY=0._EB
+   ENDIF EDDY_IF2
+#endif   
+   
 ENDDO VENT_LOOP
 
 ! Set up WALL for external boundaries of the current mesh

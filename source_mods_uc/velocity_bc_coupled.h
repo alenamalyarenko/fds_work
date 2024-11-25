@@ -31,7 +31,7 @@ TYPE (MESH_TYPE), POINTER :: M
 integer:: I,J,K
 integer:: ncid, varid1,varid2,varid3, status, timestamp
 integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
-REAL, DIMENSION(20,60)::U0,V0,W0	
+REAL, DIMENSION(20,60,1)::U0,V0,W0	
 	
 
           			
@@ -42,14 +42,18 @@ T_NOW = CURRENT_TIME()
 CALL POINT_TO_MESH(NM)
 
 
-Print*, 'testprint ', int(T), NM
-!timestamp=int(T)+1
-timestamp=1
-status=nf90_open(OBFile, nf90_nowrite, ncid)
+
+timestamp=int(T)+1
+!timestamp=1
+!Print*, 'testprint ',  NM,T,  timestamp
+
+
 
 VENT_LOOP: DO N=1,N_VENT
     VT => VENTS(N)
     COUPLED_VENT_IF: IF (VT%N_EDDY==(-1)) THEN !coupled vent
+    status=nf90_open(OBFile, nf90_nowrite, ncid)
+    !print *,'opened file', NM, trim(nf90_strerror(status))
     
    	IF (VENTS(N)%IOR==2) THEN
        !Print*, 'found south vent'
@@ -60,21 +64,28 @@ VENT_LOOP: DO N=1,N_VENT
  
  
        status=nf90_inq_varid(ncid, 'US', varid1)
+       !print *,'inq US', NM, trim(nf90_strerror(status))       
        status=nf90_inq_varid(ncid, 'VS', varid2)
+       !print *,'inq VS',NM, trim(nf90_strerror(status))       
        status=nf90_inq_varid(ncid, 'WS', varid3)
+       !print *,'inq WS',NM, trim(nf90_strerror(status))
  
        status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       !print *,'read US', NM, trim(nf90_strerror(status))
        status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       !print *,'read VS',NM, trim(nf90_strerror(status))
        status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       !print *,'read WS',NM, trim(nf90_strerror(status))
 
+       !Print*, 'eddy loop', NM, KBAR, IBAR, size( VT%U_EDDY,1),size( VT%U_EDDY,2)
        DO K=1,KBAR
         DO I=1,IBAR
-         VT%U_EDDY(I,K)=U0(I,K) 
-         VT%V_EDDY(I,K)=V0(I,K) 
-         VT%W_EDDY(I,K)=W0(I,K) 
-       ENDDO
-      ENDDO 
- 
+         VT%U_EDDY(I,K)=U0(I,K,1) 
+         VT%V_EDDY(I,K)=V0(I,K,1) 
+         VT%W_EDDY(I,K)=W0(I,K,1) 
+        ENDDO
+       ENDDO 
+       !Print*, 'assigned variables', NM ,timestamp, V0(10,1,1), V0(10,60,1), VT%V_EDDY(10,1),VT%V_EDDY(10,60) 
     ENDIF 
     
     
@@ -92,11 +103,14 @@ VENT_LOOP: DO N=1,N_VENT
     ENDIF    
     
      
-    
+   status=nf90_close(ncid)   
+   !print *,'closed netcdf',NM, trim(nf90_strerror(status))
+   
    ENDIF COUPLED_VENT_IF
 ENDDO VENT_LOOP
 
-status=nf90_close(ncid)   
+!print*, 'out of vent loop', NM
+
 
 
 T_USED(4)=T_USED(4)+CURRENT_TIME()-T_NOW

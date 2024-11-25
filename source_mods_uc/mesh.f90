@@ -154,9 +154,9 @@ TYPE MESH_TYPE
    INTEGER :: MI, MJ, MK
    INTEGER :: GI1, GI2, GJ1, GJ2, GK1, GK2
 #endif   
-#if defined coupled_bc
-   INTEGER:: COUPLED
-#endif
+!#if defined coupled_bc
+!   INTEGER:: COUPLED
+!#endif
 
 
    ! Mesh coordinate variables
@@ -349,14 +349,14 @@ IMPLICIT NONE (TYPE,EXTERNAL)
    INTEGER,POINTER :: MI, MJ, MK , GI1, GI2, GJ1, GJ2, GK1, GK2
 #endif   
 #if defined coupled_bc
-   INTEGER:: COUPLED
+   !INTEGER:: COUPLED
    ! North border
    !REAL, allocatable, DIMENSION(:,:,:):: TN, BC_VN,BC_WN1,BC_WN2
    !REAL, allocatable,  DIMENSION(:,:,:):: TE, TWBC_UE, BC_UW,BC_WE1,BC_WE2,BC_WW1,BC_WW2
    !south border
-   REAL, allocatable, DIMENSION(:,:,:):: TSS,BC_WS1,BC_WS2,BC_VS
+   !REAL, allocatable, DIMENSION(:,:,:):: TSS,BC_WS1,BC_WS2,BC_VS
    !north border
-   REAL, allocatable, DIMENSION(:,:,:):: TNN,BC_WN1,BC_WN2,BC_VN   
+   !REAL, allocatable, DIMENSION(:,:,:):: TNN,BC_WN1,BC_WN2,BC_VN   
 
 #endif
 
