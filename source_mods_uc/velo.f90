@@ -2078,9 +2078,16 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                IF (WCM%VENT_INDEX>0) THEN
                   VT=>VENTS(WCM%VENT_INDEX)
                   IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
+#if defined coupled_bc                  
+                  IF (VT%N_EDDY<0) SYNTHETIC_EDDY_METHOD=.TRUE.
+               !   print*, 'found coupled vent in velocity bc', NM, II,JJ,KK
+#endif                  
                ENDIF
             ENDIF
          ENDIF
+
+        
+       
 
          VEL_EDDY = 0._EB
          SYNTHETIC_EDDY_IF_1: IF (SYNTHETIC_EDDY_METHOD) THEN
@@ -2115,12 +2122,14 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                         IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,KK)+VT%V_EDDY(II+1,KK)) + V_WIND_LOC
                         IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_EDDY(II,KK)+VT%U_EDDY(II+1,KK)) + U_WIND_LOC
                      CASE(1)
+                        !print*, 'is this south vent?'
                         IF (OPEN_WIND_BOUNDARY) THEN
                            W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                            V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))
                         ENDIF
                         IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_EDDY(II,KK)+VT%W_EDDY(II,KK+1)) + W_WIND_LOC
                         IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,KK)+VT%V_EDDY(II,KK+1)) + V_WIND_LOC
+                        IF (ICD==2) print*,'found dv/dy'
                   END SELECT
                CASE(3) ! xy plane
                   SELECT CASE(IEC)
@@ -2141,6 +2150,11 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   END SELECT
             END SELECT IS_SELECT_1
          ENDIF SYNTHETIC_EDDY_IF_1
+
+        !  if ((ii==10).and.(jj==1).and.(kk==1)) then
+        !if (NM==1) then
+        !  Print*, 'assigned variables', NM, t , II,JJ,KK, vel_eddy 
+        ! endif
 
          ! OPEN boundary conditions, both varieties, with and without a wind
 

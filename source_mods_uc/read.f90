@@ -833,13 +833,13 @@ MESH_LOOP: DO N=1,NMESHES_READ
               
             ENDIF
             
-# if defined coupled_bc            
-            IF ((II.eq.0) .OR.(JJ.eq.0).OR.(KK.eq.0)) THEN
-             M%COUPLED=1
-            ELSE
-             M%COUPLED=0
-            ENDIF
-# endif            
+!# if defined coupled_bc            
+!            IF ((II.eq.0) .OR.(JJ.eq.0).OR.(KK.eq.0)) THEN
+!             M%COUPLED=1
+!            ELSE
+!             M%COUPLED=0
+!            ENDIF
+!# endif            
             
        ENDDO I_MULT_LOOP2
       ENDDO J_MULT_LOOP2

@@ -617,7 +617,7 @@ VENT_LOOP: DO N=1,M%N_VENT
             CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
             ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
-      END SELECT
+      END SELECT   
       ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
       CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
       ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
@@ -640,6 +640,59 @@ VENT_LOOP: DO N=1,M%N_VENT
       VT%CV_EDDY=0._EB
       VT%CW_EDDY=0._EB
    ENDIF EDDY_IF
+   
+#if defined coupled_bc
+EDDY_IF2: IF (VT%N_EDDY<0) THEN
+      SELECT CASE(ABS(VT%IOR))
+         CASE(1)
+            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+            ALLOCATE(VT%U_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+            ALLOCATE(VT%V_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+            ALLOCATE(VT%W_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+         CASE(2)
+          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
+            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+         CASE(3)
+         Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
+            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+      END SELECT   
+      ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
+      ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','Y_EDDY',IZERO)
+      ALLOCATE(VT%Z_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','Z_EDDY',IZERO)
+      ALLOCATE(VT%CU_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','CU_EDDY',IZERO)
+      ALLOCATE(VT%CV_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','CV_EDDY',IZERO)
+      ALLOCATE(VT%CW_EDDY(VT%N_EDDY),STAT=IZERO)
+      CALL ChkMemErr('READ_VENT','CW_EDDY',IZERO)
+      VT%U_EDDY=0._EB
+      VT%V_EDDY=0._EB
+      VT%W_EDDY=0._EB
+      VT%X_EDDY=0._EB
+      VT%Y_EDDY=0._EB
+      VT%Z_EDDY=0._EB
+      VT%CU_EDDY=0._EB
+      VT%CV_EDDY=0._EB
+      VT%CW_EDDY=0._EB
+   ENDIF EDDY_IF2
+#endif   
+   
 ENDDO VENT_LOOP
 
 ! Set up WALL for external boundaries of the current mesh
@@ -5287,7 +5340,6 @@ REAL, DIMENSION(21,21,61):: U0,V0,W0
 TYPE(WALL_TYPE), POINTER :: WC
 TYPE(BOUNDARY_COORD_TYPE), POINTER :: BC
 TYPE(BOUNDARY_PROP1_TYPE), POINTER :: B1
-!character(10) :: file_name
 
 integer:: ncid, varid1,varid2,varid3, status
 integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
@@ -5303,19 +5355,28 @@ CALL POINT_TO_MESH(NM)
    KMAX = KBAR
  status=nf90_open(ICFile, nf90_nowrite, ncid)
  
- Print*,'FILE NAME CHECK', ICFile
+ !Print*,'FILE NAME CHECK', ICFile
  
  status=nf90_inq_varid(ncid, 'U', varid1)
  status=nf90_inq_varid(ncid, 'V', varid2)
  status=nf90_inq_varid(ncid, 'W', varid3)
+     
+  ! IF (STATUS .NE. NF_NOERR) then
+    !  print *, trim(nf90_strerror(status))
+   !   stop "Stopped"
+   !end if    
+     
                                           
  status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
- status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+  !print * ,'U', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
+ status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1  /) ) 
+  !print *,'V', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
  status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+  !print *,'W', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
 
  status=nf90_close(ncid)
 
-
+!Print*, NM, GI1,GJ1,GK1, V0(0,0,0), V0(1,1,1),V(0,0,0), V(1,1,1)
 
 ! netcdf has to read from 1 to IBP1, but fds needs from 0 to IBAR 
 DO K=KMIN,KMAX
@@ -5327,8 +5388,8 @@ DO K=KMIN,KMAX
       ENDDO
    ENDDO
 ENDDO
-!Print*,NM, GI1,GJ1,GK1, IBP1+1,JBP1+1, KBP1+1
-!Print*, NM, GI1,GJ1,GK1, U0(0,0,0), U0(1,1,0),U(0,0,0), U(1,1,0)
+!Print*,NM, GI1,GJ1,GK1, IBP1,JBP1, KBP1
+!Print*, NM, GI1,GJ1,GK1, V0(0,0,0), V0(1,1,1),V(0,0,0), V(1,1,1)
 US=U
 VS=V
 WS=W
@@ -5392,7 +5453,7 @@ DO K=KMIN,KMAX
       ENDDO
    ENDDO
 ENDDO
-!Print*, NM, GI1,GJ1,GK1,TMP0(0,0,0),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
+!Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(0,0,0),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
 ! update density field
 
 DO K=KMIN,KMAX

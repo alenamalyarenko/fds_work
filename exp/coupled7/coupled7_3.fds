@@ -1,4 +1,4 @@
-&HEAD CHID='Coupled7_2'/
+&HEAD CHID='Coupled7_3'/
 
 # GRID
 
@@ -14,13 +14,13 @@
 #For instanteneous IC field:
 # TIME
 
-&TIME T_END=20,LOCK_TIME_STEP=F, DT=1 /
+&TIME T_END=600,LOCK_TIME_STEP=F, DT=1 /
 
 #&TIME T_END=60, DT=1 /
 
 
 #character(13)
-&ICCD ICFile='ic_palm_72.nc', OBFile='bc_test_02.nc' /
+#&ICCD ICFile='ic_palm_72.nc', OBFile='bc_test_02.nc' /
 
 &WIND SPEED=5,  DIRECTION=180., L=-500., Z_0=0.03 /
 
@@ -44,17 +44,18 @@
 #west
 #&VENT XB=0.,0.,0.,60.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/
 
+
 #roof
 &VENT MB='ZMAX', SURF_ID='OPEN' /
 
 #convective flux
-#&VENT XB=0.,60.,0.,60.,0.,0., SURF_ID='surface' /
-#&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.1 /
+&VENT XB=0.,60.,0.,60.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.1 /
 
 &DUMP DT_PL3D=1, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
 
 &MISC SIMULATION_MODE='SVLES'/
-&MISC VERBOSE=T/
+&MISC VERBOSE=T, TMPA=20/
 
 
 

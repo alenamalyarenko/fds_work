@@ -5,7 +5,8 @@ PUBLIC
 CHARACTER(13) :: ICFile
 #endif
 
-#if defined coupled_bc
+#if defined coupled_bc_file
+!bc_palm_7a.nc - 13 characters
 CHARACTER(13) :: OBFile  
 #endif  
 !OBNuFile,  OBSuFile,  OBEuFile,  OBWuFile,  

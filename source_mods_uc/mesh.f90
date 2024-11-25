@@ -126,6 +126,10 @@ TYPE MESH_TYPE
    INTEGER, ALLOCATABLE, DIMENSION(:,:,:) :: IBLK
    TYPE(STORAGE_TYPE) :: WALL_STORAGE,CFACE_STORAGE
 
+!#if defined output_nc
+!   REAL(FB), ALLOCATABLE, DIMENSION(:,:,:,:) :: QQf
+!#endif
+
    REAL(EB) :: CFL,DIVMX,DIVMN,VN,RESMAX,PART_UVWMAX=0._EB
    INTEGER  :: ICFL,JCFL,KCFL,IMX,JMX,KMX,IMN,JMN,KMN, I_VN,J_VN,K_VN,IRM,JRM,KRM, DT_RESTRICT_COUNT=0,DT_RESTRICT_STORE=0
    LOGICAL  :: CLIP_RHOMIN=.FALSE.,CLIP_RHOMAX=.FALSE.
@@ -150,9 +154,9 @@ TYPE MESH_TYPE
    INTEGER :: MI, MJ, MK
    INTEGER :: GI1, GI2, GJ1, GJ2, GK1, GK2
 #endif   
-#if defined coupled_bc
-   INTEGER:: COUPLED
-#endif
+!#if defined coupled_bc
+!   INTEGER:: COUPLED
+!#endif
 
 
    ! Mesh coordinate variables
@@ -345,14 +349,14 @@ IMPLICIT NONE (TYPE,EXTERNAL)
    INTEGER,POINTER :: MI, MJ, MK , GI1, GI2, GJ1, GJ2, GK1, GK2
 #endif   
 #if defined coupled_bc
-   INTEGER:: COUPLED
+   !INTEGER:: COUPLED
    ! North border
    !REAL, allocatable, DIMENSION(:,:,:):: TN, BC_VN,BC_WN1,BC_WN2
    !REAL, allocatable,  DIMENSION(:,:,:):: TE, TWBC_UE, BC_UW,BC_WE1,BC_WE2,BC_WW1,BC_WW2
    !south border
-   REAL, allocatable, DIMENSION(:,:,:):: TSS,BC_WS1,BC_WS2,BC_VS
+   !REAL, allocatable, DIMENSION(:,:,:):: TSS,BC_WS1,BC_WS2,BC_VS
    !north border
-   REAL, allocatable, DIMENSION(:,:,:):: TNN,BC_WN1,BC_WN2,BC_VN   
+   !REAL, allocatable, DIMENSION(:,:,:):: TNN,BC_WN1,BC_WN2,BC_VN   
 
 #endif
 
