@@ -17,7 +17,7 @@
 
 &TIME T_END=14400,LOCK_TIME_STEP=F, DT=1 /
 
-#&TIME T_END=60, DT=1 /
+#&TIME T_END=60, LOCK_TIME_STEP=F, DT=1 /
 
 
 #character(13)
