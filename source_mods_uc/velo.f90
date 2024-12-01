@@ -2081,6 +2081,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
 #if defined coupled_bc                  
                   IF (VT%N_EDDY<0) SYNTHETIC_EDDY_METHOD=.TRUE.
                !   print*, 'found coupled vent in velocity bc', NM, II,JJ,KK
+               ! this will populate vel_eddy, but I don't pick up dv/dy for some reason
 #endif                  
                ENDIF
             ENDIF
@@ -2163,7 +2164,6 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
 
             VENT_INDEX = MAX(WCM%VENT_INDEX,WCP%VENT_INDEX)
             VT => VENTS(VENT_INDEX)
-
             UPWIND_BOUNDARY = .FALSE.
             INFLOW_BOUNDARY = .FALSE.
 
@@ -2216,11 +2216,12 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
             ELSE WIND_NO_WIND_IF  ! For upwind, inflow boundaries, use the specified wind field for tangential velocity components
 
                SELECT CASE(IEC)
-                  CASE(1)
+                  CASE(1)      
                      IF (JJ==0    .AND. IOR== 2) WW(II,0,KK)    = W_WIND(KK)
                      IF (JJ==JBAR .AND. IOR==-2) WW(II,JBP1,KK) = W_WIND(KK)
                      IF (KK==0    .AND. IOR== 3) VV(II,JJ,0)    = V_WIND(KK)
                      IF (KK==KBAR .AND. IOR==-3) VV(II,JJ,KBP1) = V_WIND(KK)
+                
                   CASE(2)
                      IF (II==0    .AND. IOR== 1) WW(0,JJ,KK)    = W_WIND(KK)
                      IF (II==IBAR .AND. IOR==-1) WW(IBP1,JJ,KK) = W_WIND(KK)
@@ -2245,6 +2246,30 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
             ENDIF
 
          ENDIF OPEN_AND_WIND_BC
+         
+         
+!#if defined coupled_bc          
+!          IF ((IWM==0 .OR. WALL(IWM)%BOUNDARY_TYPE==OPEN_BOUNDARY) .AND. &
+!                               (IWP==0 .OR. WALL(IWP)%BOUNDARY_TYPE==OPEN_BOUNDARY) .AND. SYNTHETIC_EDDY_METHOD) THEN
+!
+!            VENT_INDEX = MAX(WCM%VENT_INDEX,WCP%VENT_INDEX)
+!            VT => VENTS(VENT_INDEX)
+!
+!                 select case(IEC)
+!                 case(1)
+!                     IF (JJ==0 ) then
+!                     print*, 'south vent JJ=0', II,JJ,KK
+!                      WW(II,0,KK)   = VT%W_EDDY(II,KK)
+!                      VV(II,0,KK)   = VT%V_EDDY(II,KK)
+!                      endif
+!                     !IF (JJ==JBAR .AND. IOR==-2) WW(II,JBP1,KK) = VT%W_EDDY(II,KK)
+!                     !IF (KK==0    .AND. IOR== 3) VV(II,JJ,0)    = VT%V_EDDY(II,KK)
+!                     !IF (KK==KBAR .AND. IOR==-3) VV(II,JJ,KBP1) = VT%V_EDDY(II,KK)
+!								end select
+!				  endif			
+!#endif		         
+         
+         
 
          ! Define the appropriate gas and ghost velocity
 

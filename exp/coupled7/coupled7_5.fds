@@ -20,8 +20,9 @@
 
 
 #character(13)
-&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_7a.nc' /
+&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_7b.nc' /
 
+#no wind from namelist!! 
 #&WIND SPEED=5,  DIRECTION=180., L=-500., Z_0=0.03 /
 
 # Boundary Conditions:
