@@ -14,4 +14,5 @@
 # define init_u_in
 # define coupled_bc_file
 # define coupled_bc 
+# define atm_variables
 #endif

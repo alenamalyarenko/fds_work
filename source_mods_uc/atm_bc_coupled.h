@@ -36,7 +36,7 @@ integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
 REAL, DIMENSION(20,60,1)::U0,V0,W0	
 
 integer:: varid20,varid21, varid30,varid31
-REAL, DIMENSION(22,62,1)::VS0,VS1,WS0,WS1
+REAL, DIMENSION(21,61,1)::VS0,VS1,WS0,WS1
 
           			
 T_NOW = CURRENT_TIME()
@@ -76,7 +76,7 @@ VENT_LOOP: DO N=1,N_VENT
        !Print*, 'found south vent'
 
        !figure out vent / mesh overlap indeces
-       print*, NM, MI,MJ,MK, 'vent number ', N, 'vents ',VT%I1,VT%I2,VT%J1,VT%J2, 'global mesh', GI1, GJ1,GK1
+       !print*, NM, MI,MJ,MK, 'vent number ', N, 'vents ',VT%I1,VT%I2,VT%J1,VT%J2, 'global mesh', GI1, GJ1,GK1
        !vent coordinates are 0:20; UVW_eddy varibales are 1:20!
  
  
@@ -88,8 +88,7 @@ VENT_LOOP: DO N=1,N_VENT
        !print *,'inq WS',NM, trim(nf90_strerror(status))
        
        status=nf90_inq_varid(ncid, 'VS0', varid20)       
-       status=nf90_inq_varid(ncid, 'WS0', varid30)  
- !      status=nf90_inq_varid(ncid, 'VS1', varid21)       
+       status=nf90_inq_varid(ncid, 'WS0', varid30)       
        status=nf90_inq_varid(ncid, 'WS1', varid31)            
  
        !EDDY Variables - face-averaged
@@ -101,32 +100,35 @@ VENT_LOOP: DO N=1,N_VENT
        !print *,'read WS',NM, trim(nf90_strerror(status))
        
        !Variables for omega concervation
-       status=nf90_get_var(ncid, varid20, VS0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR+2, KBAR+2,1 /) )       
-       status=nf90_get_var(ncid, varid30, WS0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR+2, KBAR+2,1 /) ) 
-       !status=nf90_get_var(ncid, varid21, VS1,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR+2, KBAR+2,1 /) )       
-       status=nf90_get_var(ncid, varid31, WS1,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR+2, KBAR+2,1 /) )        
+       !counting modelled after init because init somehow works???
+       status=nf90_get_var(ncid, varid20, VS0(1:21,1:61,1),start = (/ GI1, GK1,timestamp /),  count = (/ IBP1, KBP1,1 /) ) 
+       !print *,'read VS0', NM, trim(nf90_strerror(status))      
+       status=nf90_get_var(ncid, varid30, WS0(1:21,1:61,1),start = (/ GI1, GK1,timestamp /),  count = (/ IBP1, KBP1,1 /) )  
+       !print *,'read WS0', NM, trim(nf90_strerror(status))    
+       status=nf90_get_var(ncid, varid31, WS1(1:21,1:61,1),start = (/ GI1, GK1,timestamp /),  count = (/ IBP1, KBP1,1 /) )        
+       !print *,'read WS1', NM, trim(nf90_strerror(status)) 
 
-       !Print*, 'eddy loop', NM, KBAR, IBAR, size( VT%U_EDDY,1),size( VT%U_EDDY,2)
-       DO K=1,KBAR
-        DO I=1,IBAR
-         VT%U_EDDY(I,K)=U0(I,K,1) 
-         VT%V_EDDY(I,K)=V0(I,K,1) 
-         VT%W_EDDY(I,K)=W0(I,K,1) 
-        ENDDO
-       ENDDO 
+!       !Print*, 'eddy loop', NM, KBAR, IBAR, size( VT%U_EDDY,1),size( VT%U_EDDY,2)
+!       DO K=1,KBAR
+!        DO I=1,IBAR
+!         VT%U_EDDY(I,K)=U0(I,K,1) 
+!         VT%V_EDDY(I,K)=V0(I,K,1) 
+!         VT%W_EDDY(I,K)=W0(I,K,1) 
+!        ENDDO
+!       ENDDO 
        !Print*, 'assigned variables', NM ,timestamp, V0(10,1,1), V0(10,60,1), VT%V_EDDY(10,1),VT%V_EDDY(10,60) 
        
        
        !! assign values to velocity variables like wind profiles 
-       DO K=1,KBAR
-        DO I=1,IBAR
-         WW(I,0,K)=WS0(I,K,1) 
-         WW(I,1,K)=WS1(I,K,1)
-         VV(I,1,K)=VS0(I,K,1) 
-         VV(I,1,K+1)=VS0(I,K+1,1)
+       DO K=0,KBAR
+        DO I=0,IBAR
+         WW(I,0,K)=WS0(I+1,K+1,1) 
+         WW(I,1,K)=WS1(I+1,K+1,1)
+         VV(I,0,K)=VS0(I+1,K+1,1) 
+         VV(I,0,K+1)=VS0(I+1,K+2,1)
         ENDDO
        ENDDO 
-      ! print* ,'south vent bc',  NM,timestamp, VV(10,0,2), V0(10,2,1)
+       !print* ,'south vent bc',  NM,timestamp,  VS0(1,2,1), VS0(ibp1+1,2,1), VV(0,1,2), VV(ibp1,1,1)
        
     ENDIF 
 

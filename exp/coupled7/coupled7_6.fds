@@ -1,4 +1,4 @@
-&HEAD CHID='Coupled7_3'/
+&HEAD CHID='Coupled7_6'/
 
 # GRID
 
@@ -16,13 +16,14 @@
 
 &TIME T_END=600,LOCK_TIME_STEP=F, DT=1 /
 
-#&TIME T_END=60, DT=1 /
+#&TIME T_END=5, DT=1 /
 
 
 #character(13)
-#&ICCD ICFile='ic_palm_72.nc', OBFile='bc_test_02.nc' /
+&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_7d.nc' /
 
-&WIND SPEED=5,  DIRECTION=180., L=-500., Z_0=0.03 /
+#no wind from namelist!! 
+#&WIND SPEED=5,  DIRECTION=180., L=-500., Z_0=0.03 /
 
 # Boundary Conditions:
 #  VT%N_EDDY
@@ -31,12 +32,14 @@
 
 
 #south - coupled
-#&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/ 
+&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/ 
 
-&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN'/ 
+#&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN'/ 
 
 #north
 &VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN'/
+#&VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/
+
 
 #east
 #&VENT XB=60.,60.,0.,60.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/
@@ -48,14 +51,11 @@
 #roof
 &VENT MB='ZMAX', SURF_ID='OPEN' /
 
-#convective flux
-#&VENT XB=0.,60.,0.,60.,0.,0., SURF_ID='surface' /
-#&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.36 /
 
 &DUMP DT_PL3D=1, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
 
 &MISC SIMULATION_MODE='SVLES'/
-&MISC VERBOSE=T, TMPA=20/
+&MISC VERBOSE=T/
 
 
 

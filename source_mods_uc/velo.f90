@@ -13,8 +13,7 @@ PRIVATE
 
 PUBLIC VELOCITY_PREDICTOR,VELOCITY_CORRECTOR,NO_FLUX,BAROCLINIC_CORRECTION,MATCH_VELOCITY,MATCH_VELOCITY_FLUX,&
 #if defined coupled_bc
-      VELOCITY_BC_COUPLED, &
-      !TEMP_BC_COUPLED, &
+      ATM_BC_COUPLED, &
 #endif
        VELOCITY_BC,COMPUTE_VISCOSITY,VISCOSITY_BC,VELOCITY_FLUX,VELOCITY_FLUX_CYLINDRICAL
 
@@ -1847,7 +1846,7 @@ END SUBROUTINE VELOCITY_CORRECTOR
 
 
 #if defined coupled_bc
-# include 'velocity_bc_coupled.h'
+# include 'atm_bc_coupled.h'
 #endif
 
 !> \brief Assert tangential velocity boundary conditions
@@ -2078,11 +2077,11 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                IF (WCM%VENT_INDEX>0) THEN
                   VT=>VENTS(WCM%VENT_INDEX)
                   IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
-#if defined coupled_bc                  
-                  IF (VT%N_EDDY<0) SYNTHETIC_EDDY_METHOD=.TRUE.
-               !   print*, 'found coupled vent in velocity bc', NM, II,JJ,KK
-               ! this will populate vel_eddy, but I don't pick up dv/dy for some reason
-#endif                  
+!#if defined coupled_bc                  
+!                  IF (VT%N_EDDY<0) SYNTHETIC_EDDY_METHOD=.TRUE.
+!               !   print*, 'found coupled vent in velocity bc', NM, II,JJ,KK
+!               ! this will populate vel_eddy, but I don't pick up dv/dy for some reason
+!#endif                  
                ENDIF
             ENDIF
          ENDIF
@@ -2610,6 +2609,14 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
    ENDDO SIGN_LOOP_2
 
 ENDDO EDGE_LOOP
+
+
+!#if defined coupled_bc                  
+!    SYNTHETIC_EDDY_METHOD=.FALSE.
+!
+!#endif       
+
+
 
 T_USED(4)=T_USED(4)+CURRENT_TIME()-T_NOW
 

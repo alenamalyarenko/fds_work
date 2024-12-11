@@ -1,12 +1,12 @@
-!Glue 7_3 together
-! 
+!take data from 7_3 and make BC for 7_5
+! time-evolving V0, W0, W1
 program make_wind_bc
 use netcdf
 implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=601 !601
+INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=10 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -23,7 +23,7 @@ character(len=25)::filename,filename1,filename2,filename3
 logical::res,SKIPIT
 INTEGER::SECOND,count,par,time 
 CHARACTER(len=3)::PART,SECOND_C,NM_c
-character(len=25)::run_name,end_file_name
+character(len=25)::run_name
 
 !file out
 INTEGER::  ncid_out
@@ -41,8 +41,7 @@ integer:: nni,nnj,nnk
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !to change for other runs:
-run_name='Coupled7_8'
-end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
+run_name='Coupled7_3'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -63,10 +62,10 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
 
  meshes=(I_UPPER+1)*(J_UPPER+1)
 
- ALLOCATE( T_IN(1:(ibar+2),1:(jbar+2),1:(kBAR+2)))
- ALLOCATE( U_IN(1:(ibar+2),1:(jbar+2),1:(kBAR+2)))
- ALLOCATE( V_IN(1:(ibar+2),1:(jbar+2),1:(kBAR+2)))
- ALLOCATE( W_IN(1:(ibar+2),1:(jbar+2),1:(kBAR+2)))
+ ALLOCATE( T_IN(1:(ibar+1),1:(jbar+2),1:(kBAR+2)))
+ ALLOCATE( U_IN(1:(ibar+1),1:(jbar+2),1:(kBAR+2)))
+ ALLOCATE( V_IN(1:(ibar+1),1:(jbar+2),1:(kBAR+2)))
+ ALLOCATE( W_IN(1:(ibar+1),1:(jbar+2),1:(kBAR+2)))
  !
  ALLOCATE( T_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
  ALLOCATE( U_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
@@ -255,8 +254,15 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
       endif
       sk=1
       
+      !print*, 'found mesh and count', NM , ni,nj,nk
+      !print*, 'found starts' ,NM,si,sj,sk
+     
+      if (nm==3) then
+       print*,ni,nj,nk, si,sj,sk  !, si+ni, sj+nj,sk+nk
+      endif
+         
 
-      status=nf90_get_var(ncid_in, varid_t, t_in(1:ni,1:nj,1:nk),start=(/si,sj,sk/), &
+      status=nf90_get_var(ncid_in, varid_t, t_in(1:ni,1:nj,1:nk) ,start=(/si,sj,sk/), &
                 count = (/ ni, nj,nk /))  
       !print *, trim(nf90_strerror(status))  , NM, GI1(NM)+1, GJ1(NM)+1,GK1(NM)+1        
       status=nf90_get_var(ncid_in, varid_u, u_in(1:ni,1:nj,1:nk),start=(/si,sj,sk/), &
@@ -267,15 +273,17 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
               
       status=nf90_get_var(ncid_in, varid_w, w_in(1:ni,1:nj,1:nk),start=(/si,sj,sk/), &
                 count = (/ ni, nj,nk /))    
+
+
       status = nf90_close(ncid_in)           
      
-   
+    if(nm==3) then
+      do i=1,ni
+         print*, i,t_in(i,1,1)
+      enddo
+    endif
       
-      !write into global variable variables
-      !Global mesh coordinates:        0:20, 21:40, 41:61
-      !Global +i for t-all when i==1:  1,22,42
-      !Global +i for t-all when i==21: 21,42,62      
-      
+
       nni=0
       DO I=1,ni
        nni=nni+1
@@ -285,6 +293,11 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
         nnk=0
         DO K=1,nk 
          nnk=nnk+1
+         if((nm==3).and.(k==1).and.(nnj==1)) then
+          !print*, nni,nnj,nnk, GI1(NM)+nni,GJ1(NM)+nnj,GK1(NM)+nnk 
+          !print*,GI1(NM)+nni, nni, nnj,t_in(i,j,1)
+         endif
+         
          t_all(GI1(NM)+nni,GJ1(NM)+nnj,GK1(NM)+nnk, count)=t_in(i,j,k)
          u_all(GI1(NM)+nni,GJ1(NM)+nnj,GK1(NM)+nnk, count)=u_in(i,j,k)
          v_all(GI1(NM)+nni,GJ1(NM)+nnj,GK1(NM)+nnk, count)=v_in(i,j,k)
@@ -292,26 +305,33 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
         ENDDO
        ENDDO 
       ENDDO
+      !print*, 'assigned into t_all'
       
      !exit this mesh
      ENDDO
     ENDDO
-   endif  ! end if file exist, exit partial seconds loop
+   endif  ! end if file exist
    if (skipit) then
     exit   
    endif
   ENDDO !end par loop
  ENDDO  ! end main time loop
  
+ !print*, 'finished loop'
+ !print*, shape(t_all)   
+ 
+ 
+ do i=1,62
+ print*,i, t_all(i,1,1,1), t_all(i,2,1,1)
+ enddo
 
- !do i=1,62
- !print*,i, t_all(i,1,1,1), t_all(i,2,1,1)
- !enddo
+
+
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !write file with full varriables - out of time loop
 
- status= nf90_create(end_file_name, NF90_CLOBBER, ncid_out)
+ status= nf90_create('run_all.nc', NF90_CLOBBER, ncid_out)
  print *, trim(nf90_strerror(status))
 
  status = nf90_def_dim(ncid_out, "xc", ibarout+2, dimxc)  
@@ -334,6 +354,10 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  status = nf90_close(ncid_out) 
 
  print*, 'wrote out large dataset'     
+
+
+
+
 
 
 

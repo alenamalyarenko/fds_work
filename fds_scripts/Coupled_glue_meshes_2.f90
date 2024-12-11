@@ -41,7 +41,9 @@ integer:: nni,nnj,nnk
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !to change for other runs:
-run_name='Coupled7_8'
+!run_name='Coupled7_7'
+ CALL GET_COMMAND_ARGUMENT(1, run_name)
+
 end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -1,17 +1,15 @@
-!Glue 7_3 together
-! 
+!take data from 7_3 and make BC for 7_5
+! time-evolving V0, W0, W1
+! based on coupled_glue_meshes
 program make_wind_bc
 use netcdf
 implicit none
-
 
 !%%%%%% change for each run:
 INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=601 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
 
 REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_in, u_in, v_in, w_in
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all
@@ -23,7 +21,7 @@ character(len=25)::filename,filename1,filename2,filename3
 logical::res,SKIPIT
 INTEGER::SECOND,count,par,time 
 CHARACTER(len=3)::PART,SECOND_C,NM_c
-character(len=25)::run_name,end_file_name
+character(len=25)::run_name
 
 !file out
 INTEGER::  ncid_out
@@ -39,12 +37,15 @@ INTEGER,ALLOCATABLE,DIMENSION(:)::GI1, GI2,GJ1,GJ2,GK1, GK2, MESH_I, MESH_J
 INTEGER:: NM3,NM4, i1,i2,j1,j2,k1,k2,ni,nj,nk,si,sj,sk 
 integer:: nni,nnj,nnk
 
+
+!for BC file:
+REAL, ALLOCATABLE, DIMENSION(:,:,:):: VS0,VS1,WS0,WS1
+
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !to change for other runs:
-run_name='Coupled7_8'
-end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
+run_name='Coupled7_3'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+ PRINT*, 'started'
 
 !size varibales
  !added one more for both 0 and ibp1 cells
@@ -82,6 +83,11 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  ALLOCATE(MESH_I(1:MESHES))
  ALLOCATE(MESH_J(1:MESHES))        
  
+ ALLOCATE( VS0(1:(IBARout+2),1:(KBARout+2),NTout))
+ ALLOCATE( VS1(1:(IBARout+2),1:(KBARout+2),NTout))  
+ ALLOCATE( WS0(1:(IBARout+2),1:(KBARout+2),NTout))
+ ALLOCATE( WS1(1:(IBARout+2),1:(KBARout+2),NTout))
+ !
  T_IN=0
  U_IN=0
  V_IN=0
@@ -303,40 +309,52 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
   ENDDO !end par loop
  ENDDO  ! end main time loop
  
+ print*, 'global variables made'
+ ! skip writing out file
 
- !do i=1,62
- !print*,i, t_all(i,1,1,1), t_all(i,2,1,1)
- !enddo
 
-!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-!write file with full varriables - out of time loop
+ !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ !make out variables - 2 real layers of variables
+                                         
+ 
+ do t=1,count
+ 
+  !south border 
+ 
+  DO I=1,(IBARout+2)
+   DO K=1,(KBARout+2)
+    VS0(i,k,t)=v_all(i,1,k,t)    !v(0:ibp1,0,0:kbp1) in model numbering
+    WS0(i,k,t)=w_all(i,1,k,t)    !w(0:ibp1,0,0:kbp1) in model numbering
+    WS1(i,k,t)=w_all(i,2,k,t)    !w(0:ibp1,1,0:kbp1) in model numbering    
+   ENDDO
+  ENDDO 
+  
+ ENDDO !end timeloop
 
- status= nf90_create(end_file_name, NF90_CLOBBER, ncid_out)
- print *, trim(nf90_strerror(status))
-
- status = nf90_def_dim(ncid_out, "xc", ibarout+2, dimxc)  
- status = nf90_def_dim(ncid_out, "yc", jbarout+2, dimyc)  
- status = nf90_def_dim(ncid_out, "zc", kbarout+2, dimzc)
- status = nf90_def_dim(ncid_out, "time", count, dimt)  
-          
- status = nf90_def_var(ncid_out, "T", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_tout)
- status = nf90_def_var(ncid_out, "U", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_uout)
- status = nf90_def_var(ncid_out, "V", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_vout)
- status = nf90_def_var(ncid_out, "W", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_wout)
+ status= nf90_create('bc_palm_7d.nc', NF90_CLOBBER, ncid_out)
+ 
+ status = nf90_def_dim(ncid_out, "xc",  ibarout+2, dimxc)  
+ !status = nf90_def_dim(ncid_out, "yc",  jbarout+2, dimyc)  
+ status = nf90_def_dim(ncid_out, "zc",  kbarout+2, dimzc)
+ status = nf90_def_dim(ncid_out, "time",ntout, dimt)   
+             
+ status = nf90_def_var(ncid_out, "VS0", NF90_FLOAT, (/dimxc, dimzc, dimt/), varid_tout)
+ status = nf90_def_var(ncid_out, "WS0", NF90_FLOAT, (/dimxc, dimzc, dimt/), varid_vout)
+ status = nf90_def_var(ncid_out, "WS1", NF90_FLOAT, (/dimxc, dimzc, dimt/), varid_wout)
  
  status = nf90_enddef(ncid_out)
   
- status = nf90_put_var(ncid_out, varid_tout, t_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_uout, u_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_vout, v_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_wout, w_all(1:62,1:62,1:62, 1:count))
-
+ status = nf90_put_var(ncid_out, varid_tout, VS0(1:62,1:62, 1:count))
+ status = nf90_put_var(ncid_out, varid_vout, WS0(1:62,1:62, 1:count))
+ status = nf90_put_var(ncid_out, varid_wout, WS1(1:62,1:62, 1:count))
+ 
  status = nf90_close(ncid_out) 
+ 
+ print*, 'made new bc file'
 
- print*, 'wrote out large dataset'     
 
 
-
+! Variable admin
 DEALLOCATE(T_IN)
 DEALLOCATE(U_IN)   
 DEALLOCATE(V_IN) 
@@ -355,16 +373,10 @@ DEALLOCATE(GJ1)
 DEALLOCATE(GJ2)
 DEALLOCATE(GK1)
 DEALLOCATE(GK2)
+!
+DEALLOCATE(VS0)
+DEALLOCATE(VS1)  
+DEALLOCATE(WS0)
+DEALLOCATE(WS1)
 
-
-
-
- end program
- 
- SUBROUTINE HANDLE_ERR(STATUS)
-INTEGER STATUS
-IF (STATUS .NE. NF_NOERR) THEN
-  PRINT *, NF_STRERROR(STATUS)
-  STOP 'Stopped'
-ENDIF
-end
+end program 
