@@ -11605,7 +11605,7 @@ MESH_LOOP_1: DO NM=1,NMESHES
 
 #if defined atm_variables
                IF (N_EDDY<0) THEN
-                COUPLED_ATMOSPHERE_METHOD = .TRUE.
+                COUPLED_ATM_BOUNDARY = .TRUE.
                ENDIF
 #endif               
 

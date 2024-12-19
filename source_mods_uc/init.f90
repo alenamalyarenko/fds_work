@@ -697,34 +697,38 @@ VENT_LOOP: DO N=1,M%N_VENT
 EDDY_IF3: IF (VT%N_EDDY<0) THEN
       SELECT CASE(ABS(VT%IOR))
          CASE(1)
-            !Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
             ALLOCATE(VT%U_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
             ALLOCATE(VT%V_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
             ALLOCATE(VT%W_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+             ALLOCATE(VT%T_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
          CASE(2)
-          !Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
+          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
             ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
             ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
             ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
          CASE(3)
-         !Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
+         Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
             ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
             ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
             ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
       END SELECT   
       VT%U_ATM=0._EB
       VT%V_ATM=0._EB
       VT%W_ATM=0._EB
-   ENDIF EDDY_IF2
+      VT%T_ATM=0._EB
+   ENDIF EDDY_IF3
 #endif   
 
 

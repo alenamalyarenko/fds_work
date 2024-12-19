@@ -2076,12 +2076,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
             IF (WCM%VENT_INDEX==WCP%VENT_INDEX) THEN
                IF (WCM%VENT_INDEX>0) THEN
                   VT=>VENTS(WCM%VENT_INDEX)
-                  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
-!#if defined coupled_bc                  
-!                  IF (VT%N_EDDY<0) SYNTHETIC_EDDY_METHOD=.TRUE.
-!               !   print*, 'found coupled vent in velocity bc', NM, II,JJ,KK
-!               ! this will populate vel_eddy, but I don't pick up dv/dy for some reason
-!#endif                  
+                  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.                
                ENDIF
             ENDIF
          ENDIF
@@ -2122,14 +2117,12 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                         IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,KK)+VT%V_EDDY(II+1,KK)) + V_WIND_LOC
                         IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_EDDY(II,KK)+VT%U_EDDY(II+1,KK)) + U_WIND_LOC
                      CASE(1)
-                        !print*, 'is this south vent?'
                         IF (OPEN_WIND_BOUNDARY) THEN
                            W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                            V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))
                         ENDIF
                         IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_EDDY(II,KK)+VT%W_EDDY(II,KK+1)) + W_WIND_LOC
                         IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_EDDY(II,KK)+VT%V_EDDY(II,KK+1)) + V_WIND_LOC
-                        IF (ICD==2) print*,'found dv/dy'
                   END SELECT
                CASE(3) ! xy plane
                   SELECT CASE(IEC)
@@ -2150,11 +2143,6 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   END SELECT
             END SELECT IS_SELECT_1
          ENDIF SYNTHETIC_EDDY_IF_1
-
-        !  if ((ii==10).and.(jj==1).and.(kk==1)) then
-        !if (NM==1) then
-        !  Print*, 'assigned variables', NM, t , II,JJ,KK, vel_eddy 
-        ! endif
 
          ! OPEN boundary conditions, both varieties, with and without a wind
 
@@ -2246,29 +2234,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
 
          ENDIF OPEN_AND_WIND_BC
          
-         
-!#if defined coupled_bc          
-!          IF ((IWM==0 .OR. WALL(IWM)%BOUNDARY_TYPE==OPEN_BOUNDARY) .AND. &
-!                               (IWP==0 .OR. WALL(IWP)%BOUNDARY_TYPE==OPEN_BOUNDARY) .AND. SYNTHETIC_EDDY_METHOD) THEN
-!
-!            VENT_INDEX = MAX(WCM%VENT_INDEX,WCP%VENT_INDEX)
-!            VT => VENTS(VENT_INDEX)
-!
-!                 select case(IEC)
-!                 case(1)
-!                     IF (JJ==0 ) then
-!                     print*, 'south vent JJ=0', II,JJ,KK
-!                      WW(II,0,KK)   = VT%W_EDDY(II,KK)
-!                      VV(II,0,KK)   = VT%V_EDDY(II,KK)
-!                      endif
-!                     !IF (JJ==JBAR .AND. IOR==-2) WW(II,JBP1,KK) = VT%W_EDDY(II,KK)
-!                     !IF (KK==0    .AND. IOR== 3) VV(II,JJ,0)    = VT%V_EDDY(II,KK)
-!                     !IF (KK==KBAR .AND. IOR==-3) VV(II,JJ,KBP1) = VT%V_EDDY(II,KK)
-!								end select
-!				  endif			
-!#endif		         
-         
-         
+
 
          ! Define the appropriate gas and ghost velocity
 
@@ -2609,14 +2575,6 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
    ENDDO SIGN_LOOP_2
 
 ENDDO EDGE_LOOP
-
-
-!#if defined coupled_bc                  
-!    SYNTHETIC_EDDY_METHOD=.FALSE.
-!
-!#endif       
-
-
 
 T_USED(4)=T_USED(4)+CURRENT_TIME()-T_NOW
 

@@ -1,3 +1,6 @@
+
+COUPLED_ATM_BOUNDARY
+
     
  !for netcdf
  INTEGER:: status, dimid1, dimid2,dimid3, varid1,varid2,varid3,varid4, varid5

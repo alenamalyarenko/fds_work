@@ -5749,7 +5749,7 @@ INTEGER :: IERROR
 
 INTEGER::status, dimid1,dimid2,dimid3, dimid1c,dimid2c,dimid3c,dimid1c2,dimid2c2,dimid3c2, NF_NOERR
 INTEGER:: varid1, varid2,varid3,varid4,varid5
-INTEGER:: varid12, varid22,varid32,varid42
+INTEGER:: varid12, varid22,varid32,varid42,varid52
 
 ! Return if there are no slices to process and this is not a Plot3D dump
 
@@ -6139,52 +6139,7 @@ QUANTITY_LOOP: DO IQ=1,NQT
          ENDIF
          CLOSE(LU_SLCF(IQ,NM))
       ENDIF
-   ENDIF
-
-!#if defined output_nc  
-!! calculate face-centered values
-!      select case(IQ)
-!        case(1) !temp     
-!         DO J=1,JBP1
-!          DO I=1,IBP1
-!           DO K=1,KBP1
-!            QQ_f(I,J,KK,IQ) = REAL(0.5_EB*(QUANTITY(I,J,K)+QUANTITY(I,J-1,K)),FB)
-!           ENDDO
-!          ENDDO	 
-!         ENDDO
-!         
-!        case(2) !u
-!         DO J=1,JBP1
-!          DO I=1,IBP1
-!           DO K=1,KBP1
-!            QQ_f(I,J,KK,IQ) = REAL(0.25_EB*(QUANTITY(I,J,K)+QUANTITY(I,J-1,K)+&
-!                                             QUANTITY(I-1,J,K)+QUANTITY(I-1,J-1,K)),FB)
-!           ENDDO
-!          ENDDO	 
-!         ENDDO
-!         
-!        case(3) !v
-!         DO J=0,JBAR
-!          DO I=1,IBP1
-!           DO K=1,KBP1
-!            QQ_f(I,J,KK,IQ) = REAL((QUANTITY(I,J,K)),FB)
-!           ENDDO
-!          ENDDO	 
-!         ENDDO
-!         
-!        case(4) !w
-!         
-!        case(5) !hrr
-!         DO J=1,JBP1
-!          DO I=1,IBP1
-!           DO K=1,KBP1
-!            QQ_f(I,J,KK,IQ) = REAL(0.5_EB*(QUANTITY(I,J,K)+QUANTITY(I,J-1,K)),FB)
-!           ENDDO
-!          ENDDO	 
-!         ENDDO
-!         
-!#endif   
-   
+   ENDIF 
 
 ENDDO QUANTITY_LOOP
 
@@ -6218,20 +6173,43 @@ IF (PLOT3D) THEN
    status = nf90_def_var(LU_PL3D(NM),"u_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid22)
    status = nf90_def_var(LU_PL3D(NM),"v_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid32)
    status = nf90_def_var(LU_PL3D(NM),"w_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid42)
-
+   status = nf90_def_var(LU_PL3D(NM),"hrrpuv_a", NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid52)
    
    
    status = nf90_enddef(LU_PL3D(NM))
-   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(1:IBAR,1:JBAR,1:KBAR,1)) 
+   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(1:IBAR,1:JBAR,1:KBAR,1)) !T
    status = nf90_put_var(LU_PL3D(NM),varid2,QQ(0:IBAR,1:JBAR,1:KBAR,2)) !u
    status = nf90_put_var(LU_PL3D(NM),varid3,QQ(1:IBAR,0:JBAR,1:KBAR,3)) !v
    status = nf90_put_var(LU_PL3D(NM),varid4,QQ(1:IBAR,1:JBAR,0:KBAR,4)) !w
-   status = nf90_put_var(LU_PL3D(NM),varid5,QQ(1:IBAR,1:JBAR,1:KBAR,5))
+   status = nf90_put_var(LU_PL3D(NM),varid5,QQ(1:IBAR,1:JBAR,1:KBAR,5)) !HRR      
    
-   status = nf90_put_var(LU_PL3D(NM),varid12,QQ(0:IBP1,0:JBP1,0:KBP1,1)) 
-   status = nf90_put_var(LU_PL3D(NM),varid22,QQ(0:IBP1,0:JBP1,0:KBP1,2)) !u
-   status = nf90_put_var(LU_PL3D(NM),varid32,QQ(0:IBP1,0:JBP1,0:KBP1,3)) !v
-   status = nf90_put_var(LU_PL3D(NM),varid42,QQ(0:IBP1,0:JBP1,0:KBP1,4)) !w 
+   status = nf90_put_var(LU_PL3D(NM),varid12,MESHES(NM)%TMP(0:IBP1,0:JBP1,0:KBP1) - 273.15)    
+   status = nf90_put_var(LU_PL3D(NM),varid22,  MESHES(NM)%U(0:IBP1,0:JBP1,0:KBP1))      
+   status = nf90_put_var(LU_PL3D(NM),varid32,  MESHES(NM)%V(0:IBP1,0:JBP1,0:KBP1))      
+   status = nf90_put_var(LU_PL3D(NM),varid42,  MESHES(NM)%W(0:IBP1,0:JBP1,0:KBP1))      
+   status = nf90_put_var(LU_PL3D(NM),varid52,  MESHES(NM)%Q(0:IBP1,0:JBP1,0:KBP1)*0.001_EB)    !  Q(II,JJ,KK)*0.001_EB
+   
+  ! status = nf90_put_var(LU_PL3D(NM),varid12,QQ(0:IBP1,0:JBP1,0:KBP1,1)) 
+  ! status = nf90_put_var(LU_PL3D(NM),varid22,QQ(0:IBP1,0:JBP1,0:KBP1,2)) 
+  ! status = nf90_put_var(LU_PL3D(NM),varid32,QQ(0:IBP1,0:JBP1,0:KBP1,3))
+  ! status = nf90_put_var(LU_PL3D(NM),varid42,QQ(0:IBP1,0:JBP1,0:KBP1,4)) 
+
+ !  status = nf90_def_var(LU_PL3D(NM),"temp_a",   NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid12)   
+ !  status = nf90_def_var(LU_PL3D(NM),"u_a",      NF90_FLOAT, (/dimid1,dimid2c2,dimid3c2/),varid22)     
+ !  status = nf90_def_var(LU_PL3D(NM),"v_a",      NF90_FLOAT, (/dimid1c2,dimid2,dimid3c2/),varid32)     
+ !  status = nf90_def_var(LU_PL3D(NM),"w_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid42)   
+ !  status = nf90_put_var(LU_PL3D(NM),varid12,MESHES(NM)%TMP(0:IBP1,0:JBP1,0:KBP1))  !22,22,22
+ !  status = nf90_put_var(LU_PL3D(NM),varid22,MESHES(NM)%U(0:IBAR,1:JBAR,1:KBAR))    !21,20,20
+ !  status = nf90_put_var(LU_PL3D(NM),varid32,MESHES(NM)%V(1:IBAR,0:JBAR,1:KBAR))    !20,21,20 
+ !  status = nf90_put_var(LU_PL3D(NM),varid42,MESHES(NM)%W(0:IBP1,0:JBP1,0:KBP1))    !22,22,22 
+   
+
+
+
+
+
+
+  
    
    status = nf90_close(LU_PL3D(NM))   
    
