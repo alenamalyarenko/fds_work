@@ -641,57 +641,98 @@ VENT_LOOP: DO N=1,M%N_VENT
       VT%CW_EDDY=0._EB
    ENDIF EDDY_IF
    
-#if defined coupled_bc
-EDDY_IF2: IF (VT%N_EDDY<0) THEN
+!#if defined coupled_bc
+!EDDY_IF2: IF (VT%N_EDDY<0) THEN
+!      SELECT CASE(ABS(VT%IOR))
+!         CASE(1)
+!            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+!            ALLOCATE(VT%U_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+!            ALLOCATE(VT%V_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+!            ALLOCATE(VT%W_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+!         CASE(2)
+!          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
+!            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+!            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+!            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+!         CASE(3)
+!         Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
+!            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
+!            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
+!            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+!            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+!      END SELECT   
+!      ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
+!      CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
+!      ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
+!      CALL ChkMemErr('READ_VENT','Y_EDDY',IZERO)
+!      ALLOCATE(VT%Z_EDDY(VT%N_EDDY),STAT=IZERO)
+!      CALL ChkMemErr('READ_VENT','Z_EDDY',IZERO)
+!      ALLOCATE(VT%CU_EDDY(VT%N_EDDY),STAT=IZERO)
+!      CALL ChkMemErr('READ_VENT','CU_EDDY',IZERO)
+!      ALLOCATE(VT%CV_EDDY(VT%N_EDDY),STAT=IZERO)
+!      CALL ChkMemErr('READ_VENT','CV_EDDY',IZERO)
+!      ALLOCATE(VT%CW_EDDY(VT%N_EDDY),STAT=IZERO)
+!      CALL ChkMemErr('READ_VENT','CW_EDDY',IZERO)
+!      VT%U_EDDY=0._EB
+!      VT%V_EDDY=0._EB
+!      VT%W_EDDY=0._EB
+!      VT%X_EDDY=0._EB
+!      VT%Y_EDDY=0._EB
+!      VT%Z_EDDY=0._EB
+!      VT%CU_EDDY=0._EB
+!      VT%CV_EDDY=0._EB
+!      VT%CW_EDDY=0._EB
+!   ENDIF EDDY_IF2
+!#endif   
+
+#if defined atm_variables
+EDDY_IF3: IF (VT%N_EDDY<0) THEN
       SELECT CASE(ABS(VT%IOR))
          CASE(1)
             Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
-            ALLOCATE(VT%U_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
-            ALLOCATE(VT%V_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
-            ALLOCATE(VT%W_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+            ALLOCATE(VT%U_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%V_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%W_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+             ALLOCATE(VT%T_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
          CASE(2)
           Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
-            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
-            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
-            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+            ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
          CASE(3)
          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
-            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
-            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
-            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
+            ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
       END SELECT   
-      ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
-      CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
-      ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
-      CALL ChkMemErr('READ_VENT','Y_EDDY',IZERO)
-      ALLOCATE(VT%Z_EDDY(VT%N_EDDY),STAT=IZERO)
-      CALL ChkMemErr('READ_VENT','Z_EDDY',IZERO)
-      ALLOCATE(VT%CU_EDDY(VT%N_EDDY),STAT=IZERO)
-      CALL ChkMemErr('READ_VENT','CU_EDDY',IZERO)
-      ALLOCATE(VT%CV_EDDY(VT%N_EDDY),STAT=IZERO)
-      CALL ChkMemErr('READ_VENT','CV_EDDY',IZERO)
-      ALLOCATE(VT%CW_EDDY(VT%N_EDDY),STAT=IZERO)
-      CALL ChkMemErr('READ_VENT','CW_EDDY',IZERO)
-      VT%U_EDDY=0._EB
-      VT%V_EDDY=0._EB
-      VT%W_EDDY=0._EB
-      VT%X_EDDY=0._EB
-      VT%Y_EDDY=0._EB
-      VT%Z_EDDY=0._EB
-      VT%CU_EDDY=0._EB
-      VT%CV_EDDY=0._EB
-      VT%CW_EDDY=0._EB
-   ENDIF EDDY_IF2
+      VT%U_ATM=0._EB
+      VT%V_ATM=0._EB
+      VT%W_ATM=0._EB
+      VT%T_ATM=0._EB
+   ENDIF EDDY_IF3
 #endif   
+
+
+
    
 ENDDO VENT_LOOP
 

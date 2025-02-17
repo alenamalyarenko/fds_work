@@ -11603,6 +11603,13 @@ MESH_LOOP_1: DO NM=1,NMESHES
                   ENDIF
                ENDIF
 
+#if defined atm_variables
+               IF (N_EDDY<0) THEN
+                COUPLED_ATM_BOUNDARY = .TRUE.
+               ENDIF
+#endif               
+
+
                ! Check if the VENT is attached to a specific OBST
 
                IF (OBST_ID/='null') THEN

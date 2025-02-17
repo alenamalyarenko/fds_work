@@ -95,6 +95,8 @@ INTEGER, PARAMETER :: INTERPOLATED_BOUNDARY=6      !< Flag for SF\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: PERIODIC_BOUNDARY=7          !< Flag for SF\%BOUNDARY_TYPE, VT\%BOUNDARY_TYPE, WC\%BOUNDARY_TYPE
 INTEGER, PARAMETER :: HVAC_BOUNDARY=42             !< Flag for SF\%THERMAL_BC_INDEX, SF\%SPECIES_BC_INDEX, VT\%BOUNDARY_TYPE
 
+
+
 INTEGER, PARAMETER :: FISHPAK_BC_PERIODIC=0            !< Flag for FISHPAK_BC(I) I=1,3: Period BC for Poisson solver
 INTEGER, PARAMETER :: FISHPAK_BC_DIRICHLET_DIRICHLET=1 !< Flag for FISHPAK_BC(I) I=1,3: Dirichlet at both sides
 INTEGER, PARAMETER :: FISHPAK_BC_DIRICHLET_NEUMANN=2   !< Flag for FISHPAK_BC(I) I=1,3: Dirichlet at lower, Neumann at upper
@@ -264,6 +266,10 @@ LOGICAL :: REACTING_THIN_OBSTRUCTIONS=.FALSE.       !< Thin obstructions that of
 LOGICAL :: SMOKE3D_16=.FALSE.                       !< Output 3D smoke values using 16 bit integers
 LOGICAL :: CHECK_BOUNDARY_ONE_D_ARRAYS=.FALSE.      !< Flag that indicates that ONE_D array dimensions need to be checked
 LOGICAL :: TENSOR_DIFFUSIVITY=.FALSE.               !< If true, use experimental tensor diffusivity model for spec and tmp
+
+#if defined atm_variables
+LOGICAL :: COUPLED_ATM_BOUNDARY=.FALSE.             !< 
+#endif
 
 INTEGER, ALLOCATABLE, DIMENSION(:) :: CHANGE_TIME_STEP_INDEX      !< Flag to indicate if a mesh needs to change time step
 INTEGER, ALLOCATABLE, DIMENSION(:) :: SETUP_PRESSURE_ZONES_INDEX  !< Flag to indicate if a mesh needs to keep searching for ZONEs
