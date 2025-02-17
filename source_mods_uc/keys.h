@@ -5,7 +5,7 @@
 #define write_init
 #define output_full_variable
 
-#define coupled
+#undef coupled
 
 #if defined coupled
 # define global_mesh
