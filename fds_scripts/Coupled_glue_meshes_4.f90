@@ -1,6 +1,6 @@
 !Glue 7_3 together
 ! 
-! _a variables read from netcdf; something is wrong
+! reading old variable output (QQ) 
 
 program make_wind_bc
 use netcdf
@@ -238,11 +238,11 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
 
 	    !read output files
       status=nf90_open(filename1, nf90_nowrite, ncid_in)
-      status=nf90_inq_varid(ncid_in, 'temp_a',  varid_t)
-      status=nf90_inq_varid(ncid_in, 'u_a',     varid_u )
-      status=nf90_inq_varid(ncid_in, 'v_a',     varid_v)
-      status=nf90_inq_varid(ncid_in, 'w_a',     varid_w) 
-      status=nf90_inq_varid(ncid_in, 'hrrpuv_a',varid_h) 
+      status=nf90_inq_varid(ncid_in, 'temp',  varid_t)
+      status=nf90_inq_varid(ncid_in, 'u',     varid_u )
+      status=nf90_inq_varid(ncid_in, 'v',     varid_v)
+      status=nf90_inq_varid(ncid_in, 'w',     varid_w) 
+      status=nf90_inq_varid(ncid_in, 'hrrpuv',varid_h) 
      
       ni=GI2(NM)-GI1(NM)+1
       nj=GJ2(NM)-GJ1(NM)+1
