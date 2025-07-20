@@ -1441,6 +1441,9 @@ TYPE VENTS_TYPE
    REAL(EB), ALLOCATABLE, DIMENSION(:) :: X_EDDY,Y_EDDY,Z_EDDY,CU_EDDY,CV_EDDY,CW_EDDY
 !#if defined atm_variables 
    REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: U_ATM,V_ATM,W_ATM , T_ATM  
+!#endif
+!#if defined global_mesh
+   INTEGER :: GI1=-1,GI2=-1,GJ1=-1,GJ2=-1,GK1=-1,GK2=-1
 !#endif   
 END TYPE VENTS_TYPE
 

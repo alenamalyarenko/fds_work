@@ -13,6 +13,7 @@ cp ../../fds/Source/* ../Source/
 cp ../source_mods_uc/keys.h             ../Source/
 cp ../source_mods_uc/coupled_files.h    ../Source/
 cp ../source_mods_uc/atm_bc_coupled.h   ../Source/
+cp ../source_mods_uc/velocity_bc.h      ../Source/
 
 cp ../source_mods_uc/velo.f90  ../Source/
 cp ../source_mods_uc/read.f90  ../Source/
@@ -35,4 +36,4 @@ cp ../source_mods_uc/divg.f90  ../Source/
 cp ../source_mods_uc/wall.f90  ../Source/
 
 
-FFLAGS="$FFLAGS -fpp" FCOMPL="ifort" obj="fds" make  -j 8 impi_intel_linux_uc
+FFLAGS="$FFLAGS -fpp -g -warn all  -diag-enable remark"  FCOMPL="ifort" obj="fds" make  -j 8 impi_intel_linux_uc

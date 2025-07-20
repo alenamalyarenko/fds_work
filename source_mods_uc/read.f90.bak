@@ -2,7 +2,7 @@
 #define GITHASH_PP "unknown"
 #endif
 #include 'keys.h'
-
+#include 'coupled_files.h'
 !> \brief Subroutines that read the various NAMELIST lines in the FDS input file
 
 MODULE READ_INPUT
@@ -824,14 +824,13 @@ MESH_LOOP: DO N=1,NMESHES_READ
             IF (NM3.eq.1) THEN
             ! we can find corner coordinates
             	! add +1 on each side for zero and IBP1
-            	! corrected 18 July to include ghosts
-
-            M%GI1 = 0
-            M%GI2 = M%IBAR +1         
-            M%GJ1 = 0
-            M%GJ2 = M%JBAR +1
-            M%GK1 = 0
-            M%GK2 = M%KBAR  +1            
+            M%GK1 = 1
+            M%GK2 = 1+ M%KBAR
+            M%GI1 = 1
+            M%GI2 = 1+ M%IBAR          
+            M%GJ1 = 1
+            M%GJ2 = 1+ M%JBAR
+              
             ENDIF
             
 !# if defined coupled_bc            
@@ -856,13 +855,12 @@ MESH_LOOP: DO N=1,NMESHES_READ
       pnt => MESHES(NM3)
       IF (NM3>1) THEN
 
-       !corrected 18 July 2025 to match coupled_glue_meshed which I trust ?!
-       i1=0
-       i2=1
-       j1=0
-       j2=1
-       k1=0
-       k2=1
+      i1=1
+      i2=1
+      j1=1
+      j2=1
+      k1=1
+      k2=1
 
        DO KK2=(MR%K_LOWER),pnt%MK  
         DO JJ2=(MR%J_LOWER),pnt%MJ
@@ -919,22 +917,18 @@ MESH_LOOP: DO N=1,NMESHES_READ
           ENDIF
          ENDDO
         ENDDO
-       ENDDO !end of NM4 loops             
-      ENDIF  !if NM3>1
-      
-#if defined vent_debug
-!print*, 'set up global mesh', NM3, pnt%GI1, pnt%GI2,pnt%GJ1,pnt%GJ2,pnt%GK1,pnt%GK2  
-#endif
-
-     
-      
+       ENDDO             
+      ENDIF
      ENDDO I_MULT_LOOP3
     ENDDO J_MULT_LOOP3
    ENDDO K_MULT_LOOP3
 
 #endif 
 
+#if defined vent_debug
+print*, 'set up global mesh', NM, pnt%GI1, pnt%GI2,pnt%GJ1,pnt%GJ2,pnt%GK1,pnt%GK2  
 
+#endif
 
 
 ENDDO MESH_LOOP
@@ -1042,7 +1036,7 @@ IF_HT3D: IF (N_HT3D_SURF_LINES>0) THEN
 
    DEALLOCATE(HT3D_OBST)
 
-ENDIF IF_HT3D
+
 
 ! MESH_SEPARATION_DISTANCE is a very small length used to determine if there are periodic boundaries. NEIGHBOR_SEPARATION_DISANCE
 ! is the distance beyond which no information or message passing is assumed between the meshes. Its value is deliberately
@@ -11865,7 +11859,7 @@ MESH_LOOP_2: DO NM=1,NMESHES
    ENDDO  VENT_LOOP_3
 
 
-!Print*,'Mesh',NM, 'Vents setup finished',N_vent,n_total,n_explicit, N_vent_total
+Print*,'Mesh',NM, 'Vents setup finished',N_vent,n_total,n_explicit, N_vent_total
 ENDDO MESH_LOOP_2
 
 

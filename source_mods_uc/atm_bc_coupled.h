@@ -1,7 +1,7 @@
 ! included in velo.f90
 SUBROUTINE ATM_BC_COUPLED(T,NM)
 use netcdf
-USE COUPLED_FILES, ONLY: OBFile
+USE COUPLED_FILES
 USE MESH_POINTERS
 
 REAL(EB), INTENT(IN) :: T
@@ -35,7 +35,7 @@ timestamp=int(T)+1
 VENT_LOOP: DO N=1,N_VENT
     VT => VENTS(N)
     COUPLED_VENT_IF: IF (VT%N_EDDY==(-1)) THEN !coupled vent
-    status=nf90_open(OBFile, nf90_nowrite, ncid)
+    status=nf90_open(OBFile , nf90_nowrite, ncid)
     !print *,'opened file', NM, trim(nf90_strerror(status))
     
    	IF (VENTS(N)%IOR==2) THEN
@@ -57,14 +57,15 @@ VENT_LOOP: DO N=1,N_VENT
         
  
        !EDDY Variables - face-averaged
-       status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid1, U0,start = (/ VT%GI1+1, VT%GK1+1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       
        !print *,'read US', NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid2, V0,start = (/ VT%GI1+1, VT%GK1+1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
        !print *,'read VS',NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid3, W0,start = (/ VT%GI1+1, VT%GK1+1,timestamp /),  count = (/ IBAR, KBAR,1 /) )
        !print *,'read WS',NM, trim(nf90_strerror(status))
        !no temp yet
-       !status=nf90_get_var(ncid, varid4, T0,start = (/ GI1, GK1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
+       !status=nf90_get_var(ncid, varid4, T0,start = (/ VT%GI1+1, VT%GK1+1,timestamp /),  count = (/ IBAR, KBAR,1 /) ) 
        
 
        !Print*, 'eddy loop', NM,GI1, GK1, size( VT%U_ATM,1),size( VT%U_ATM,2)

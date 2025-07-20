@@ -1229,28 +1229,12 @@ PREDICT_NORMALS: IF (PREDICTOR) THEN
                      CASE(-3); B1%U_NORMAL_S = B1%U_NORMAL_S + TIME_RAMP_FACTOR*VT%W_EDDY(BC%II,BC%JJ)*PROFILE_FACTOR
                   END SELECT
                ENDIF
-#if defined atm_variables     
-               !IF (VT%N_EDDY<0) THEN ! Coupled BC  
-               IF (COUPLED_ATM_BOUNDARY) THEN
-                  IF (SF%PROFILE/=0 .AND. ABS(SF%VEL)>TWO_EPSILON_EB) THEN
-                     PROFILE_FACTOR = ABS(B1%U_NORMAL_0/SF%VEL)
-                  ELSE
-                     PROFILE_FACTOR = 1._EB
-                  ENDIF
-                  SELECT CASE(BC%IOR)
-                     CASE( 1); B1%U_NORMAL_S = B1%U_NORMAL_S - TIME_RAMP_FACTOR*VT%U_ATM(BC%JJ,BC%KK)*PROFILE_FACTOR
-                     CASE(-1); B1%U_NORMAL_S = B1%U_NORMAL_S + TIME_RAMP_FACTOR*VT%U_ATM(BC%JJ,BC%KK)*PROFILE_FACTOR
-                     CASE( 2); B1%U_NORMAL_S = B1%U_NORMAL_S - TIME_RAMP_FACTOR*VT%V_ATM(BC%II,BC%KK)*PROFILE_FACTOR
-                     CASE(-2); B1%U_NORMAL_S = B1%U_NORMAL_S + TIME_RAMP_FACTOR*VT%V_ATM(BC%II,BC%KK)*PROFILE_FACTOR
-                     CASE( 3); B1%U_NORMAL_S = B1%U_NORMAL_S - TIME_RAMP_FACTOR*VT%W_ATM(BC%II,BC%JJ)*PROFILE_FACTOR
-                     CASE(-3); B1%U_NORMAL_S = B1%U_NORMAL_S + TIME_RAMP_FACTOR*VT%W_ATM(BC%II,BC%JJ)*PROFILE_FACTOR
-                  END SELECT
-               ENDIF
-#endif               
+       
                
             ENDIF VENT_IF
 
          CASE(OPEN_BOUNDARY,INTERPOLATED_BOUNDARY)
+
             SELECT CASE(BC%IOR)
                CASE( 1); B1%U_NORMAL_S = -U(BC%II,BC%JJ,BC%KK)
                CASE(-1); B1%U_NORMAL_S =  U(BC%II-1,BC%JJ,BC%KK)

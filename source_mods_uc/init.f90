@@ -5407,12 +5407,12 @@ CALL POINT_TO_MESH(NM)
    !   stop "Stopped"
    !end if    
      
-                                          
- status=nf90_get_var(ncid, varid1, U0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+  !Print*, 'init UVW ',NM,  GI1, GJ1, GK1                                        
+ status=nf90_get_var(ncid, varid1, U0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
   !print * ,'U', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
- status=nf90_get_var(ncid, varid2, V0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1  /) ) 
+ status=nf90_get_var(ncid, varid2, V0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBP1, JBP1, KBP1  /) ) 
   !print *,'V', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
- status=nf90_get_var(ncid, varid3, W0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+ status=nf90_get_var(ncid, varid3, W0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
   !print *,'W', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
 
  status=nf90_close(ncid)
@@ -5483,7 +5483,7 @@ CALL POINT_TO_MESH(NM)
    
 status=nf90_open(ICFile, nf90_nowrite, ncid)
 status=nf90_inq_varid(ncid, 'TMP', varid1)
-status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1, GJ1, GK1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
+status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
 ! if(status /= nf90_NoErr) call handle_err(status)
 status=nf90_close(ncid)
 

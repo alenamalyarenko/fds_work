@@ -1,4 +1,4 @@
-&HEAD CHID='Coupled7_7'/
+&HEAD CHID='Coupled9_1'/
 
 # GRID
 # 9 cpu
@@ -6,28 +6,22 @@
 &MULT ID='mesh_fire', DX=20, DY=20, DZ=60., I_UPPER=2, J_UPPER=2, K_UPPER=0/
 
 
-&TIME T_END=600,LOCK_TIME_STEP=F, DT=1 /
+&TIME T_END=1,LOCK_TIME_STEP=F, DT=1 /
 
 
 #character(13)
-&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_7d.nc' /
+#&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_8a.nc' /
 
-#no wind from namelist!! 
-#&WIND SPEED=5,  DIRECTION=180., L=-500., Z_0=0.03 /
 
-# Boundary Conditions:
-#  VT%N_EDDY
-#  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
-
+#roof - open always
+&VENT MB='ZMAX', SURF_ID='OPEN' /
 
 #south - coupled
-&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/ 
-
-#&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN'/ 
-
+&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN'/ 
+&WIND SPEED=5,  DIRECTION=180., L=-500., Z_0=0.03 /
 #north - open
 &VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN'/
-#&VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/
+
 
 
 #east - closed
@@ -36,15 +30,9 @@
 #&VENT XB=0.,0.,0.,60.,0.,60.,SURF_ID='OPEN'/
 
 
-#roof - open always
-&VENT MB='ZMAX', SURF_ID='OPEN' /
-
 &DUMP DT_PL3D=1, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
 
 &MISC SIMULATION_MODE='SVLES'/
 &MISC VERBOSE=T/
-
-
-
 
 &TAIL /

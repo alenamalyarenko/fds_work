@@ -10,7 +10,7 @@
 
 
 #character(13)
-&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_8a.nc' /
+&ICCD ICFile='ic_fds_7_6.nc', OBFile='bc_for_8_3.nc' /
 
 #south - coupled
 &VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/ 
