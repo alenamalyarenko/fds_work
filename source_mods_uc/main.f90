@@ -375,9 +375,13 @@ DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
 
 
 #if defined coupled_bc
+# ifdef coupled_debug
 IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Started ATM_BC_COUPLED') 
+# endif
    CALL ATM_BC_COUPLED(T_BEGIN,NM)                                                  !read and assign _ATM variables from nc files
+# ifdef coupled_debug
 IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Completed ATM_BC_COUPLED')   
+# endif
 #endif  
   
    IF (SYNTHETIC_EDDY_METHOD) CALL SYNTHETIC_EDDY_SETUP(NM)
@@ -451,7 +455,13 @@ IF (.NOT.RESTART) THEN
             CALL COMPUTE_RADIATION(T_BEGIN,NM,ITER)
             IF (CC_IBM) CALL CCCOMPUTE_RADIATION(T_BEGIN,NM,ITER)
          ENDIF
+#ifdef coupled_debug         
+         IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('start of first wall_BC')
+#endif         
          CALL WALL_BC(T_BEGIN,DT,NM)
+#ifdef coupled_debug         
+          IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('finish of first wall_BC')
+#endif          
       ENDDO
       IF (RADIATION .AND. EXCHANGE_RADIATION) THEN
          DO ANG_INC_COUNTER=1,ANGLE_INCREMENT
@@ -690,6 +700,9 @@ MAIN_LOOP: DO
       ENDIF
 
       ! Boundary conditions for temperature, species, and density. Start divergence calculation.
+#ifdef coupled_debug
+IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Starting wall_bc in predictor')
+#endif
 
       COMPUTE_WALL_BC_LOOP_A: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
          CALL WALL_BC(T,DT,NM)
@@ -780,7 +793,9 @@ MAIN_LOOP: DO
    VELOCITY_BC_LOOP: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
 #if defined coupled_bc
       ! Apply UVW to U_eddy variables to be used in the main velocity_bc
-      !IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc predictor')
+# ifdef coupled_debug      
+      IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc predictor - atm_bc_coupled')
+# endif      
       CALL ATM_BC_COUPLED(T,NM)
 #endif  
 
@@ -861,6 +876,9 @@ MAIN_LOOP: DO
    ENDIF
 
    ! Particle heat and mass transfer
+#ifdef coupled_debug   
+IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Starting wall_bc in corrector')
+#endif
 
    WALL_COUNTER = WALL_COUNTER + 1
    COMPUTE_WALL_BC_2B: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
@@ -966,10 +984,9 @@ MAIN_LOOP: DO
    ! Apply velocity boundary conditions, and update values of HRR, DEVC, etc.
 
    VELOCITY_BC_LOOP_2: DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
-!#if defined coupled_bc
-!     ! IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc corrector')
-!      CALL VELOCITY_BC_COUPLED(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
-!#endif     
+#if defined coupled_debug
+ IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Place to apply velocity bc corrector')
+#endif     
       CALL VELOCITY_BC(T,NM,APPLY_TO_ESTIMATED_VARIABLES=.FALSE.)
       CALL UPDATE_GLOBAL_OUTPUTS(T,DT,NM)
    ENDDO VELOCITY_BC_LOOP_2

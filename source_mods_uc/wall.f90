@@ -54,10 +54,15 @@ CALL POINT_TO_MESH(NM)
 
 ! Compute the temperature TMP_F at all boundary cells, including PYROLYSIS and 1-D heat transfer
 
+#ifdef coupled_debug
+Print*, 'Wall - thermal BC', NM
+#endif
 CALL THERMAL_BC(T,NM)
 
 ! Compute rho*D at WALL cells
-
+#ifdef coupled_debug
+Print*, 'Wall - dissufivity BC', NM
+#endif
 CALL DIFFUSIVITY_BC
 
 ! Special boundary routines
@@ -65,12 +70,19 @@ IF (DEPOSITION .AND. .NOT.INITIALIZATION_PHASE) CALL DEPOSITION_BC(DT,NM)
 IF (HVAC_SOLVE .AND. .NOT.INITIALIZATION_PHASE) CALL HVAC_BC
 
 ! Compute the species mass fractions, ZZ_F, at all boundary cells
-
+#ifdef coupled_debug
+Print*, 'Wall - species BC', NM
+#endif
 CALL SPECIES_BC(T,DT,NM)
 
 ! Compute the density, RHO_F, at WALL cells only
-
+#ifdef coupled_debug
+Print*, 'Wall - density BC', NM
+#endif
 CALL DENSITY_BC
+#ifdef coupled_debug
+Print*, 'Wall - end BC', NM
+#endif
 
 T_USED(6)=T_USED(6)+CURRENT_TIME()-TNOW
 END SUBROUTINE WALL_BC
@@ -276,6 +288,8 @@ REAL(EB), POINTER, DIMENSION(:,:,:,:) :: OM_ZZP=>NULL()
 REAL(EB), POINTER, DIMENSION(:,:,:) :: OM_MUP=>NULL()
 REAL(EB), DIMENSION(0:3,0:3,0:3) :: U_TEMP,Z_TEMP,F_TEMP
 
+!print*, 'inside wall?? 1'
+
 SF  => SURFACE(SURF_INDEX)
 
 IF (PRESENT(WALL_INDEX)) THEN
@@ -298,6 +312,8 @@ JJG = BC%JJG
 KKG = BC%KKG
 IOR = BC%IOR
 
+!print*, 'inside wall?? 2'
+
 ! Compute surface temperature, TMP_F, and convective heat flux, Q_CON_F, for various boundary conditions
 
 METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
@@ -310,7 +326,7 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
    CASE (INFLOW_OUTFLOW) METHOD_OF_HEAT_TRANSFER  ! Only for WALL cells
 
       ! Base inflow/outflow decision on velocity component with same predictor/corrector attribute
-
+!print*, 'inside wall?? 3'
       SELECT CASE(IOR)
          CASE( 1); UN =  UU(II,JJ,KK)
          CASE(-1); UN = -UU(II-1,JJ,KK)
@@ -321,16 +337,24 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
          CASE DEFAULT; UN = 0._EB
       END SELECT
 
+       !print*, ' inside wall velocity', IOR,II,JJ,KK, UN
+     
       IF (UN>TWO_EPSILON_EB) THEN  ! Assume the flow is coming into the domain
          B1%TMP_F = TMP_0(KK)
          IF (WC%VENT_INDEX>0) THEN
-            VT => VENTS(WC%VENT_INDEX)  
-#if defined atm_variables            
+            VT => VENTS(WC%VENT_INDEX) 
+#ifdef coupled_debug             
+             print*, 'inside wall?? 2' 
+#endif             
+#if defined atm_variables    
+                  
             IF (COUPLED_ATM_BOUNDARY) THEN
                TSI = T - T_BEGIN   
                SELECT CASE(IOR) 
                 CASE(2) !SOUTH BC  
+#ifdef coupled_debug                
                  print*, 'using t_atm in wall'                                                                                 
+#endif                 
                  B1%TMP_F = T_ATM(II,KK) + EVALUATE_RAMP(TSI,VT%TMP_EXTERIOR_RAMP_INDEX)*(VT%TMP_EXTERIOR- T_ATM(II,KK))         
                END SELECT
             ELSE

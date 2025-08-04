@@ -17,6 +17,8 @@ integer:: ncid, varid1,varid2,varid3,varid4, status, timestamp
 integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
 REAL,ALLOCATABLE, DIMENSION(:,:):: T0,U0,V0,W0
 
+
+
        			
 T_NOW = CURRENT_TIME()
 
@@ -74,10 +76,12 @@ VENT_LOOP: DO N=1,N_VENT
          VT%U_ATM(I,K)=U0(I,K) 
          VT%V_ATM(I,K)=V0(I,K) 
          VT%W_ATM(I,K)=W0(I,K) 
-         VT%T_ATM(I,K)=T0(I,K) +273.15
+         VT%T_ATM(I,K)=T0(I,K) 
         ENDDO
        ENDDO 
-              
+#ifdef coupled_debug       
+       print*,'atm_bc prescribed',     VT%U_ATM(I,K),     size( VT%U_ATM,1),size( VT%U_ATM,2), VT%T_ATM(I,K)
+#endif       
     ENDIF 
 
     

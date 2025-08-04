@@ -641,63 +641,14 @@ VENT_LOOP: DO N=1,M%N_VENT
       VT%CW_EDDY=0._EB
    ENDIF EDDY_IF
    
-!#if defined coupled_bc
-!EDDY_IF2: IF (VT%N_EDDY<0) THEN
-!      SELECT CASE(ABS(VT%IOR))
-!         CASE(1)
-!            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
-!            ALLOCATE(VT%U_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
-!            ALLOCATE(VT%V_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
-!            ALLOCATE(VT%W_EDDY(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
-!         CASE(2)
-!          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
-!            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
-!            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
-!            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
-!         CASE(3)
-!         Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
-!            ALLOCATE(VT%U_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','U_EDDY',IZERO)
-!            ALLOCATE(VT%V_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','V_EDDY',IZERO)
-!            ALLOCATE(VT%W_EDDY(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-!            CALL ChkMemErr('READ_VENT','W_EDDY',IZERO)
-!      END SELECT   
-!      ALLOCATE(VT%X_EDDY(VT%N_EDDY),STAT=IZERO)
-!      CALL ChkMemErr('READ_VENT','X_EDDY',IZERO)
-!      ALLOCATE(VT%Y_EDDY(VT%N_EDDY),STAT=IZERO)
-!      CALL ChkMemErr('READ_VENT','Y_EDDY',IZERO)
-!      ALLOCATE(VT%Z_EDDY(VT%N_EDDY),STAT=IZERO)
-!      CALL ChkMemErr('READ_VENT','Z_EDDY',IZERO)
-!      ALLOCATE(VT%CU_EDDY(VT%N_EDDY),STAT=IZERO)
-!      CALL ChkMemErr('READ_VENT','CU_EDDY',IZERO)
-!      ALLOCATE(VT%CV_EDDY(VT%N_EDDY),STAT=IZERO)
-!      CALL ChkMemErr('READ_VENT','CV_EDDY',IZERO)
-!      ALLOCATE(VT%CW_EDDY(VT%N_EDDY),STAT=IZERO)
-!      CALL ChkMemErr('READ_VENT','CW_EDDY',IZERO)
-!      VT%U_EDDY=0._EB
-!      VT%V_EDDY=0._EB
-!      VT%W_EDDY=0._EB
-!      VT%X_EDDY=0._EB
-!      VT%Y_EDDY=0._EB
-!      VT%Z_EDDY=0._EB
-!      VT%CU_EDDY=0._EB
-!      VT%CV_EDDY=0._EB
-!      VT%CW_EDDY=0._EB
-!   ENDIF EDDY_IF2
-!#endif   
 
 #if defined atm_variables
 EDDY_IF3: IF (VT%N_EDDY<0) THEN
       SELECT CASE(ABS(VT%IOR))
          CASE(1)
+# ifdef coupled_debug         
             Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+# endif            
             ALLOCATE(VT%U_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
             ALLOCATE(VT%V_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
@@ -706,7 +657,9 @@ EDDY_IF3: IF (VT%N_EDDY<0) THEN
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
              ALLOCATE(VT%T_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
          CASE(2)
+# ifdef coupled_debug       
           Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
+# endif          
             ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
             ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
@@ -715,7 +668,9 @@ EDDY_IF3: IF (VT%N_EDDY<0) THEN
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
             ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
          CASE(3)
+# ifdef coupled_debug       
          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
+# endif         
             ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
             ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
@@ -5437,24 +5392,24 @@ WS=W
 
 ! Set normal velocity on external and internal boundaries (follows divg)
 
-!DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
-!   WC => WALL(IW)
-!   BC => BOUNDARY_COORD(WC%BC_INDEX)
-!   B1 => BOUNDARY_PROP1(WC%B1_INDEX)
-!   IOR = BC%IOR
-!   II  = BC%II
-!   JJ  = BC%JJ
-!   KK  = BC%KK
-!   SELECT CASE(IOR)
-!      CASE( 1) ; B1%U_NORMAL_S = -U(II,JJ,KK)
-!      CASE(-1) ; B1%U_NORMAL_S =  U(II-1,JJ,KK)
-!      CASE( 2) ; B1%U_NORMAL_S = -V(II,JJ,KK)
-!      CASE(-2) ; B1%U_NORMAL_S =  V(II,JJ-1,KK)
-!      CASE( 3) ; B1%U_NORMAL_S = -W(II,JJ,KK)
-!      CASE(-3) ; B1%U_NORMAL_S =  W(II,JJ,KK-1)
-!   END SELECT
-!   B1%U_NORMAL = B1%U_NORMAL_S
-!ENDDO
+DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
+   WC => WALL(IW)
+   BC => BOUNDARY_COORD(WC%BC_INDEX)
+   B1 => BOUNDARY_PROP1(WC%B1_INDEX)
+   IOR = BC%IOR
+   II  = BC%II
+   JJ  = BC%JJ
+   KK  = BC%KK
+   SELECT CASE(IOR)
+      CASE( 1) ; B1%U_NORMAL_S = -U(II,JJ,KK)
+      CASE(-1) ; B1%U_NORMAL_S =  U(II-1,JJ,KK)
+      CASE( 2) ; B1%U_NORMAL_S = -V(II,JJ,KK)
+      CASE(-2) ; B1%U_NORMAL_S =  V(II,JJ-1,KK)
+      CASE( 3) ; B1%U_NORMAL_S = -W(II,JJ,KK)
+      CASE(-3) ; B1%U_NORMAL_S =  W(II,JJ,KK-1)
+   END SELECT
+   B1%U_NORMAL = B1%U_NORMAL_S
+ENDDO
 
 END SUBROUTINE UVW_INIT_NC
 #endif
@@ -5482,7 +5437,7 @@ CALL POINT_TO_MESH(NM)
    KMIN = 1 ;    KMAX = KBAR
    
 status=nf90_open(ICFile, nf90_nowrite, ncid)
-status=nf90_inq_varid(ncid, 'TMP', varid1)
+status=nf90_inq_varid(ncid, 'T', varid1)
 status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
 ! if(status /= nf90_NoErr) call handle_err(status)
 status=nf90_close(ncid)
@@ -5490,11 +5445,13 @@ status=nf90_close(ncid)
 DO K=KMIN,KMAX
    DO J=JMIN,JMAX
       DO I=IMIN,IMAX       
-            TMP(I,J,K)=TMP0(I,J,K)      
+            TMP(I,J,K)=TMP0(I,J,K)   
       ENDDO
    ENDDO
 ENDDO
-!Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(0,0,0),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
+# ifdef coupled_debug
+Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(0,0,0),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
+# endif
 ! update density field
 
 DO K=KMIN,KMAX
