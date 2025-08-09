@@ -5349,30 +5349,35 @@ CALL POINT_TO_MESH(NM)
    JMAX = JBAR
    KMIN = 0
    KMAX = KBAR
+   
+   Print*,'FILE NAME CHECK', ICFile
+   
  status=nf90_open(ICFile, nf90_nowrite, ncid)
  
- !Print*,'FILE NAME CHECK', ICFile
+ 
  
  status=nf90_inq_varid(ncid, 'U', varid1)
  status=nf90_inq_varid(ncid, 'V', varid2)
  status=nf90_inq_varid(ncid, 'W', varid3)
      
-  ! IF (STATUS .NE. NF_NOERR) then
-    !  print *, trim(nf90_strerror(status))
-   !   stop "Stopped"
-   !end if    
+  IF (STATUS .NE. nf90_noerr) then
+      print *, 'vel ', trim(nf90_strerror(status))
+      stop "Stopped"
+  end if    
      
-  !Print*, 'init UVW ',NM,  GI1, GJ1, GK1                                        
- status=nf90_get_var(ncid, varid1, U0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+  !Print*, 'init UVW sizes ',NM,  GI1, GJ1, GK1, IBAR, JBAR, KBAR                                        
+ status=nf90_get_var(ncid, varid1, U0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
   !print * ,'U', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
- status=nf90_get_var(ncid, varid2, V0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBP1, JBP1, KBP1  /) ) 
+ status=nf90_get_var(ncid, varid2, V0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR  /) ) 
   !print *,'V', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
- status=nf90_get_var(ncid, varid3, W0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBP1, JBP1, KBP1 /) ) 
+ status=nf90_get_var(ncid, varid3, W0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
   !print *,'W', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
 
  status=nf90_close(ncid)
 
-!Print*, NM, GI1,GJ1,GK1, V0(0,0,0), V0(1,1,1),V(0,0,0), V(1,1,1)
+Print*, 'Read V Init ', NM, V0(1,1,1),V0(1,1,55),V0(1,1,56),V0(1,1,57),V0(1,1,58),V0(1,1,59),V0(1,1,60)
+Print*, 'Read U Init ', NM, U0(1,1,1),U0(1,1,55),U0(1,1,56),U0(1,1,57),U0(1,1,58),U0(1,1,59),U0(1,1,60)
+
 
 ! netcdf has to read from 1 to IBP1, but fds needs from 0 to IBAR 
 DO K=KMIN,KMAX
@@ -5385,7 +5390,7 @@ DO K=KMIN,KMAX
    ENDDO
 ENDDO
 !Print*,NM, GI1,GJ1,GK1, IBP1,JBP1, KBP1
-!Print*, NM, GI1,GJ1,GK1, V0(0,0,0), V0(1,1,1),V(0,0,0), V(1,1,1)
+!Print*, NM, GI1,GJ1,GK1, U(10,10,10), U(IMAX,JMAX,KMAX),V(10,10,10), V(IMAX,JMAX,KMAX)
 US=U
 VS=V
 WS=W
@@ -5436,10 +5441,12 @@ CALL POINT_TO_MESH(NM)
    JMIN = 1 ;    JMAX = JBAR
    KMIN = 1 ;    KMAX = KBAR
    
+    Print*,'FILE NAME CHECK', ICFile
+   
 status=nf90_open(ICFile, nf90_nowrite, ncid)
 status=nf90_inq_varid(ncid, 'T', varid1)
 status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
-! if(status /= nf90_NoErr) call handle_err(status)
+ if(status /= nf90_NoErr)  print *, 'temp', trim(nf90_strerror(status))
 status=nf90_close(ncid)
 
 DO K=KMIN,KMAX
@@ -5450,7 +5457,7 @@ DO K=KMIN,KMAX
    ENDDO
 ENDDO
 # ifdef coupled_debug
-Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(0,0,0),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
+Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(1,1,1),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
 # endif
 ! update density field
 

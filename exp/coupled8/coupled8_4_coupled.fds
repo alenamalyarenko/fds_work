@@ -10,10 +10,11 @@
 
 
 #character(13)
-&ICCD ICFile='ic_fds_7_6.nc', OBFile='bc_for_8_3.nc' /
+&ICCD  OBFile='bc_for_8_3.nc' /
+#&ICCD ICFile='ic_fds_7_6.nc', OBFile='bc_for_8_3.nc' /
 
 #south - coupled
-&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/ 
+&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN'/ 
 
 #north - open
 &VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN'/

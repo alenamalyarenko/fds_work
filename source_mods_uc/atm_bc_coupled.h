@@ -81,7 +81,9 @@ VENT_LOOP: DO N=1,N_VENT
        ENDDO 
 #ifdef coupled_debug       
        print*,'atm_bc prescribed',     VT%U_ATM(I,K),     size( VT%U_ATM,1),size( VT%U_ATM,2), VT%T_ATM(I,K)
-#endif       
+       print*,'atm_bc readin', NM, V0(1,1),V0(1,55),V0(1,56),V0(1,57),V0(1,58),V0(1,59),V0(1,60)
+#endif    
+       
     ENDIF 
 
     
