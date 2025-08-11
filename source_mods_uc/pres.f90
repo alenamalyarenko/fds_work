@@ -1,3 +1,4 @@
+#include 'keys.h'
 MODULE PRES
 
 ! Find the perturbation pressure by solving Poisson's Equation
@@ -170,7 +171,7 @@ WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS
          ENDIF
          
          !print*, 'inside pressure loop 1' , NM
-!#if defined atm_variables
+#if defined atm_variables
          !print*, 'inside pressure loop 2' , NM
          !VEL_EDDY = 0._EB
          IF (VT%N_EDDY<0) THEN
@@ -185,7 +186,7 @@ WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS
             !Print*, 'Pressure Vel_eddy', NM, VT%IOR, VEL_EDDY ! vel_eddy ~8, this is good
          ENDIF
          
-!#endif         
+#endif         
 
          ICF = 0
          IF (CC_IBM) THEN
@@ -208,11 +209,11 @@ WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS
          ENDIF
 
 !Print*, 'prescibing vel-eddy working for south border 0 ', VT%N_EDDY
-!#if defined coupled_bc
+#if defined coupled_bc
          IF (VT%N_EDDY<0) THEN
-!#else
-!         IF (OPEN_WIND_BOUNDARY) THEN
-!#endif         
+#else
+         IF (OPEN_WIND_BOUNDARY) THEN
+#endif         
          ! Print*, 'prescibing vel-eddy working for south border 1'
             IF (DOT_PRODUCT(BC%NVEC,(/U_WIND(K),V_WIND(K),W_WIND(K)/))<-TWO_EPSILON_EB) THEN
                H0 = 0._EB

@@ -338,12 +338,14 @@ DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
    IF (UVW_RESTART)  CALL UVW_INIT(NM,CSVFINFO(NM)%UVWFILE)
    IF (TMP_RESTART)  CALL TMP_INIT(NM,CSVFINFO(NM)%TMPFILE)
    IF (SPEC_RESTART) CALL SPEC_INIT(NM,CSVFINFO(NM)%SPECFILE)
+#if defined init_t_in   
+   CALL TEMP_INIT_NC(NM)  
+#endif  
+
 #if defined init_u_in
    CALL UVW_INIT_NC(NM) 
 #endif
-#if defined init_t_in   
-   CALL TEMP_INIT_NC(NM)  
-#endif   
+ 
 ENDDO
 
 ! Init centroid data (i.e. rho,zz) on cut-cells, cut-faces and CFACEs.
@@ -378,7 +380,7 @@ DO NM=LOWER_MESH_INDEX,UPPER_MESH_INDEX
 # ifdef coupled_debug
 IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Started ATM_BC_COUPLED') 
 # endif
-   CALL ATM_BC_COUPLED(T_BEGIN,NM)                                                  !read and assign _ATM variables from nc files
+   CALL ATM_BC_COUPLED(T_BEGIN,NM)           !read and assign _ATM variables from nc files
 # ifdef coupled_debug
 IF (MY_RANK==0 .AND. VERBOSE) CALL VERBOSE_PRINTOUT('Completed ATM_BC_COUPLED')   
 # endif

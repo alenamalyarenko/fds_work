@@ -5323,6 +5323,10 @@ ENDDO
 
 END SUBROUTINE SPEC_INIT
 
+
+
+
+
 #if defined init_u_in
 SUBROUTINE UVW_INIT_NC(NM)
 USE COUPLED_FILES, ONLY: ICFile
@@ -5330,19 +5334,14 @@ use netcdf
 USE MESH_POINTERS
 INTEGER  :: I,J,K,II,JJ,KK,IW,IOR,LU_UVW,IERROR,IMIN,IMAX,JMIN,JMAX,KMIN,KMAX
 INTEGER, INTENT(IN) :: NM
-
-REAL, DIMENSION(21,21,61):: U0,V0,W0
-
 TYPE(WALL_TYPE), POINTER :: WC
 TYPE(BOUNDARY_COORD_TYPE), POINTER :: BC
 TYPE(BOUNDARY_PROP1_TYPE), POINTER :: B1
-
+REAL, DIMENSION(21,21,61):: U0,V0,W0
 integer:: ncid, varid1,varid2,varid3, status
 integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
 
 CALL POINT_TO_MESH(NM)
-
-
    IMIN = 0
    IMAX = IBAR
    JMIN = 0
@@ -5350,37 +5349,32 @@ CALL POINT_TO_MESH(NM)
    KMIN = 0
    KMAX = KBAR
    
-   Print*,'FILE NAME CHECK', ICFile
+ !Print*,'FILE NAME CHECK UVW ', ICFile
+ !Print*, size(U0)
    
  status=nf90_open(ICFile, nf90_nowrite, ncid)
- 
- 
- 
  status=nf90_inq_varid(ncid, 'U', varid1)
  status=nf90_inq_varid(ncid, 'V', varid2)
  status=nf90_inq_varid(ncid, 'W', varid3)
+    
+ if(status /= nf90_NoErr)  print *, 'temp', trim(nf90_strerror(status))     
      
-  IF (STATUS .NE. nf90_noerr) then
-      print *, 'vel ', trim(nf90_strerror(status))
-      stop "Stopped"
-  end if    
-     
-  !Print*, 'init UVW sizes ',NM,  GI1, GJ1, GK1, IBAR, JBAR, KBAR                                        
- status=nf90_get_var(ncid, varid1, U0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
-  !print * ,'U', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
- status=nf90_get_var(ncid, varid2, V0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR  /) ) 
-  !print *,'V', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
- status=nf90_get_var(ncid, varid3, W0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
-  !print *,'W', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
+ !Print*, 'init UVW sizes ',NM,  GI1, GJ1, GK1, IBAR, JBAR, KBAR                                        
+ status=nf90_get_var(ncid, varid1, U0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR+1, JBAR+1, KBAR+1 /) ) 
+ !print * ,'U', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
+ status=nf90_get_var(ncid, varid2, V0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR+1, JBAR+1, KBAR+1  /) ) 
+ !print *,'V', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
+ status=nf90_get_var(ncid, varid3, W0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR+1, JBAR+1, KBAR+1 /) ) 
+ !print *,'W', trim(nf90_strerror(status)), NM,GI1, GJ1, GK1
 
  status=nf90_close(ncid)
 
-Print*, 'Read V Init ', NM, V0(1,1,1),V0(1,1,55),V0(1,1,56),V0(1,1,57),V0(1,1,58),V0(1,1,59),V0(1,1,60)
-Print*, 'Read U Init ', NM, U0(1,1,1),U0(1,1,55),U0(1,1,56),U0(1,1,57),U0(1,1,58),U0(1,1,59),U0(1,1,60)
+ !Print*, 'Read V Init ', NM, V0(1,1,1),V0(1,1,55),V0(1,1,56),V0(1,1,57),V0(1,1,58),V0(1,1,59),V0(1,1,60)
+ !Print*, 'Read U Init ', NM, U0(1,1,1),U0(1,1,55),U0(1,1,56),U0(1,1,57),U0(1,1,58),U0(1,1,59),U0(1,1,60)
 
 
 ! netcdf has to read from 1 to IBP1, but fds needs from 0 to IBAR 
-DO K=KMIN,KMAX
+ DO K=KMIN,KMAX
    DO J=JMIN,JMAX
       DO I=IMIN,IMAX
             U(I,J,K)=U0(I+1,J+1,K+1)
@@ -5388,16 +5382,16 @@ DO K=KMIN,KMAX
             W(I,J,K)=W0(I+1,J+1,K+1)
       ENDDO
    ENDDO
-ENDDO
+ ENDDO
 !Print*,NM, GI1,GJ1,GK1, IBP1,JBP1, KBP1
 !Print*, NM, GI1,GJ1,GK1, U(10,10,10), U(IMAX,JMAX,KMAX),V(10,10,10), V(IMAX,JMAX,KMAX)
-US=U
-VS=V
-WS=W
+
+ US=U
+ VS=V
+ WS=W
 
 ! Set normal velocity on external and internal boundaries (follows divg)
-
-DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
+ DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
    WC => WALL(IW)
    BC => BOUNDARY_COORD(WC%BC_INDEX)
    B1 => BOUNDARY_PROP1(WC%B1_INDEX)
@@ -5414,54 +5408,49 @@ DO IW=1,N_EXTERNAL_WALL_CELLS+N_INTERNAL_WALL_CELLS
       CASE(-3) ; B1%U_NORMAL_S =  W(II,JJ,KK-1)
    END SELECT
    B1%U_NORMAL = B1%U_NORMAL_S
-ENDDO
-
+ ENDDO
 END SUBROUTINE UVW_INIT_NC
 #endif
 
-#if defined init_t_in
 
+#if defined init_t_in
 SUBROUTINE TEMP_INIT_NC(NM)
 USE COUPLED_FILES, ONLY: ICFile
 use netcdf
 USE MESH_POINTERS
-
 USE RADCONS, ONLY: UIIDIM
 INTEGER  :: I,J,K,II,JJ,KK,IW,IOR,LU_UVW,IERROR,IMIN,IMAX,JMIN,JMAX,KMIN,KMAX
 INTEGER, INTENT(IN) :: NM
 REAL(EB), DIMENSION(20,20,60):: TMP0
-
-!integer, parameter :: NDIMS = 3
 integer :: status, ncid, varid1
 
-  
-  
-CALL POINT_TO_MESH(NM)
+ CALL POINT_TO_MESH(NM)
    IMIN = 1 ;    IMAX = IBAR
    JMIN = 1 ;    JMAX = JBAR
    KMIN = 1 ;    KMAX = KBAR
    
-    Print*,'FILE NAME CHECK', ICFile
+ !Print*,'FILE NAME CHECK T', ICFile
    
-status=nf90_open(ICFile, nf90_nowrite, ncid)
-status=nf90_inq_varid(ncid, 'T', varid1)
-status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
- if(status /= nf90_NoErr)  print *, 'temp', trim(nf90_strerror(status))
-status=nf90_close(ncid)
+ status=nf90_open(ICFile, nf90_nowrite, ncid)
+ status=nf90_inq_varid(ncid, 'T', varid1)
+ status=nf90_get_var(ncid, varid1, TMP0,start = (/ GI1+1, GJ1+1, GK1+1 /),  count = (/ IBAR, JBAR, KBAR /) ) 
+ if(status /= nf90_NoErr)  print *, 'temp ', trim(nf90_strerror(status))
+ status=nf90_close(ncid)
 
-DO K=KMIN,KMAX
+ DO K=KMIN,KMAX
    DO J=JMIN,JMAX
       DO I=IMIN,IMAX       
             TMP(I,J,K)=TMP0(I,J,K)   
       ENDDO
    ENDDO
-ENDDO
+ ENDDO
+
 # ifdef coupled_debug
-Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(1,1,1),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
+! Print*,'init file',  NM, GI1,GJ1,GK1,TMP0(1,1,1),  TMP0(1,1,1),TMP0(IBAR,JBAR,1), TMP(IBAR,JBAR,1)-273.15
 # endif
 ! update density field
 
-DO K=KMIN,KMAX
+ DO K=KMIN,KMAX
    DO J=JMIN,JMAX
       DO I=IMIN,IMAX
          RHO(I,J,K)  = P_0(K)/(TMP(I,J,K)*RSUM(I,J,K))
@@ -5472,7 +5461,7 @@ DO K=KMIN,KMAX
          ENDIF
       ENDDO
    ENDDO
-ENDDO
+ ENDDO
 
 END SUBROUTINE TEMP_INIT_NC
 #endif
