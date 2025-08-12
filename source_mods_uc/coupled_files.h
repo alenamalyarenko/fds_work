@@ -7,7 +7,8 @@ CHARACTER(13) :: ICFile
 
 !#if defined coupled_bc_file
 !bc_palm_7a.nc - 13 characters
-CHARACTER(13) :: OBFile  
+CHARACTER(13) :: OBFile 
+integer:: ncid	 
 !#endif  
 
 

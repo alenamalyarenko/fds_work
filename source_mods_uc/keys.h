@@ -17,6 +17,7 @@
 # define coupled_bc_file
 # define coupled_bc 
 # define atm_variables
+# define bc_time_interp
 #endif
 
 
