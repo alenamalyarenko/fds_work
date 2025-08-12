@@ -1,4 +1,5 @@
 !> \brief Collection of routines to compute boundary conditions
+#include 'keys.h'
 
 MODULE WALL_ROUTINES
 
@@ -337,25 +338,24 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
          CASE DEFAULT; UN = 0._EB
       END SELECT
 
-       !print*, ' inside wall velocity', IOR,II,JJ,KK, UN
+       !print*, ' inside wall velocity 4 ', IOR,II,JJ,KK, UN
      
       IF (UN>TWO_EPSILON_EB) THEN  ! Assume the flow is coming into the domain
          B1%TMP_F = TMP_0(KK)
          IF (WC%VENT_INDEX>0) THEN
             VT => VENTS(WC%VENT_INDEX) 
 #ifdef coupled_debug             
-             print*, 'inside wall?? 2' 
+             !print*, 'inside wall?? 5' , COUPLED_ATM_BOUNDARY
 #endif             
 #if defined atm_variables    
-                  
-            IF (COUPLED_ATM_BOUNDARY) THEN
+             IF (VT%N_EDDY<0) THEN     
                TSI = T - T_BEGIN   
                SELECT CASE(IOR) 
                 CASE(2) !SOUTH BC  
 #ifdef coupled_debug                
-                 print*, 'using t_atm in wall'                                                                                 
+                 print*, 'using t_atm in wall 6'                                                                                 
 #endif                 
-                 B1%TMP_F = T_ATM(II,KK) + EVALUATE_RAMP(TSI,VT%TMP_EXTERIOR_RAMP_INDEX)*(VT%TMP_EXTERIOR- T_ATM(II,KK))         
+                 B1%TMP_F = VT%T_ATM(II,KK)     
                END SELECT
             ELSE
 #endif            

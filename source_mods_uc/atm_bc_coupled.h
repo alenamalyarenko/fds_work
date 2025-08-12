@@ -97,9 +97,9 @@ VENT_LOOP: DO N=1,N_VENT
     VT => VENTS(N)
     COUPLED_VENT_IF: IF (VT%N_EDDY==(-1)) THEN !coupled vent
     
-    !IF (T==0) THEN
+    IF (T==0) THEN
     status=nf90_open(OBFile , nf90_nowrite, ncid)
-    !ENDIF
+    ENDIF
     !print *,'opened file', NM, trim(nf90_strerror(status))
     
    	IF (VENTS(N)%IOR==2) THEN
@@ -115,8 +115,7 @@ VENT_LOOP: DO N=1,N_VENT
        !print *,'inq VS',NM, trim(nf90_strerror(status))       
        status=nf90_inq_varid(ncid, 'WS', varid3)
        !print *,'inq WS',NM, trim(nf90_strerror(status))
-       !no temp yet
-       !status=nf90_inq_varid(ncid, 'TS', varid4)
+       status=nf90_inq_varid(ncid, 'TS', varid4)
        !print *,'inq TS',NM, trim(nf90_strerror(status))
         
  
@@ -127,8 +126,8 @@ VENT_LOOP: DO N=1,N_VENT
        !print *,'read VS',NM, trim(nf90_strerror(status))
        status=nf90_get_var(ncid, varid3, W0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) )
        !print *,'read WS',NM, trim(nf90_strerror(status))
-       !no temp yet
-       !status=nf90_get_var(ncid, varid4,T0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid4,T0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       !print *,'read TS',NM, trim(nf90_strerror(status))
 #if defined bc_time_interp       
        !EDDY Variables - face-averaged - Later timestamp
        status=nf90_get_var(ncid, varid1, U1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) )        
@@ -137,8 +136,8 @@ VENT_LOOP: DO N=1,N_VENT
        !print *,'read VS',NM, trim(nf90_strerror(status))
        status=nf90_get_var(ncid, varid3, W1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) )
        !print *,'read WS',NM, trim(nf90_strerror(status))
-       !no temp yet
-       !status=nf90_get_var(ncid, varid4,T1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid4,T1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       !print *,'read TS',NM, trim(nf90_strerror(status))
 #endif
 
 
@@ -149,12 +148,12 @@ VENT_LOOP: DO N=1,N_VENT
          VT%U_ATM(I,K)=U0(I,K)*wght0+U1(I,K)*wght1 
          VT%V_ATM(I,K)=V0(I,K)*wght0+V1(I,K)*wght1 
          VT%W_ATM(I,K)=W0(I,K)*wght0+W1(I,K)*wght1 
-         VT%T_ATM(I,K)=T0(I,K)*wght0+T1(I,K)*wght1 
+         VT%T_ATM(I,K)=T0(I,K)*wght0+T1(I,K)*wght1 +273.15
 #else
          VT%U_ATM(I,K)=U0(I,K)
          VT%V_ATM(I,K)=V0(I,K)
          VT%W_ATM(I,K)=W0(I,K)
-         VT%T_ATM(I,K)=T0(I,K)
+         VT%T_ATM(I,K)=T0(I,K)  +273.15
 
 #endif         
         ENDDO
@@ -162,8 +161,9 @@ VENT_LOOP: DO N=1,N_VENT
 #ifdef coupled_debug       
        print*,'atm_bc prescribed',     VT%U_ATM(I,K),     size( VT%U_ATM,1),size( VT%U_ATM,2), VT%T_ATM(I,K)
        print*,'atm_bc readin', NM, V0(1,1),V0(1,55),V0(1,56),V0(1,57),V0(1,58),V0(1,59),V0(1,60)
+       print*,'atm_bc readin', NM, T0(1,1),T0(1,55),T0(1,56),T0(1,57),T0(1,58),T0(1,59),T0(1,60) 
 #endif    
-       
+      
     ENDIF 
 
     
@@ -180,9 +180,9 @@ VENT_LOOP: DO N=1,N_VENT
     ENDIF    
     
    
-   !IF (T>=T_END) THEN
-   !status=nf90_close(ncid)   
-   !ENDIF
+   IF (T>=T_END) THEN
+   status=nf90_close(ncid)   
+   ENDIF
    !print *,'closed netcdf',NM, trim(nf90_strerror(status))
    
    ENDIF COUPLED_VENT_IF
