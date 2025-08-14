@@ -5337,7 +5337,8 @@ INTEGER, INTENT(IN) :: NM
 TYPE(WALL_TYPE), POINTER :: WC
 TYPE(BOUNDARY_COORD_TYPE), POINTER :: BC
 TYPE(BOUNDARY_PROP1_TYPE), POINTER :: B1
-REAL, DIMENSION(21,21,61):: U0,V0,W0
+REAL,ALLOCATABLE, DIMENSION(:,:,:):: U0,V0,W0
+!REAL, DIMENSION(21,21,61):: U0,V0,W0
 integer:: ncid, varid1,varid2,varid3, status
 integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
 
@@ -5348,6 +5349,10 @@ CALL POINT_TO_MESH(NM)
    JMAX = JBAR
    KMIN = 0
    KMAX = KBAR
+   
+ ALLOCATE( U0(1:IBAR+1,1:JBAR+1,1:KBAR+1))
+ ALLOCATE( V0(1:IBAR+1,1:JBAR+1,1:KBAR+1)) 	
+ ALLOCATE( W0(1:IBAR+1,1:JBAR+1,1:KBAR+1))  
    
  !Print*,'FILE NAME CHECK UVW ', ICFile
  !Print*, size(U0)
@@ -5409,6 +5414,11 @@ CALL POINT_TO_MESH(NM)
    END SELECT
    B1%U_NORMAL = B1%U_NORMAL_S
  ENDDO
+ 
+DEALLOCATE(U0)
+DEALLOCATE(V0) 	
+DEALLOCATE(W0) 
+ 
 END SUBROUTINE UVW_INIT_NC
 #endif
 
@@ -5421,7 +5431,8 @@ USE MESH_POINTERS
 USE RADCONS, ONLY: UIIDIM
 INTEGER  :: I,J,K,II,JJ,KK,IW,IOR,LU_UVW,IERROR,IMIN,IMAX,JMIN,JMAX,KMIN,KMAX
 INTEGER, INTENT(IN) :: NM
-REAL(EB), DIMENSION(20,20,60):: TMP0
+!REAL(EB), DIMENSION(20,20,60):: TMP0
+REAL,ALLOCATABLE, DIMENSION(:,:,:):: TMP0
 integer :: status, ncid, varid1
 
  CALL POINT_TO_MESH(NM)
@@ -5430,6 +5441,8 @@ integer :: status, ncid, varid1
    KMIN = 1 ;    KMAX = KBAR
    
  !Print*,'FILE NAME CHECK T', ICFile
+ ALLOCATE( TMP0(1:IBAR,1:JBAR,1:KBAR))
+ 
    
  status=nf90_open(ICFile, nf90_nowrite, ncid)
  status=nf90_inq_varid(ncid, 'T', varid1)
@@ -5463,6 +5476,7 @@ integer :: status, ncid, varid1
    ENDDO
  ENDDO
 
+DEALLOCATE(TMP0)
 END SUBROUTINE TEMP_INIT_NC
 #endif
 
