@@ -20,7 +20,7 @@ REAL,ALLOCATABLE, DIMENSION(:,:):: T0,U0,V0,W0
 
 #if defined bc_time_interp
 REAL,ALLOCATABLE, DIMENSION(:,:):: T1,U1,V1,W1
-real:: wght0, wght1	,  locTime, modTime, tmpTime, recSpacing
+real:: wght0, wght1	,  locTime, modTime, tmpTime
 	
 !     Implicit function:
 Real:: F90MODULO, arg1, arg2
@@ -63,26 +63,27 @@ ALLOCATE( W1(1:IBAR,1:KBAR))
 
 
 !figure out 2 timestamps
-timestamp0=int(T)
-timestamp1=int(T)+1
+!timestamp0=int(T)
+!timestamp1=int(T)+1
+!wght0= (T-timestamp0)/recSpacing
+!wght1= 1-wght0  
 
 !! spacing in forcing file
-recSpacing=1
+!recSpacing=1
 !
-! locTime = T - recSpacing*0.5
-!        modTime = F90MODULO(locTime,recSpacing)
+ locTime = T !- recSpacing*0.5
+        modTime = F90MODULO(locTime,recSpacing)
 !!    time-record before (tRec1) and after (tRec2) current time:
-!        timestamp0 = 1 + NINT( (locTime-modTime)/recSpacing )
-!        timestamp1 = 1 + timestamp0    
+        timestamp0 = 1 + NINT( (locTime-modTime)/recSpacing )
+        timestamp1 = 1 + timestamp0    
 !!figure out 2 weights
-!wght1=modTime / recSpacing
-!wght0=1.0 - wght1
+wght1=modTime / recSpacing
+wght0=1.0 - wght1
              
              
            
 
-wght0= (T-timestamp0)/recSpacing
-wght1= 1-wght0  
+
 	
 
 !Print*, 'timestamps ',T, locTime, modTime
@@ -120,26 +121,32 @@ VENT_LOOP: DO N=1,N_VENT
         
  
        !EDDY Variables - face-averaged - early timestamp
-       status=nf90_get_var(ncid, varid1, U0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) )        
+       status=nf90_get_var(ncid, varid1, U0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0 /),  count = (/ IBAR, KBAR,1 /) )        
        !print *,'read US', NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid2, V0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid2, V0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0 /),  count = (/ IBAR, KBAR,1 /) ) 
        !print *,'read VS',NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid3, W0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid3, W0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0 /),  count = (/ IBAR, KBAR,1 /) )
        !print *,'read WS',NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid4,T0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid4, T0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0 /),  count = (/ IBAR, KBAR,1 /) ) 
        !print *,'read TS',NM, trim(nf90_strerror(status))
+       
+       if (status /= nf90_noerr) then
+       	!call handle_err(status) 
+       	stop
+       endif
 #if defined bc_time_interp       
        !EDDY Variables - face-averaged - Later timestamp
-       status=nf90_get_var(ncid, varid1, U1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) )        
+       status=nf90_get_var(ncid, varid1, U1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1 /),  count = (/ IBAR, KBAR,1 /) )        
        !print *,'read US', NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid2, V1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid2, V1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1 /),  count = (/ IBAR, KBAR,1 /) ) 
        !print *,'read VS',NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid3, W1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid3, W1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1 /),  count = (/ IBAR, KBAR,1 /) )
        !print *,'read WS',NM, trim(nf90_strerror(status))
-       status=nf90_get_var(ncid, varid4,T1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1+1 /),  count = (/ IBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid4, T1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1 /),  count = (/ IBAR, KBAR,1 /) ) 
        !print *,'read TS',NM, trim(nf90_strerror(status))
 #endif
 
+  
 
        !Print*, 'eddy loop', NM,GI1, GK1, size( VT%U_ATM,1),size( VT%U_ATM,2)
        DO K=1,KBAR

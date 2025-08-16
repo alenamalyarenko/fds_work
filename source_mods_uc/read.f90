@@ -15921,7 +15921,7 @@ use coupled_files
 
 integer:: N_iccd
 
-NAMELIST /ICCD/ OBFile, ICFile
+NAMELIST /ICCD/ OBFile, ICFile, recSpacing
                 
 
 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0
