@@ -355,7 +355,12 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
 #ifdef coupled_debug                
                  print*, 'using t_atm in wall 6'                                                                                 
 #endif                 
-                 B1%TMP_F = VT%T_ATM(II,KK)     
+                 B1%TMP_F = VT%TS_ATM(II,KK)    
+                CASE(-2)               
+                 B1%TMP_F = VT%TN_ATM(II,KK)    
+                 
+                 
+                  
                END SELECT
             ELSE
 #endif            
