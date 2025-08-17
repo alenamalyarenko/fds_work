@@ -18,10 +18,16 @@ integer::  varid1,varid2,varid3,varid4, status, timestamp0, timestamp1
 integer :: ndims_in, nvars_in, ngatts_in, unlimdimid_in
 REAL,ALLOCATABLE, DIMENSION(:,:):: TS0,US0,VS0,WS0
 REAL,ALLOCATABLE, DIMENSION(:,:):: TN0,UN0,VN0,WN0
+REAL,ALLOCATABLE, DIMENSION(:,:):: TE0,UE0,VE0,WE0
+REAL,ALLOCATABLE, DIMENSION(:,:):: TW0,UW0,VW0,WW0	
+	
 
 #if defined bc_time_interp
 REAL,ALLOCATABLE, DIMENSION(:,:):: TS1,US1,VS1,WS1
 REAL,ALLOCATABLE, DIMENSION(:,:):: TN1,UN1,VN1,WN1
+REAL,ALLOCATABLE, DIMENSION(:,:):: TE1,UE1,VE1,WE1
+REAL,ALLOCATABLE, DIMENSION(:,:):: TW1,UW1,VW1,WW1	
+	
 real:: wght0, wght1	,  locTime, modTime, tmpTime
 	
 !     Implicit function:
@@ -46,7 +52,17 @@ ALLOCATE( WS0(1:IBAR,1:KBAR))
 ALLOCATE( TN0(1:IBAR,1:KBAR))
 ALLOCATE( UN0(1:IBAR,1:KBAR))
 ALLOCATE( VN0(1:IBAR,1:KBAR)) 	
-ALLOCATE( WN0(1:IBAR,1:KBAR))  	 
+ALLOCATE( WN0(1:IBAR,1:KBAR)) 
+	
+ALLOCATE( TE0(1:JBAR,1:KBAR))
+ALLOCATE( UE0(1:JBAR,1:KBAR))
+ALLOCATE( VE0(1:JBAR,1:KBAR)) 	
+ALLOCATE( WE0(1:JBAR,1:KBAR))  	
+ALLOCATE( TW0(1:JBAR,1:KBAR))
+ALLOCATE( UW0(1:JBAR,1:KBAR))
+ALLOCATE( VW0(1:JBAR,1:KBAR)) 	
+ALLOCATE( WW0(1:JBAR,1:KBAR)) 	
+	 	 
 
 #if defined bc_time_interp	
 ALLOCATE( TS1(1:IBAR,1:KBAR))
@@ -59,7 +75,15 @@ ALLOCATE( UN1(1:IBAR,1:KBAR))
 ALLOCATE( VN1(1:IBAR,1:KBAR)) 	
 ALLOCATE( WN1(1:IBAR,1:KBAR))  
 	
-	
+ALLOCATE( TE1(1:JBAR,1:KBAR))
+ALLOCATE( UE1(1:JBAR,1:KBAR))
+ALLOCATE( VE1(1:JBAR,1:KBAR)) 	
+ALLOCATE( WE1(1:JBAR,1:KBAR)) 
+	 	
+ALLOCATE( TW1(1:JBAR,1:KBAR))
+ALLOCATE( UW1(1:JBAR,1:KBAR))
+ALLOCATE( VW1(1:JBAR,1:KBAR)) 	
+ALLOCATE( WW1(1:JBAR,1:KBAR)) 	
 	 	
       timestamp1 = 0
 
@@ -209,15 +233,15 @@ VENT_LOOP: DO N=1,N_VENT
        DO K=1,KBAR
         DO I=1,IBAR
 #if defined bc_time_interp        
-         VT%US_ATM(I,K)=UN0(I,K)*wght0+UN1(I,K)*wght1 
-         VT%VS_ATM(I,K)=VN0(I,K)*wght0+VN1(I,K)*wght1 
-         VT%WS_ATM(I,K)=WN0(I,K)*wght0+WN1(I,K)*wght1 
-         VT%TS_ATM(I,K)=TN0(I,K)*wght0+TN1(I,K)*wght1 +273.15
+         VT%UN_ATM(I,K)=UN0(I,K)*wght0+UN1(I,K)*wght1 
+         VT%VN_ATM(I,K)=VN0(I,K)*wght0+VN1(I,K)*wght1 
+         VT%WN_ATM(I,K)=WN0(I,K)*wght0+WN1(I,K)*wght1 
+         VT%TN_ATM(I,K)=TN0(I,K)*wght0+TN1(I,K)*wght1 +273.15
 #else
-         VT%US_ATM(I,K)=UN0(I,K)
-         VT%VS_ATM(I,K)=VN0(I,K)
-         VT%WS_ATM(I,K)=WN0(I,K)
-         VT%TS_ATM(I,K)=TN0(I,K)  +273.15
+         VT%UN_ATM(I,K)=UN0(I,K)
+         VT%VN_ATM(I,K)=VN0(I,K)
+         VT%WN_ATM(I,K)=WN0(I,K)
+         VT%TN_ATM(I,K)=TN0(I,K)  +273.15
 
 #endif         
         ENDDO
@@ -226,10 +250,81 @@ VENT_LOOP: DO N=1,N_VENT
     ENDIF     
      
    	IF (VENTS(N)%IOR==1) THEN
-   		 	   Print*, 'found east vent?'  
+   		 	   !Print*, 'found west vent!'  
+   		 	    
+       status=nf90_inq_varid(ncid, 'UW', varid1)
+       status=nf90_inq_varid(ncid, 'VW', varid2)
+       status=nf90_inq_varid(ncid, 'WW', varid3)
+       status=nf90_inq_varid(ncid, 'TW', varid4)
+        
+       status=nf90_get_var(ncid, varid1, UW0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) )        
+       status=nf90_get_var(ncid, varid2, VW0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid3, WW0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid4, TW0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) ) 
+       
+#if defined bc_time_interp       
+       status=nf90_get_var(ncid, varid1, UW1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) )        
+       status=nf90_get_var(ncid, varid2, VW1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid3, WW1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid4, TW1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) ) 
+#endif
+
+       DO K=1,KBAR
+        DO J=1,JBAR
+#if defined bc_time_interp        
+         VT%UW_ATM(J,K)=UW0(J,K)*wght0+UW1(J,K)*wght1 
+         VT%VW_ATM(J,K)=VW0(J,K)*wght0+VW1(J,K)*wght1 
+         VT%WW_ATM(J,K)=WW0(J,K)*wght0+WW1(J,K)*wght1 
+         VT%TW_ATM(J,K)=TW0(J,K)*wght0+TW1(J,K)*wght1 +273.15
+#else
+         VT%UW_ATM(J,K)=UW0(J,K)
+         VT%VW_ATM(J,K)=VW0(J,K)
+         VT%WW_ATM(J,K)=WW0(J,K)
+         VT%TW_ATM(J,K)=TW0(J,K)  +273.15
+
+#endif         
+        ENDDO
+       ENDDO 
+   		 	   
+   		 	   
     ENDIF   	    
     
     IF (VENTS(N)%IOR==-1) THEN
+    	!Print*, 'found east vent!'  
+    	 
+       status=nf90_inq_varid(ncid, 'UE', varid1)
+       status=nf90_inq_varid(ncid, 'VE', varid2)
+       status=nf90_inq_varid(ncid, 'WE', varid3)
+       status=nf90_inq_varid(ncid, 'TE', varid4)
+        
+       status=nf90_get_var(ncid, varid1, UE0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) )        
+       status=nf90_get_var(ncid, varid2, VE0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid3, WE0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid4, TE0,start = (/ VT%GJ1+1, VT%GK1+1,timestamp0 /),  count = (/ JBAR, KBAR,1 /) ) 
+       
+#if defined bc_time_interp       
+       status=nf90_get_var(ncid, varid1, UE1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) )        
+       status=nf90_get_var(ncid, varid2, VE1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid3, WE1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) )
+       status=nf90_get_var(ncid, varid4, TE1,start = (/ VT%GJ1+1, VT%GK1+1,timestamp1 /),  count = (/ JBAR, KBAR,1 /) ) 
+#endif
+
+       DO K=1,KBAR
+        DO J=1,JBAR
+#if defined bc_time_interp        
+         VT%UE_ATM(J,K)=UE0(J,K)*wght0+UE1(J,K)*wght1 
+         VT%VE_ATM(J,K)=VE0(J,K)*wght0+VE1(J,K)*wght1 
+         VT%WE_ATM(J,K)=WE0(J,K)*wght0+WE1(J,K)*wght1 
+         VT%TE_ATM(J,K)=TE0(J,K)*wght0+TE1(J,K)*wght1 +273.15
+#else
+         VT%UE_ATM(J,K)=UE0(J,K)
+         VT%VE_ATM(J,K)=VE0(J,K)
+         VT%WE_ATM(J,K)=WE0(J,K)
+         VT%TE_ATM(J,K)=TE0(J,K)  +273.15
+
+#endif         
+        ENDDO
+       ENDDO 
     ENDIF    
     
    
@@ -252,7 +347,17 @@ DEALLOCATE(WS0)
 DEALLOCATE(TN0)
 DEALLOCATE(UN0)
 DEALLOCATE(VN0) 	
-DEALLOCATE(WN0) 
+DEALLOCATE(WN0)
+!
+DEALLOCATE(TE0)
+DEALLOCATE(UE0)
+DEALLOCATE(VE0) 	
+DEALLOCATE(WE0) 
+!
+DEALLOCATE(TW0)
+DEALLOCATE(UW0)
+DEALLOCATE(VW0) 	
+DEALLOCATE(WW0)
 
 #if defined bc_time_interp
 DEALLOCATE(TS1)
@@ -264,6 +369,19 @@ DEALLOCATE(TN1)
 DEALLOCATE(UN1)
 DEALLOCATE(VN1) 	
 DEALLOCATE(WN1) 
+
+DEALLOCATE(TE1)
+DEALLOCATE(UE1)
+DEALLOCATE(VE1) 	
+DEALLOCATE(WE1) 
+
+DEALLOCATE(TW1)
+DEALLOCATE(UW1)
+DEALLOCATE(VW1) 	
+DEALLOCATE(WW1) 
+
+
+
 #endif
 
 T_USED(4)=T_USED(4)+CURRENT_TIME()-T_NOW

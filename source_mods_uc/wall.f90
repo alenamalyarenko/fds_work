@@ -357,10 +357,11 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
 #endif                 
                  B1%TMP_F = VT%TS_ATM(II,KK)    
                 CASE(-2)               
-                 B1%TMP_F = VT%TN_ATM(II,KK)    
-                 
-                 
-                  
+                 B1%TMP_F = VT%TN_ATM(II,KK)                     
+                CASE(1)
+                 B1%TMP_F = VT%TW_ATM(JJ,KK)                  
+                CASE(-1)   
+                 B1%TMP_F = VT%TE_ATM(JJ,KK)   
                END SELECT
             ELSE
 #endif            

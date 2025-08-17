@@ -11627,7 +11627,7 @@ MESH_LOOP_1: DO NM=1,NMESHES
 #if defined atm_variables
                IF (N_EDDY<0) THEN
                 COUPLED_ATM_BOUNDARY = .TRUE.    
-                print*, 'coupled_atm_boundary ' , COUPLED_ATM_BOUNDARY         
+                !print*, 'coupled_atm_boundary in VENT ' , COUPLED_ATM_BOUNDARY         
                ENDIF
 #endif         
 

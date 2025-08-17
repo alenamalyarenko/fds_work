@@ -311,31 +311,32 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
          ENDIF SYNTHETIC_EDDY_IF_1
          
 #if defined atm_variables
-!Print*, 'start of _atm in velocity_bc', NM, VEL_EDDY
-!Print*, VT%N_EDDY
-          IF (COUPLED_ATM_BOUNDARY) THEN
-         ! IF (VT%N_EDDY<0) THEN	
+Print*, 'start of _atm in velocity_bc 1', NM, VEL_EDDY
+Print*, 'start of _atm in velocity_bc 2', VT%N_EDDY
+
+         ! IF (COUPLED_ATM_BOUNDARY) THEN
+          IF (VT%N_EDDY<0) THEN	
             IS_SELECT_2: SELECT CASE(IS) ! unsigned vent orientation
                CASE(1) ! yz plane
                   SELECT CASE(IEC) ! edge orientation
                      CASE(2) 
-                        print*, 'check 1'
+                        print*, 'check 1 - velocity BC east?'
                         IF (OPEN_WIND_BOUNDARY) THEN
                            U_WIND_LOC = 0.5_EB*(U_WIND(KK)+U_WIND(KK+1))
                            W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                         ENDIF
                         
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_ATM(JJ,KK)+VT%U_ATM(JJ,KK+1)) + U_WIND_LOC
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_ATM(JJ,KK)+VT%W_ATM(JJ,KK+1)) + W_WIND_LOC
+                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%UE_ATM(JJ,KK)+VT%UE_ATM(JJ,KK+1)) + U_WIND_LOC
+                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%WE_ATM(JJ,KK)+VT%WE_ATM(JJ,KK+1)) + W_WIND_LOC
                      CASE(3)   
-                     print*, 'check 2'
+                     print*, 'check 2  - velocity BC west?'
                         IF (OPEN_WIND_BOUNDARY) THEN
                            V_WIND_LOC = V_WIND(KK)
                            U_WIND_LOC = U_WIND(KK)
                         ENDIF   
                         
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_ATM(JJ,KK)+VT%V_ATM(JJ+1,KK)) + V_WIND_LOC
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_ATM(JJ,KK)+VT%U_ATM(JJ+1,KK)) + U_WIND_LOC
+                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VW_ATM(JJ,KK)+VT%VW_ATM(JJ+1,KK)) + V_WIND_LOC
+                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%UW_ATM(JJ,KK)+VT%UW_ATM(JJ+1,KK)) + U_WIND_LOC
                   END SELECT
                CASE(2) ! zx plane
                   SELECT CASE(IEC)
@@ -346,8 +347,8 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                            U_WIND_LOC = U_WIND(KK)
                         ENDIF      
                        
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_ATM(II,KK)+VT%V_ATM(II+1,KK)) + V_WIND_LOC
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_ATM(II,KK)+VT%U_ATM(II+1,KK)) + U_WIND_LOC
+                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VS_ATM(II,KK)+VT%VS_ATM(II+1,KK)) + V_WIND_LOC
+                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%US_ATM(II,KK)+VT%US_ATM(II+1,KK)) + U_WIND_LOC
                      CASE(1)   
                      !print*, 'check 4',VT%W_ATM(II,KK), VT%V_ATM(II,KK)
                         IF (OPEN_WIND_BOUNDARY) THEN
@@ -355,35 +356,28 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                            V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))
                         ENDIF      
                         
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,KK)+VT%W_ATM(II,KK+1)) + W_WIND_LOC
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_ATM(II,KK)+VT%V_ATM(II,KK+1)) + V_WIND_LOC
+                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%WN_ATM(II,KK)+VT%WN_ATM(II,KK+1)) + W_WIND_LOC
+                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%VN_ATM(II,KK)+VT%VN_ATM(II,KK+1)) + V_WIND_LOC
                   END SELECT
                CASE(3) ! xy plane
                   SELECT CASE(IEC)
                      CASE(1)   
-                           print*, 'check 5'
                         IF (OPEN_WIND_BOUNDARY) THEN
                            W_WIND_LOC = W_WIND(KK)
                            V_WIND_LOC = V_WIND(KK)
-                        ENDIF  
-                        
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,JJ)+VT%W_ATM(II,JJ+1)) + W_WIND_LOC
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_ATM(II,JJ)+VT%V_ATM(II,JJ+1)) + V_WIND_LOC
+                        ENDIF   
+                        !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,JJ)+VT%W_ATM(II,JJ+1)) + W_WIND_LOC
+                        !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_ATM(II,JJ)+VT%V_ATM(II,JJ+1)) + V_WIND_LOC
                      CASE(2)    
-                           print*, 'check 6', II,JJ
                         IF (OPEN_WIND_BOUNDARY) THEN
                            U_WIND_LOC = U_WIND(KK)
                            W_WIND_LOC = W_WIND(KK)
                         ENDIF  
-                            print*, 'check 6.1',  VT%U_ATM(II,JJ)
-                            print*, 'check 6.1.1',  VT%U_ATM(II+1,JJ)
-                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_ATM(II,JJ)+VT%U_ATM(II+1,JJ)) + U_WIND_LOC    
-                        	print*, 'check 6.2'
-                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,JJ)+VT%W_ATM(II+1,JJ)) + W_WIND_LOC        
-                        	print*, 'check 6.3'
+                        !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_ATM(II,JJ)+VT%U_ATM(II+1,JJ)) + U_WIND_LOC    
+                        !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,JJ)+VT%W_ATM(II+1,JJ)) + W_WIND_LOC        
                   END SELECT
             END SELECT IS_SELECT_2
-            !Print*, 'end of _atm in velocity_bc', NM,  VEL_EDDY
+            Print*, 'end of _atm in velocity_bc', NM,  VEL_EDDY
          ENDIF
 
 #endif         
