@@ -351,20 +351,13 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
              IF (VT%N_EDDY<0) THEN     
                TSI = T - T_BEGIN   
                SELECT CASE(IOR) 
-
-!                CASE(2) !SOUTH BC                 
-!                 B1%TMP_F = VT%TS_ATM(II,KK)    
-!                CASE(-2)               
-!                 B1%TMP_F = VT%TN_ATM(II,KK)                     
-!                CASE(1)
-!                 B1%TMP_F = VT%TW_ATM(JJ,KK)                  
-!                CASE(-1)   
-!                 B1%TMP_F = VT%TE_ATM(JJ,KK)  
-             
-               CASE(2) !SOUTH BC                 
-                 B1%TMP_F = VT%TS_ATM(II,KK)    
-
-                 
+                CASE(2) !SOUTH BC  
+#ifdef coupled_debug                
+                 print*, 'using t_atm in wall 6'                                                                                 
+#endif                 
+                 B1%TMP_F = VT%TS_ATM(II,KK)     
+                CASE(-2) !N BC  
+                 B1%TMP_F = VT%TN_ATM(II,KK)   
                END SELECT
             ELSE
 #endif            

@@ -4,7 +4,7 @@
 !> and array components of these derived types are denoted like this, for example: N_BOUNDARY_COORD_SCALAR_INTEGERS. You must
 !> adjust this value if you add or subtract components from the derived type. You should then use an existing component
 !> as a guide and trace it through func.f90 to see how to initialize this component.
-#include 'keys.h'
+
 MODULE TYPES
 
 USE PRECISION_PARAMETERS
@@ -1439,15 +1439,13 @@ TYPE VENTS_TYPE
                Z_EDDY_MIN=0._EB,Z_EDDY_MAX=0._EB
    REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: U_EDDY,V_EDDY,W_EDDY
    REAL(EB), ALLOCATABLE, DIMENSION(:) :: X_EDDY,Y_EDDY,Z_EDDY,CU_EDDY,CV_EDDY,CW_EDDY
-#if defined atm_variables 
-   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: US_ATM,VS_ATM,WS_ATM , TS_ATM  
-!   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: UN_ATM,VN_ATM,WN_ATM , TN_ATM 
-!   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: UE_ATM,VE_ATM,WE_ATM , TE_ATM 
-!   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: UW_ATM,VW_ATM,WW_ATM , TW_ATM       
-#endif
-#if defined global_mesh
+!#if defined atm_variables 
+   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: US_ATM,VS_ATM,WS_ATM ,TS_ATM  
+   REAL(EB), ALLOCATABLE, DIMENSION(:,:) :: UN_ATM,VN_ATM,WN_ATM ,TN_ATM   
+!#endif
+!#if defined global_mesh
    INTEGER :: GI1=-1,GI2=-1,GJ1=-1,GJ2=-1,GK1=-1,GK2=-1
-#endif   
+!#endif   
 END TYPE VENTS_TYPE
 
 
