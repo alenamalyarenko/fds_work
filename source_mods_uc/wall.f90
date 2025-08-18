@@ -359,6 +359,7 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
                 CASE(-2) !N BC  
                  B1%TMP_F = VT%TN_ATM(II,KK)  
                 CASE(1) ! WEST
+                print*, 'west temp', JJ,KK,  VT%TW_ATM(JJ,KK) 
                   B1%TMP_F = VT%TW_ATM(JJ,KK)    
                 CASE (-1) !EAST 
                   B1%TMP_F = VT%TE_ATM(JJ,KK) 

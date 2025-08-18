@@ -375,7 +375,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   if (southern) then                   
                     SELECT CASE(IEC)
                        CASE(3)      
-                        print*, 'check 3 S' , ICD, II,KK
+                        !print*, 'check 3 S' , ICD, II,KK
                           IF (OPEN_WIND_BOUNDARY) THEN
                              V_WIND_LOC = V_WIND(KK)
                              U_WIND_LOC = U_WIND(KK)
@@ -384,7 +384,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                           IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VS_ATM(II,KK)+VT%VS_ATM(II+1,KK)) + V_WIND_LOC
                           IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%US_ATM(II,KK)+VT%US_ATM(II+1,KK)) + U_WIND_LOC
                        CASE(1)   
-                       print*, 'check 4 S' , ICD, II,KK
+                       !print*, 'check 4 S' , ICD, II,KK
                           IF (OPEN_WIND_BOUNDARY) THEN
                              W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                              V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))
@@ -396,7 +396,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   else   ! northern
                   	SELECT CASE(IEC)
                        CASE(3)      
-                        print*, 'check 3 N' , ICD, II,KK
+                        !print*, 'check 3 N' , ICD, II,KK
                           IF (OPEN_WIND_BOUNDARY) THEN
                              V_WIND_LOC = V_WIND(KK)
                              U_WIND_LOC = U_WIND(KK)
@@ -405,7 +405,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                           !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VN_ATM(II,KK)+VT%VN_ATM(II+1,KK)) + V_WIND_LOC
                           !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%UN_ATM(II,KK)+VT%UN_ATM(II+1,KK)) + U_WIND_LOC
                        CASE(1)   
-                       print*, 'check 4 N' , ICD, II,KK
+                       !print*, 'check 4 N' , ICD, II,KK
                           IF (OPEN_WIND_BOUNDARY) THEN
                              W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                              V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))

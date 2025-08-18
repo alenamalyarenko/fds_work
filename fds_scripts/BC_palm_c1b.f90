@@ -7,7 +7,7 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=10 !601
+INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=3600 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

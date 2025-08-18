@@ -146,7 +146,7 @@ VENT_LOOP: DO N=1,N_VENT
        !Print*, 'found south vent'
 
        !figure out vent / mesh overlap indeces
-       !print*, NM, MI,MJ,MK, 'vent number ', N, 'vents ',VT%I1,VT%I2,VT%J1,VT%J2, 'global mesh', GI1, GJ1,GK1
+       !print*, NM, MI,MJ,MK, 'vent number ', N, 'vents ',VT%GI1,VT%GI2,VT%GJ1,VT%GJ2, 'global mesh', GI1, GJ1,GK1
        !vent coordinates are 0:20; UVW_eddy varibales are 1:20 (face centered) 
         
        status=nf90_inq_varid(ncid, 'US', varid1)
@@ -169,10 +169,10 @@ VENT_LOOP: DO N=1,N_VENT
        status=nf90_get_var(ncid, varid4, TS0,start = (/ VT%GI1+1, VT%GK1+1,timestamp0 /),  count = (/ IBAR, KBAR,1 /) ) 
        !print *,'read TS',NM, trim(nf90_strerror(status))
         
-       if (status /= nf90_noerr) then
-       	!call handle_err(status) 
-       	stop
-       endif
+       !if (status /= nf90_noerr) then
+       !  print *, trim(nf90_strerror(status))
+       !	stop
+       !endif
 #if defined bc_time_interp       
        !EDDY Variables - face-averaged - Later timestamp
        status=nf90_get_var(ncid, varid1, US1,start = (/ VT%GI1+1, VT%GK1+1,timestamp1 /),  count = (/ IBAR, KBAR,1 /) )        
@@ -205,11 +205,11 @@ VENT_LOOP: DO N=1,N_VENT
         ENDDO
        ENDDO 
 #ifdef coupled_debug       
-       print*,'atm_bc prescribed',     VT%U_ATM(I,K),     size( VT%U_ATM,1),size( VT%U_ATM,2), VT%T_ATM(I,K)
-       print*,'atm_bc readin', NM, V0(1,1),V0(1,55),V0(1,56),V0(1,57),V0(1,58),V0(1,59),V0(1,60)
-       print*,'atm_bc readin', NM, T0(1,1),T0(1,55),T0(1,56),T0(1,57),T0(1,58),T0(1,59),T0(1,60) 
+       print*,'atm_bc prescribed',     VT%US_ATM(I,K),   VT%TS_ATM(I,K)
+!       print*,'atm_bc readin', NM, V0(1,1),V0(1,55),V0(1,56),V0(1,57),V0(1,58),V0(1,59),V0(1,60)
+!       print*,'atm_bc readin', NM, T0(1,1),T0(1,55),T0(1,56),T0(1,57),T0(1,58),T0(1,59),T0(1,60) 
 #endif    
-      
+      !Print*, 'South Vent Temp',   VT%TS_ATM(10,10) 
     ENDIF 
 
     
@@ -249,7 +249,8 @@ VENT_LOOP: DO N=1,N_VENT
         
 #endif         
         ENDDO
-       ENDDO  	   
+       ENDDO 
+       Print*, 'North Vent Temp',   VT%TN_ATM(10,10) 	   
     ENDIF     
      
    	IF (VENTS(N)%IOR==1) THEN
@@ -279,14 +280,16 @@ VENT_LOOP: DO N=1,N_VENT
          VT%WW_ATM(J,K)=WW0(J,K)*wght0+WW1(J,K)*wght1 
          VT%TW_ATM(J,K)=TW0(J,K)*wght0+TW1(J,K)*wght1 +273.15
 #else   
-         VT%UW_ATM(I,K)=UW0(J,K)
-         VT%VW_ATM(I,K)=VW0(J,K)
-         VT%WW_ATM(I,K)=WW0(J,K)
-         VT%TW_ATM(I,K)=TW0(J,K)  +273.15
+         VT%UW_ATM(J,K)=UW0(J,K)
+         VT%VW_ATM(J,K)=VW0(J,K)
+         VT%WW_ATM(J,K)=WW0(J,K)
+         VT%TW_ATM(J,K)=TW0(J,K)  +273.15
         
 #endif         
         ENDDO
        ENDDO 
+      Print*, 'West Vent Temp',   VT%TW_ATM(10,10)
+       
     ENDIF   	    
     
     IF (VENTS(N)%IOR==-1) THEN
