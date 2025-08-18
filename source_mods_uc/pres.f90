@@ -179,7 +179,9 @@ WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS
          !print*, 'inside pressure loop 3' , NM
             SELECT CASE((VT%IOR))
                !TAKE EDDY VALUES AND ADD COUPLED TO HAVE COUPLED+SEM
-               CASE(1); VEL_EDDY = VEL_EDDY + VT%US_ATM(J,K)
+               CASE(1); VEL_EDDY = VEL_EDDY + VT%UW_ATM(J,K)
+               CASE(-1); VEL_EDDY = VEL_EDDY + VT%UE_ATM(J,K) 
+               
                CASE(2); VEL_EDDY = VEL_EDDY + VT%VS_ATM(I,K)
                CASE(-2); VEL_EDDY = VEL_EDDY + VT%VN_ATM(I,K)
                CASE(3); VEL_EDDY = VEL_EDDY + VT%WS_ATM(I,J)

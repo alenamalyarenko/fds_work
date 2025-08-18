@@ -16,15 +16,15 @@
 &VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN'/ 
 
 #north - open
-&VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN', N_EDDY=-1/
+&VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN'/
 
 #roof - open always
 &VENT MB='ZMAX', SURF_ID='OPEN' /
 
 #east - coupled
-#&VENT XB=60.,60.,0.,60.,0.,60.,SURF_ID='OPEN'/
+&VENT XB=60.,60.,0.,60.,0.,60.,SURF_ID='OPEN', N_EDDY=-1/
 #west - closed
-#&VENT XB=0.,0.,0.,60.,0.,60.,SURF_ID='OPEN'/
+&VENT XB=0.,0.,0.,60.,0.,60.,SURF_ID='OPEN', N_EDDY=-1/
 
 
 &DUMP DT_PL3D=10, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /

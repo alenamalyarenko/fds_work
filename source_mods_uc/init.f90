@@ -649,13 +649,34 @@ EDDY_IF3: IF (VT%N_EDDY<0) THEN
 # ifdef coupled_debug         
             Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
 # endif            
-            !ALLOCATE(VT%U_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-            !CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
-            !ALLOCATE(VT%V_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-            !CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
-            !ALLOCATE(VT%W_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
-            !CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
-            !ALLOCATE(VT%T_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%UW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%VW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%WW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%TW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            VT%UW_ATM=0._EB  
+            VT%VW_ATM=0._EB  
+            VT%WW_ATM=0._EB  
+            VT%TW_ATM=0._EB  
+         CASE(-1)
+# ifdef coupled_debug         
+            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+# endif            
+            ALLOCATE(VT%UE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%VE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%WE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%TE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            VT%UE_ATM=0._EB  
+            VT%VE_ATM=0._EB  
+            VT%WE_ATM=0._EB  
+            VT%TE_ATM=0._EB      
+            
+            
          CASE(2)
 # ifdef coupled_debug       
           Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2

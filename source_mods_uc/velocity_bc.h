@@ -248,7 +248,11 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   IF (VT%N_EDDY<0) COUPLED_ATM_BOUNDARY=.TRUE. 
                   !Print*, 'Coupled BC activated'	
                   IF (VT%IOR==2) southern=.TRUE.   
-                  IF (VT%IOR==-2) southern=.false.  	             
+                  IF (VT%IOR==-2) southern=.false.  
+                  !
+                  IF (VT%IOR==1) western=.TRUE.   
+                  IF (VT%IOR==-1) western=.false. 	
+                  		             
 #endif                  	
                ENDIF
             ENDIF
@@ -324,26 +328,49 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
         ! IF (VT%N_EDDY<0) THEN	
             IS_SELECT_2: SELECT CASE(IS) ! unsigned vent orientation
                CASE(1) ! yz plane
-                  SELECT CASE(IEC) ! edge orientation
-                     CASE(2) 
-                        print*, 'check 1'
-                        IF (OPEN_WIND_BOUNDARY) THEN
-                           U_WIND_LOC = 0.5_EB*(U_WIND(KK)+U_WIND(KK+1))
-                           W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
-                        ENDIF
-                        
-                        !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_ATM(JJ,KK)+VT%U_ATM(JJ,KK+1)) + U_WIND_LOC
-                        !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_ATM(JJ,KK)+VT%W_ATM(JJ,KK+1)) + W_WIND_LOC
-                     CASE(3)   
-                     print*, 'check 2'
-                        IF (OPEN_WIND_BOUNDARY) THEN
-                           V_WIND_LOC = V_WIND(KK)
-                           U_WIND_LOC = U_WIND(KK)
-                        ENDIF   
-                        
-                        !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%V_ATM(JJ,KK)+VT%V_ATM(JJ+1,KK)) + V_WIND_LOC
-                        !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%U_ATM(JJ,KK)+VT%U_ATM(JJ+1,KK)) + U_WIND_LOC
-                  END SELECT
+                  if (western) then  
+                    SELECT CASE(IEC) ! edge orientation
+                       CASE(2) 
+                          !print*, 'check 1'
+                          IF (OPEN_WIND_BOUNDARY) THEN
+                             U_WIND_LOC = 0.5_EB*(U_WIND(KK)+U_WIND(KK+1))
+                             W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
+                          ENDIF
+                          
+                          IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%UW_ATM(JJ,KK)+VT%UW_ATM(JJ,KK+1)) + U_WIND_LOC
+                          IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%WW_ATM(JJ,KK)+VT%WW_ATM(JJ,KK+1)) + W_WIND_LOC
+                       CASE(3)   
+                          !print*, 'check 2'
+                          IF (OPEN_WIND_BOUNDARY) THEN
+                             V_WIND_LOC = V_WIND(KK)
+                             U_WIND_LOC = U_WIND(KK)
+                          ENDIF   
+                          
+                          IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VW_ATM(JJ,KK)+VT%VW_ATM(JJ+1,KK)) + V_WIND_LOC
+                          IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%UW_ATM(JJ,KK)+VT%UW_ATM(JJ+1,KK)) + U_WIND_LOC
+                    END SELECT   
+                  else !eastern 
+                    SELECT CASE(IEC) ! edge orientation
+                       CASE(2) 
+                          !print*, 'check 1'
+                          IF (OPEN_WIND_BOUNDARY) THEN
+                             U_WIND_LOC = 0.5_EB*(U_WIND(KK)+U_WIND(KK+1))
+                             W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
+                          ENDIF
+                          
+                          IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%UE_ATM(JJ,KK)+VT%UE_ATM(JJ,KK+1)) + U_WIND_LOC
+                          IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%WE_ATM(JJ,KK)+VT%WE_ATM(JJ,KK+1)) + W_WIND_LOC
+                       CASE(3)   
+                          !print*, 'check 2'
+                          IF (OPEN_WIND_BOUNDARY) THEN
+                             V_WIND_LOC = V_WIND(KK)
+                             U_WIND_LOC = U_WIND(KK)
+                          ENDIF   
+                          
+                          IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VE_ATM(JJ,KK)+VT%VE_ATM(JJ+1,KK)) + V_WIND_LOC
+                          IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%UE_ATM(JJ,KK)+VT%UE_ATM(JJ+1,KK)) + U_WIND_LOC
+                    END SELECT 
+                  endif	  
                CASE(2) ! zx plane ! this loop for south/north coupled border 
                   if (southern) then                   
                     SELECT CASE(IEC)
@@ -366,7 +393,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                           IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%WS_ATM(II,KK)+VT%WS_ATM(II,KK+1)) + W_WIND_LOC
                           IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%VS_ATM(II,KK)+VT%VS_ATM(II,KK+1)) + V_WIND_LOC
                     END SELECT  
-                  else
+                  else   ! northern
                   	SELECT CASE(IEC)
                        CASE(3)      
                         print*, 'check 3 N' , ICD, II,KK
