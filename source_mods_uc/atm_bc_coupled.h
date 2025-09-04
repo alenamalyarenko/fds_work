@@ -250,7 +250,7 @@ VENT_LOOP: DO N=1,N_VENT
 #endif         
         ENDDO
        ENDDO 
-       Print*, 'North Vent Temp',   VT%TN_ATM(10,10) 	   
+       !Print*, 'North Vent Temp',   VT%TN_ATM(10,10) 	   
     ENDIF     
      
    	IF (VENTS(N)%IOR==1) THEN
@@ -288,7 +288,7 @@ VENT_LOOP: DO N=1,N_VENT
 #endif         
         ENDDO
        ENDDO 
-      Print*, 'West Vent Temp',   VT%TW_ATM(10,10)
+      !Print*, 'West Vent Temp',   VT%TW_ATM(10,10)
        
     ENDIF   	    
     

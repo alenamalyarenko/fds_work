@@ -1,6 +1,0 @@
-rm Coupled*
-
-cp /home/ama677/fds/build_maui/fds_impi_intel_linux_nc .
-cp /home/ama677/fds/exp/coupled2/ic_pal6.nc .
-cp /home/ama677/fds/exp/coupled2/bc_pal8.nc .
-sbatch submit.bash

@@ -219,19 +219,19 @@ t1=1
                 
   DO J=1,JBARout
    DO K=1,KBARout
-    TE(j,k,t)=t_fc_EW(0,j,k,t)-273.15
-    UE(j,k,t)=u_fc_EW(0,j,k,t)    
-    VE(j,k,t)=v_fc_EW(0,j,k,t)    
-    WE(j,k,t)=w_fc_EW(0,j,k,t)       
+    TE(j,k,t)=t_fc_EW(IBARout,j,k,t)-273.15
+    UE(j,k,t)=u_fc_EW(IBARout,j,k,t)    
+    VE(j,k,t)=v_fc_EW(IBARout,j,k,t)    
+    WE(j,k,t)=w_fc_EW(IBARout,j,k,t)       
    ENDDO
   ENDDO               
                       
    DO J=1,JBARout
    DO K=1,KBARout
-    TW(j,k,t)=t_fc_EW(IBARout,j,k,t)-273.15
-    UW(j,k,t)=u_fc_EW(IBARout,j,k,t)    
-    VW(j,k,t)=v_fc_EW(IBARout,j,k,t)    
-    WW(j,k,t)=w_fc_EW(IBARout,j,k,t)       
+    TW(j,k,t)=t_fc_EW(0,j,k,t)-273.15
+    UW(j,k,t)=u_fc_EW(0,j,k,t)    
+    VW(j,k,t)=v_fc_EW(0,j,k,t)    
+    WW(j,k,t)=w_fc_EW(0,j,k,t)       
    ENDDO
   ENDDO                        
                 
