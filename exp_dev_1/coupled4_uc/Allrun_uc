@@ -1,0 +1,10 @@
+rm Coupled*
+
+
+cp /mnt/data2/data2/FDS/fds_work/build_uc/fds_impi_intel_linux_uc .
+#cp /mnt/data2/data2/FDS/fds_work/exp/coupled3/ic_pal9.nc .
+#cp /mnt/data2/data2/FDS/fds_work/exp/coupled3/bc_pal9.nc .
+
+mpirun -np 1 ./fds_impi_intel_linux_uc coupled4.fds 
+
+

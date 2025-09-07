@@ -1,0 +1,46 @@
+&HEAD CHID='Palm_c1'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+# 9 cpu
+&MESH IJK=20,20,60, XB=0.0,320.0,  0.0,320.0,  0,540,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=320, DY=320, DZ=540., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+
+
+&TIME T_END=3600, LOCK_TIME_STEP=F, DT=1 /
+
+#character(13)
+&ICCD ICFile='ic_palm_c1.nc', OBFile='bc_palm_c1.nc', recSpacing=1 /
+
+
+
+#roof - always open - HOT
+&VENT MB='ZMAX', SURF_ID='OPEN', TMP_EXTERIOR = 30.0/
+
+#west - coupled
+&VENT XB=0.,0.,     0.,960., 0.,540.,SURF_ID='OPEN',N_EDDY=-1 /
+#east - coupled
+&VENT XB=960.,960., 0.,960., 0.,540.,SURF_ID='OPEN' ,N_EDDY=-1 , TMP_EXTERIOR = 30.0/
+
+
+#south - coupled
+&VENT XB=0.,960.,     0.,0., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
+#north - coupled
+&VENT XB=0.,960., 960.,960., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
+
+
+&VENT XB=0.,960.,0.,960.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.36 / # kW/m2
+
+&MISC SIMULATION_MODE='SVLES'/
+&MISC VERBOSE=T/
+&MISC TMPA=30.,HUMIDITY=30/
+
+# Outputs:
+&DUMP DT_PL3D=25, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+&ISOF QUANTITY='TEMPERATURE', VALUE(1:4)=30.0, 31.0, 32., 33 /
+
+
+&TAIL /

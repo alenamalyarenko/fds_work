@@ -1,0 +1,65 @@
+&HEAD CHID='Palm1_4'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+
+# 16 cpu
+#&MESH IJK=64,64,256, XB=0.0,256.0,  0.0,256.0,  0,1024,  MULT_ID='mesh_fire' /
+#&MULT ID='mesh_fire', DX=256, DY=256, DZ=1024., I_UPPER=3, J_UPPER=3, K_UPPER=0/
+
+# 64 cpu
+&MESH IJK=32,32,256, XB=0.0,128.0,  0.0,128.0,  0,1024,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=128, DY=128, DZ=1024., I_UPPER=7, J_UPPER=7, K_UPPER=0/
+
+#For instanteneous IC field:
+# TIME
+
+&TIME T_END=14400,LOCK_TIME_STEP=F, DT=1 /
+
+#&TIME T_END=60, LOCK_TIME_STEP=F, DT=1 /
+
+
+#character(13)
+#&ICCD ICFile='ic_test_01.nc', OBFile='bc_test_02.nc' /
+
+&WIND SPEED=10, Z_REF=20, DIRECTION=180., L=-100., Z_0=0.03 /
+
+# Boundary Conditions:
+#  VT%N_EDDY
+#  IF (VT%N_EDDY>0) SYNTHETIC_EDDY_METHOD=.TRUE.
+
+
+#&VENT MB='XMIN', SURF_ID='OPEN'/
+#&VENT MB='XMAX', SURF_ID='OPEN'/
+#&VENT MB='YMIN', SURF_ID='OPEN'/
+#&VENT MB='YMAX', SURF_ID='OPEN'/
+
+
+&VENT MB='ZMAX', SURF_ID='OPEN',TMP_EXTERIOR=20 /
+
+#south - coupled
+&VENT XB=0.,1024., 0.,0., 0.,1024.,SURF_ID='PERIODIC' /
+#north
+&VENT XB=0.,1024., 1024.,1024., 0.,1024.,SURF_ID='PERIODIC'/
+
+#east
+&VENT XB=1024.,1024., 0.,1024., 0.,1024.,SURF_ID='PERIODIC'/
+
+#west
+&VENT XB=0.,0., 0.,1024., 0.,1014.,SURF_ID='PERIODIC' /
+
+
+
+&VENT XB=0.,1024.,0.,1024.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.36 / # kW/m2
+
+&DUMP DT_PL3D=60, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+
+
+&MISC VERBOSE=T, TMPA=20/
+
+
+
+
+&TAIL /

@@ -1,0 +1,94 @@
+&HEAD CHID='Coupled1avg'/
+
+# GRID
+# NX NY NZ (counted from zero, so there's NX+1 tacer cells) 
+# x1 x2 y1 y2 z1 z2 (tracer cell coordinates! take dx/2 and add to corner of global grid)
+&MESH IJK=20,20,20, XB=0.0,320.0,0.0, 320.0,0,180, MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=320, DY=320, DZ=180., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+# TIME
+&TIME T_END=3600,  DT=1/
+
+#&TIME T_END=60,LOCK_TIME_STEP=T, DT=1/
+
+#character(10)
+&ICCD ICFile='ic_pal6.nc' /
+#&ICCD ICFile='ic_pal8.nc' /
+# OUTPUT FREQ
+# SIG_FIGS - precision of output
+# DT_HRR - output of heat release rate, averaged over DT
+# DT_DEVC - output of devices
+# DT_SLCF - 2d slice files
+# DT_SL3d - 3d slice files ?????
+
+# for coupled:
+# DT_SMOKE3D
+#  HRRPUV, SOOT
+# DT_RESTART 
+# DT_PL3D - 3d output (.q) 
+#    PLOT3D_QUANTITY(1:5)='TEMPERATURE','U-VELOCITY','V-VELOCITY','W-VELOCITY','HRRPUV' 
+# HRRPUV - per unit volume 
+# WRITE_XYZ - outputs coordinates (.xyz)
+# DT_UVW - velocity field
+# output:
+# species : O2, CO2, fuel , soot particles - 3d (concentration / mass fraction)
+# heat flux : total ( convective  + radiation )
+# butning rate - g/s / m2 
+
+&DUMP DT_PL3D=3600, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+
+&VENT MB='ZMAX', SURF_ID='OPEN' /
+&VENT MB='YMAX', SURF_ID='OPEN' /
+&VENT MB='XMAX', SURF_ID='OPEN' /
+&VENT MB='XMIN', SURF_ID='OPEN' /
+&VENT MB='YMIN', SURF_ID='OPEN' /
+
+#&SURF ID='inlet', VEL=-1., PROFILE='ATMOSPHERIC', Z0=0.5, PLE=0.3, COLOR='BLUE' /
+
+# WHAT IS THE PHYSICS/CHEMISTRY SETTING
+# level set 4 - wind and fire are fully coupled
+# Simple very large eddy simulation
+#&MISC SIMULATION_MODE='SVLES', LEVEL_SET_MODE=4 /
+
+# WIND AND TEMP AT DOMAIN BOUNDARIES
+&WIND SPEED=4.8, DIRECTION=270., L=-500., Z_0=0.03, TMP_REF=20, STRATIFICATION=FALSE /
+
+
+# FIRE STUFF
+
+#Grass Fire
+&MISC SIMULATION_MODE='SVLES', LEVEL_SET_MODE=4 /
+&REAC FUEL='FUEL VAPOR', C=3.4, H=6.2, O=2.5, SOOT_YIELD=0.02, HEAT_OF_COMBUSTION=17700. /
+&SURF ID='IGNITION', VEG_LSET_IGNITE_TIME=0, VEG_LSET_FUEL_INDEX=1 /
+&SURF ID='LINE', VEG_LSET_ROS_00 = 1./
+&VENT XB=16.,80.,  448.,512.,  0.,0., SURF_ID='IGNITION' /
+&VENT XB=16.,80.,  448.,512.,  0.,0., SURF_ID='LINE' /
+&VENT XB=16.,80.,  448.,512.,  0.,0., SURF_ID='LINE' /
+&VENT XB=80.,900.,  16.,944.,  0.,0., SURF_ID='Tall Grass' /
+&SURF ID                        = 'Tall Grass'
+      VEG_LSET_FUEL_INDEX       = 3
+      VEG_LSET_M1               = 0.058 /
+
+
+
+ 
+#Crown Fire
+#&MISC SIMULATION_MODE='SVLES'/
+#&REAC FUEL='FUEL VAPOR', C=3.4, H=6.2, O=2.5, SOOT_YIELD=0.02, HEAT_OF_COMBUSTION=17700. /
+#&SURF ID='FIRE', HRRPUA=1250, COLOR='RED' RAMP_Q='HRR' /
+#&VENT XB= 440,520,40,920,0,0, SURF_ID='FIRE' /
+#&RAMP ID='HRR', T=0.0, F=0.0 /
+#&RAMP ID='HRR', T=3, F=1.0 /
+#&RAMP ID='HRR', T=300, F=1.0 /
+
+
+
+
+
+
+
+
+
+&MISC VERBOSE=T /
+
+&TAIL /

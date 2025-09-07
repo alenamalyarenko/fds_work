@@ -1,0 +1,9 @@
+rm Coupled*
+
+module load intel/2022a
+module load netCDF-Fortran/4.6.0-iimpi-2022a
+
+cp /home/ama677/FDS/fds_work/exp/coupled7/submit.bash .
+
+cp /home/ama677/FDS/fds_work/build_mahuika/fds_impi_intel_linux_nc .
+sbatch submit.bash

@@ -1,0 +1,5 @@
+rm Coupled*
+
+cp /home/ama677/fds/exp/coupled0/fds_impi_intel_linux_nc .
+
+sbatch submit.bash

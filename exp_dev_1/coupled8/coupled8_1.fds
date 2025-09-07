@@ -1,0 +1,36 @@
+&HEAD CHID='Coupled8_1'/
+
+# GRID
+# 9 cpu
+&MESH IJK=20,20,60, XB=0.0,20.0,  0.0,20.0,  0,60,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=20, DY=20, DZ=60., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+
+&TIME T_END=600,LOCK_TIME_STEP=F, DT=1 /
+
+
+#character(13)
+&ICCD ICFile='ic_palm_74.nc', OBFile='bc_palm_8a.nc' /
+
+#south - coupled
+&VENT XB=0.,60.,0.,0.,0.,60.,SURF_ID='OPEN',N_EDDY=-1/ 
+
+#north - open
+&VENT XB=0.,60.,60.,60.,0.,60.,SURF_ID='OPEN'/
+
+#roof - open always
+&VENT MB='ZMAX', SURF_ID='OPEN' /
+
+#east - closed
+#&VENT XB=60.,60.,0.,60.,0.,60.,SURF_ID='OPEN'/
+#west - closed
+#&VENT XB=0.,0.,0.,60.,0.,60.,SURF_ID='OPEN'/
+
+
+&DUMP DT_PL3D=1, DT_HRR =0, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+
+&MISC SIMULATION_MODE='SVLES'/
+&MISC VERBOSE=T/
+
+
+&TAIL /
