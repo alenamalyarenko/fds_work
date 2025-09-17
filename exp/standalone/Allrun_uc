@@ -1,0 +1,11 @@
+rm STD*
+rm fds_impi_intel_linux_uc
+
+cp /mnt/data2/data2/FDS/fds_work/exec_backup/fds_impi_intel_linux_uc fds_impi_intel_linux_uc
+
+
+
+ulimit -s unlimited
+mpirun -np 9 ./fds_impi_intel_linux_uc  /mnt/data2/data2/FDS/fds_work/exp/standalone/std_1_1.fds 
+
+

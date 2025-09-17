@@ -15,7 +15,7 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=601 !601
+INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT=900 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -23,7 +23,8 @@ INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 
 
 REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_in, u_in, v_in, w_in, h_in
-REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all, h_all
+REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all, h_all  
+real,allocatable,dimension(:)::timestamp
 
 !file in
 INTEGER:: status, ncid_in
@@ -37,7 +38,7 @@ character(len=25)::run_name,end_file_name
 !file out
 INTEGER::  ncid_out
 integer:: dimxc,dimyc,dimzc,dimt, dimx,dimy,dimz  
-integer:: varid_uout,varid_vout,varid_wout,varid_tout, varid_hout
+integer:: varid_uout,varid_vout,varid_wout,varid_tout, varid_hout, varid_time
 
 !	other
 INTEGER :: NM,IOR,IZERO,I,J,K,N,T, meshes
@@ -50,7 +51,7 @@ integer:: nni,nnj,nnk
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !to change for other runs:
-!run_name='Coupled7_7'
+!run_name='CPL1_1'
  CALL GET_COMMAND_ARGUMENT(1, run_name)
 
 end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
@@ -85,6 +86,8 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  ALLOCATE( V_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
  ALLOCATE( W_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
  ALLOCATE( H_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
+ 
+ allocate(timestamp(NTout))
  !
  ALLOCATE(GI1(1:MESHES))
  ALLOCATE(GI2(1:MESHES))
@@ -233,7 +236,11 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
     count=count+1   
     !print*,filename
     skipit=.true.     
-   
+    
+    !timestamp
+    timestamp(count)=SECOND+(PAR-1)/100.0
+    
+    
     !this time stamp exists, now read all meshes in
     NM=0
     DO JJ2=0,J_UPPER 
@@ -327,11 +334,13 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !write file with full varriables - out of time loop
 ! need nf90_64bit_offset for files >2 GB
- status= nf90_create(path=end_file_name, cmode=or(nf90_noclobber,nf90_64bit_offset), ncid=ncid_out)
+
+
+ status= nf90_create(path=end_file_name, cmode=or(nf90_noclobber,nf90_64bit_data), ncid=ncid_out)
  
 
  
- !print *, trim(nf90_strerror(status))
+ print *, trim(nf90_strerror(status))
 
  status = nf90_def_dim(ncid_out, "xc", ibarout+2, dimxc)  
  status = nf90_def_dim(ncid_out, "yc", jbarout+2, dimyc)  
@@ -343,17 +352,19 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  status = nf90_def_var(ncid_out, "V", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_vout)
  status = nf90_def_var(ncid_out, "W", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_wout)
  status = nf90_def_var(ncid_out, "H", NF90_FLOAT, (/dimxc, dimyc, dimzc, dimt/), varid_hout) 
+ status = nf90_def_var(ncid_out, "time", NF90_FLOAT, (/dimt/), varid_time)  
   !print *,'define hrr', trim(nf90_strerror(status))
   
  status = nf90_enddef(ncid_out)
- !print *,'define mode end?', trim(nf90_strerror(status))
+ print *,'define mode end?', trim(nf90_strerror(status))
   
- status = nf90_put_var(ncid_out, varid_tout, t_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_uout, u_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_vout, v_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_wout, w_all(1:62,1:62,1:62, 1:count))
- status = nf90_put_var(ncid_out, varid_hout, h_all(1:62,1:62,1:62, 1:count))
- !print *,'write hrr', trim(nf90_strerror(status))
+ status = nf90_put_var(ncid_out, varid_tout, t_all(1:IBAROUT+2,1:JBAROUT+2,1:KBAROUT+2, 1:count))
+ status = nf90_put_var(ncid_out, varid_uout, u_all(1:IBAROUT+2,1:JBAROUT+2,1:KBAROUT+2, 1:count))
+ status = nf90_put_var(ncid_out, varid_vout, v_all(1:IBAROUT+2,1:JBAROUT+2,1:KBAROUT+2, 1:count))
+ status = nf90_put_var(ncid_out, varid_wout, w_all(1:IBAROUT+2,1:JBAROUT+2,1:KBAROUT+2, 1:count))
+ status = nf90_put_var(ncid_out, varid_hout, h_all(1:IBAROUT+2,1:JBAROUT+2,1:KBAROUT+2, 1:count))
+ status = nf90_put_var(ncid_out, varid_time, timestamp( 1:count)) 
+ print *,'write hrr', trim(nf90_strerror(status))
  status = nf90_close(ncid_out) 
 
  print*, 'wrote out large dataset'     
@@ -381,6 +392,7 @@ DEALLOCATE(GJ2)
 DEALLOCATE(GK1)
 DEALLOCATE(GK2)
 
+deallocate(timestamp)
 
 
 

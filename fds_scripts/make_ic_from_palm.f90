@@ -17,7 +17,8 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60!
+! Standalone:
+INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT=3600 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -96,10 +97,21 @@ end_file_name= 'ic_' // TRIM(run_name)//  '.nc'
    print*, 'opened PALM output'   
 
     
-x1=158
-y1=158
-z1=3
-t1=1
+!Palm File Info:
+!	zu_3d = 151 ;  DZ=9m; Z levels: 0, 4.5, 13.5, ...  1345.5
+!	zw_3d = 151 ;
+!	x = 384 ;      DX=16m,
+!	xu = 384 ;
+!	y = 384 ;      DY=16m,
+!	yv = 384 ;
+! File center: (192, 192)
+! Start point for FDS Domain:
+! 192-(60*3)/2=102
+
+x1=102   
+y1=102   
+z1=2     
+t1=1     
 
   
   status=nf90_inq_varid(ncid_in, 'u', varid_u )
@@ -111,16 +123,16 @@ t1=1
   ! load all with both ghosts
   ! 158:218 
    
-  status=nf90_get_var(ncid_in, varid_t, T_ALL(1:(IBARout+2), 1:(JBARout+2), 1:(KBARout+2)) ,start=(/x1-1,y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /))
+  status=nf90_get_var(ncid_in, varid_t, T_ALL(1:(IBARout+2), 1:(JBARout+2), 1:(KBARout+2)) ,start=(/x1-1,y1-1,z1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /))
   
   ! deal with level z=1 on PALM by not readin it 
   status=nf90_get_var(ncid_in, varid_w, W_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1-1,y1-1,z1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /)) 
    
   ! 159:219 (in x) + 2 ghosts 
-  status=nf90_get_var(ncid_in, varid_u, U_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1,  y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /))
+  status=nf90_get_var(ncid_in, varid_u, U_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1,  y1-1,z1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /))
   
   ! 159:219 (in y) + 2 ghosts
-  status=nf90_get_var(ncid_in, varid_v, V_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1-1,y1,  z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /))
+  status=nf90_get_var(ncid_in, varid_v, V_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1-1,y1,  z1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /))
   
   status=nf90_close(ncid_in)
 

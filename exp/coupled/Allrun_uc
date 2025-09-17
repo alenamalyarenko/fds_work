@@ -1,0 +1,14 @@
+rm EXP*
+rm fds_impi_intel_linux_uc
+
+cp /mnt/data2/data2/FDS/fds_work/exec_backup/fds_impi_intel_linux_uc_coupled fds_impi_intel_linux_uc
+
+cp /mnt/data2/data2/FDS/fds_work/fds_scripts/ic_palm_c1.nc ic_palm_c1.nc
+cp /mnt/data2/data2/FDS/fds_work/fds_scripts/bc_palm_c1.nc bc_palm_c1.nc
+
+
+
+ulimit -s unlimited
+mpirun -np 9 ./fds_impi_intel_linux_uc  /mnt/data2/data2/FDS/fds_work/exp/coupled/cpl_1_1.fds 
+
+

@@ -9,16 +9,22 @@ implicit none
 
 
 !%%%%%% change for each run:
-! Standalone:
-INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT=1000 !601
+! INCREASED RES:
+INTEGER,PARAMETER:: IBAR=60*4, JBAR=60*4, KBAR=60*3, NT=1
+!3x3 domain, numbers here go 0:2,0:2
+INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
+
+
+! ORIGINAL PALM:
+INTEGER,PARAMETER:: IBAR1=60, JBAR1=60, KBAR1=60, NT=1000
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-
-REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_in, u_in, v_in, w_in, h_in
+REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_in, u_in, v_in,w_in, h_in
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all, h_all
+
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_fc_ns, u_fc_ns, v_fc_ns,w_fc_ns
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_fc_ew, u_fc_ew, v_fc_ew,w_fc_ew
 
@@ -29,7 +35,7 @@ character(len=25)::filename,filename1,filename2,filename3
 logical::res,SKIPIT
 INTEGER::SECOND,count,par,time 
 CHARACTER(len=3)::PART,SECOND_C,NM_c
-character(len=25)::run_name,end_file_name,in_file_name
+character(len=25)::run_name,in_file_name
 
 !file out
 INTEGER::  ncid_out
@@ -38,10 +44,13 @@ integer:: varid_usout,varid_vsout,varid_wsout,varid_tsout, varid_hsout
 integer:: varid_unout,varid_vnout,varid_wnout,varid_tnout, varid_hnout
 integer:: varid_ueout,varid_veout,varid_weout,varid_teout, varid_heout
 integer:: varid_uwout,varid_vwout,varid_wwout,varid_twout, varid_hwout
+character(len=25)::end_file_name,end_file_name1,end_file_name2
+INTEGER:: COUNT5, COUNT10
 
 !	other
 INTEGER :: NM,IOR,IZERO,I,J,K,N,T, meshes
 INTEGER:: IBP1, JBP1, KBP1, IBP2, JBP2,KBP2,IBARout, JBARout, KBARout, NTout, JJ2,II2
+INTEGER:: IBARout1, JBARout1, KBARout1
 
 !global mesh
 INTEGER,ALLOCATABLE,DIMENSION(:)::GI1, GI2,GJ1,GJ2,GK1, GK2, MESH_I, MESH_J
@@ -54,25 +63,24 @@ REAL, ALLOCATABLE, DIMENSION(:,:,:):: TS,US,VS,WS
 REAL, ALLOCATABLE, DIMENSION(:,:,:):: TN,UN,VN,WN
 
 REAL, ALLOCATABLE, DIMENSION(:,:,:):: TE,UE,VE,WE     
-REAL, ALLOCATABLE, DIMENSION(:,:,:):: TW,UW,VW,WW     
+REAL, ALLOCATABLE, DIMENSION(:,:,:):: TW,UW,VW,WW  
+ 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-!to change for other runs:
-run_name='palm_c1'
+ !to change for other runs:
+ run_name='palm_c1'
 
-in_file_name='DATA_3D_NETCDF_N03'
-end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
+ in_file_name='DATA_3D_NETCDF_N03'
+ end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
+ end_file_name1= 'bc_' // TRIM(run_name)//  '_5s.nc'
+ end_file_name2= 'bc_' // TRIM(run_name)//  '_10s.nc'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-!size varibales
+ !size varibales - FOR DOMAIN THAT IS RUNNNING
  !added one more for both 0 and ibp1 cells
  IBP1=IBAR+1
  JBP1=JBAR+1
  KBP1=KBAR+1
-
- IBP2=IBAR+2 
- JBP2=JBAR+2 
- KBP2=KBAR+2 
              
  IBARout=IBAR*(I_UPPER+1)
  JBARout=JBAR*(J_UPPER+1)
@@ -81,6 +89,16 @@ end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
 
  meshes=(I_UPPER+1)*(J_UPPER+1)
 
+ ! 	sizes for PALM domain
+ IBARout1=IBAR1*(I_UPPER+1)
+ JBARout1=JBAR1*(J_UPPER+1)
+ KBARout1=KBAR1
+ !
+ ALLOCATE( T_IN(1:(IBARout1+2),1:(JBARout1+2),1:(KBARout1+2),NTout)) 
+ ALLOCATE( U_IN(1:(IBARout1+2),1:(JBARout1+2),1:(KBARout1+2),NTout)) 
+ ALLOCATE( V_IN(1:(IBARout1+2),1:(JBARout1+2),1:(KBARout1+2),NTout)) 
+ ALLOCATE( W_IN(1:(IBARout1+2),1:(JBARout1+2),1:(KBARout1+2),NTout)) 
+ ALLOCATE( H_IN(1:(IBARout1+2),1:(JBARout1+2),1:(KBARout1+2),NTout)) 
  !
  ALLOCATE( T_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
  ALLOCATE( U_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
@@ -122,14 +140,14 @@ end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
  ALLOCATE( TW(1:(JBARout),1:(KBARout),NTout))    
  ALLOCATE( UW(1:(JBARout),1:(KBARout),NTout))    
  ALLOCATE( VW(1:(JBARout),1:(KBARout),NTout))    
- ALLOCATE( WW(1:(JBARout),1:(KBARout),NTout))    
+ ALLOCATE( WW(1:(JBARout),1:(KBARout),NTout))  
  
  
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-  status=nf90_open(in_file_name, nf90_nowrite, ncid_in)
+ status=nf90_open(in_file_name, nf90_nowrite, ncid_in)
 
-!Palm File Info:
+! Palm File Info:
 !	zu_3d = 151 ;  DZ=9m; Z levels: 0, 4.5, 13.5, ...  1345.5
 !	zw_3d = 151 ;
 !	x = 384 ;      DX=16m,
@@ -140,35 +158,60 @@ end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
 ! Start point for FDS Domain:
 ! 192-(60*3)/2=102
 
-x1=102   
-y1=102   
-z1=2     
-t1=1     
+ x1=102   
+ y1=102   
+ z1=2     
+ t1=1     
 
  
-  status=nf90_inq_varid(ncid_in, 'u', varid_u )
-  status=nf90_inq_varid(ncid_in, 'v', varid_v)
-  status=nf90_inq_varid(ncid_in, 'w', varid_w)
-  status=nf90_inq_varid(ncid_in, 'theta', varid_t) 
-  
-  ! 157:218,156:217 (62,62)
-  status=nf90_get_var(ncid_in, varid_u, U_ALL,start=(/x1,y1-1,z1,1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,NT /))
-  
-  ! 156:217, 157:218 (62,62)
-  status=nf90_get_var(ncid_in, varid_v, V_ALL,start=(/x1-1,y1,z1,1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,NT /))
-  
-  ! 156:217, 156:217 (62,62)
-  status=nf90_get_var(ncid_in, varid_w, W_ALL,start=(/x1-1,y1-1,z1,1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,NT /)) 
-  
-  ! 156:217, 156:217 (62,62)
-  status=nf90_get_var(ncid_in, varid_t, T_ALL,start=(/x1-1,y1-1,z1,1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,NT /))
-  
-  status=nf90_close(ncid_in)
+ status=nf90_inq_varid(ncid_in, 'u', varid_u )
+ status=nf90_inq_varid(ncid_in, 'v', varid_v)
+ status=nf90_inq_varid(ncid_in, 'w', varid_w)
+ status=nf90_inq_varid(ncid_in, 'theta', varid_t) 
+ 
+ ! 157:218,156:217 (62,62)
+ status=nf90_get_var(ncid_in, varid_u, U_IN,start=(/x1,y1-1,z1,1/), count = (/ (IBARout1+2), (JBARout1+2), (KBARout1+2) ,NT /))
+ 
+ ! 156:217, 157:218 (62,62)
+ status=nf90_get_var(ncid_in, varid_v, V_IN,start=(/x1-1,y1,z1,1/), count = (/ (IBARout1+2), (JBARout1+2), (KBARout1+2) ,NT /))
+ 
+ ! 156:217, 156:217 (62,62)
+ status=nf90_get_var(ncid_in, varid_w, W_IN,start=(/x1-1,y1-1,z1,1/), count = (/ (IBARout1+2), (JBARout1+2), (KBARout1+2) ,NT /)) 
+ 
+ ! 156:217, 156:217 (62,62)
+ status=nf90_get_var(ncid_in, varid_t, T_IN,start=(/x1-1,y1-1,z1,1/), count = (/ (IBARout1+2), (JBARout1+2), (KBARout1s+2) ,NT /))
+ 
+ status=nf90_close(ncid_in)
+
+
+
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ DO T=1,NT !START TIMELOOP POST PROCESSING
+
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+! interpolate t_in (16m) into t_all (4m)
+
+  DO I=1,IBAROUT+2
+   DO J=1,JBAROUT+2
+    DO K=1,KBAROUT+2
+     T_ALL(I,J,K,T)=
+     U_ALL(I,J,K,T)=
+     V_ALL(I,J,K,T)=
+     W_ALL(I,J,K,T)= 
+    ENDDO
+   ENDDO
+  ENDDO
+
+
+
+
+
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
- DO T=1,NT
 
  ! add +1 to t_all indeces as t_all is 1:(ibp1+1)
   DO I=1,IBARout
@@ -185,8 +228,6 @@ t1=1
   ENDDO     
 
 
-
-
  ! add +1 to t_all indeces as t_all is 1:(ibp1+1)
   DO I=0,IBARout
    DO J=1,JBARout
@@ -200,10 +241,6 @@ t1=1
     ENDDO
    ENDDO
   ENDDO     
-
-
-
-
 
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   !make out variables -from face-centerted ones
@@ -239,7 +276,7 @@ t1=1
    ENDDO
   ENDDO               
                       
-   DO J=1,JBARout
+  DO J=1,JBARout
    DO K=1,KBARout
     TW(j,k,t)=t_fc_EW(0,j,k,t)-273.15
     UW(j,k,t)=u_fc_EW(0,j,k,t)    
@@ -251,12 +288,14 @@ t1=1
             
  ENDDO !end timeloop  
 
-!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- !output
+ 
+  
+ !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ !output - 1S
  status= nf90_create(path=end_file_name, cmode=or(nf90_noclobber,nf90_64bit_offset), ncid=ncid_out)
  
  status = nf90_def_dim(ncid_out, "xc",  ibarout, dimxc)  
- status = nf90_def_dim(ncid_out, "yc", jbarout, dimyc)  
+ status = nf90_def_dim(ncid_out, "yc",  jbarout, dimyc)  
  status = nf90_def_dim(ncid_out, "zc",  kbarout, dimzc)
  status = nf90_def_dim(ncid_out, "time",ntout, dimt)   
              
@@ -282,31 +321,32 @@ t1=1
  
  status = nf90_enddef(ncid_out)
   
- status = nf90_put_var(ncid_out, varid_tsout, TS(1:IBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_usout, US(1:IBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_vsout, VS(1:IBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_wsout, WS(1:IBARout,1:KBARout, 1:NT))
+ status = nf90_put_var(ncid_out, varid_tsout, TS(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_usout, US(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_vsout, VS(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_wsout, WS(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_tnout, TN(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_unout, UN(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_vnout, VN(1:IBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_wnout, WN(1:IBARout,1:KBARout, 1:NTout)) 
+ status = nf90_put_var(ncid_out, varid_teout, TE(1:JBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_ueout, UE(1:JBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_veout, VE(1:JBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_weout, WE(1:JBARout,1:KBARout, 1:NTout)) 
+ status = nf90_put_var(ncid_out, varid_twout, TW(1:JBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_uwout, UW(1:JBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_vwout, VW(1:JBARout,1:KBARout, 1:NTout))
+ status = nf90_put_var(ncid_out, varid_wwout, WW(1:JBARout,1:KBARout, 1:NTout))
  
- status = nf90_put_var(ncid_out, varid_tnout, TN(1:IBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_unout, UN(1:IBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_vnout, VN(1:IBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_wnout, WN(1:IBARout,1:KBARout, 1:NT))
- 
- status = nf90_put_var(ncid_out, varid_teout, TE(1:JBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_ueout, UE(1:JBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_veout, VE(1:JBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_weout, WE(1:JBARout,1:KBARout, 1:NT))
- 
- status = nf90_put_var(ncid_out, varid_twout, TW(1:JBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_uwout, UW(1:JBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_vwout, VW(1:JBARout,1:KBARout, 1:NT))
- status = nf90_put_var(ncid_out, varid_wwout, WW(1:JBARout,1:KBARout, 1:NT))
- 
- 
- status = nf90_close(ncid_out) 
- print*, 'made new bc file'
+ status = nf90_close(ncid_out)  
 
+!%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+DEALLOCATE(T_IN)                              
+DEALLOCATE(U_IN)                              
+DEALLOCATE(V_IN)
+DEALLOCATE(W_IN)
+DEALLOCATE(H_IN)
 !
 DEALLOCATE(T_ALL)                              
 DEALLOCATE(U_ALL)                              
@@ -328,33 +368,28 @@ DEALLOCATE(TS)
 DEALLOCATE(US)  
 DEALLOCATE(VS)
 DEALLOCATE(WS)
-
 DEALLOCATE(TN)
 DEALLOCATE(UN)  
 DEALLOCATE(VN)
 DEALLOCATE(WN)
-
-!
 DEALLOCATE(TE)
 DEALLOCATE(UE)  
 DEALLOCATE(VE)
 DEALLOCATE(WE)
-
 DEALLOCATE(TW)
 DEALLOCATE(UW)  
 DEALLOCATE(VW)
 DEALLOCATE(WW)
+!
 
+end program
 
-
- end program
-
- SUBROUTINE HANDLE_ERR(STATUS)
-INTEGER STATUS
-IF (STATUS .NE. NF_NOERR) THEN
+SUBROUTINE HANDLE_ERR(STATUS)
+ INTEGER STATUS
+ IF (STATUS .NE. NF_NOERR) THEN
   PRINT *, NF_STRERROR(STATUS)
-  STOP 'Stopped'
-ENDIF
+  STOP 'Stopped' 
+ ENDIF
 end
 
 
