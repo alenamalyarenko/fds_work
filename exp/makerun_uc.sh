@@ -52,7 +52,7 @@ if [ ! -d "$workdir" ]; then
 fi
 cd "$workdir"
 
-rm -f "$path_to_file"*
+rm -f "$runname"*
 
 logfile="$workdir/run_${runname}_${mode}_$(date '+%Y%m%d_%H%M%S').log"
 # Redirect all output to screen + logfile
@@ -65,14 +65,27 @@ ulimit -s unlimited
 
 # --- Select executable & input file ---
 if [ "$mode" = "standalone" ]; then
-    exec_src="/mnt/data2/data2/FDS/fds_work/exec_backup/fds_impi_intel_linux_uc"
+    exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc"
     fds_file="/mnt/data2/data2/FDS/fds_work/exp/standalone/${path_to_file}.fds"
 elif [ "$mode" = "coupled" ]; then
-    exec_src="/mnt/data2/data2/FDS/fds_work/exec_backup/fds_impi_intel_linux_uc_coupled"
+    exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc_coupled"
     fds_file="/mnt/data2/data2/FDS/fds_work/exp/coupled/${path_to_file}.fds"
 else
     echo "Error: unknown mode '$mode'. Must be 'standalone' or 'coupled'."
     usage
+fi
+
+# --- Extract T_END from .fds file ---
+if [ -f "$fds_file" ]; then
+    T_END=$(grep -i "T_END" "$fds_file" | head -n 1 | sed -E 's/.*T_END *= *([0-9.]+).*/\1/')
+    if [ -n "$T_END" ]; then
+        echo "Detected T_END=$T_END (from $fds_file)"
+    else
+        echo "Warning: could not detect T_END in $fds_file"
+    fi
+else
+    echo "Error: fds_file $fds_file not found"
+    exit 1
 fi
 
 
@@ -111,7 +124,7 @@ ifx -mcmodel=medium  -o program.exe  glue_output.f90 -I/usr/local/netcdf-ifort/4
 
 cp program.exe "$workdir"
 cd "$workdir"
-./program.exe "$runname"
+./program.exe "$runname" "$T_END"
 mv "OUT_${runname}.nc" /mnt/data2/data2/FDS/fds_work/fds_scripts/
 
 

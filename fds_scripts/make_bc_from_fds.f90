@@ -8,7 +8,7 @@ implicit none
 
 !%%%%%% change for each run:
 !size for each mesh
-INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60, NT=601 
+INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT=900 
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -482,25 +482,25 @@ end_file_name= 'BC_from_' // TRIM(run_name)//  '.nc'
  status = nf90_def_var(ncid_out, "WW", NF90_FLOAT, (/dimyc, dimzc, dimt/), varid_wwout) 
  status = nf90_enddef(ncid_out)
   
- status = nf90_put_var(ncid_out, varid_tsout, TS(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_usout, US(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_vsout, VS(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_wsout, WS(1:60,1:60, 1:count))
+ status = nf90_put_var(ncid_out, varid_tsout, TS(1:IBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_usout, US(1:IBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_vsout, VS(1:IBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_wsout, WS(1:IBARout,1:KBARout, 1:count))
  !
- status = nf90_put_var(ncid_out, varid_tnout, TN(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_unout, UN(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_vnout, VN(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_wnout, WN(1:60,1:60, 1:count))
+ status = nf90_put_var(ncid_out, varid_tnout, TN(1:IBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_unout, UN(1:IBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_vnout, VN(1:IBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_wnout, WN(1:IBARout,1:KBARout, 1:count))
  !
- status = nf90_put_var(ncid_out, varid_teout, TE(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_ueout, UE(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_veout, VE(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_weout, WE(1:60,1:60, 1:count))
+ status = nf90_put_var(ncid_out, varid_teout, TE(1:JBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_ueout, UE(1:JBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_veout, VE(1:JBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_weout, WE(1:JBARout,1:KBARout, 1:count))
  !
- status = nf90_put_var(ncid_out, varid_twout, TW(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_uwout, UW(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_vwout, VW(1:60,1:60, 1:count))
- status = nf90_put_var(ncid_out, varid_wwout, WW(1:60,1:60, 1:count))
+ status = nf90_put_var(ncid_out, varid_twout, TW(1:JBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_uwout, UW(1:JBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_vwout, VW(1:JBARout,1:KBARout, 1:count))
+ status = nf90_put_var(ncid_out, varid_wwout, WW(1:JBARout,1:KBARout, 1:count))
  
  
  status = nf90_close(ncid_out) 

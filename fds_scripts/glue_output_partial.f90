@@ -15,7 +15,7 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60
+INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT1=3600
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -32,7 +32,7 @@ integer:: varid_u,varid_v,varid_w,varid_t, varid_h
 character(len=25)::filename,filename1,filename2,filename3
 logical::res,SKIPIT
 INTEGER::SECOND,count,par,time 
-CHARACTER(len=3)::PART,SECOND_C,NM_c
+CHARACTER(len=4)::PART,SECOND_C,NM_c
 character(len=25)::run_name,end_file_name
 
 !file out
@@ -73,7 +73,9 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  IBARout=IBAR*(I_UPPER+1)
  JBARout=JBAR*(J_UPPER+1)
  KBARout=KBAR
- NTout=NT
+ NTout=NT-NT1+1
+ 
+ !print*, NTout
 
  meshes=(I_UPPER+1)*(J_UPPER+1)
 
@@ -221,17 +223,20 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
   
  
  
- 
+! print*, 'mesh ok'
  
 ! IS THERE A FILE WITH WITH TIME STAMP?
  count=0
- DO TIME=1,NT
+ DO TIME=NT1,NT
   SECOND=TIME-1
   SKIPIT=.FALSE.  
   DO PAR=1,100
+
+   !print*, par, second
    WRITE(PART,'(I2.2)'),par-1  
    WRITE(SECOND_C,'(I0)'),SECOND
-
+  
+   
    FILENAME=TRIM(run_name)// '_1_' // TRIM(SECOND_C) // 'p' // TRIM(part) // '.q.nc'
    inquire(file=filename, exist=res)    
    if (res) then  !file exists
