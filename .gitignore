@@ -6,10 +6,10 @@
 *.mod
 *.nc
 *.exe
-fds_impi_intel_linux_nc
-fds_impi_intel_linux
-fds_impi_intel_linux_uc
+fds_impi_intel_linux*
+/exp/terrain/
 /test_runs_local
+._*
 
 DATA_3D_NETCDF_N03
 DATA_1D_PR_NETCDF_N03

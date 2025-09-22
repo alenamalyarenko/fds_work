@@ -1,8 +1,5 @@
 #define write_init
-
-#define plot_3d_out
-#undef plot_hrr_out
-#undef output_nc
+#define output_nc
 
 
 #define coupled

@@ -369,6 +369,11 @@ ALLOCATE(LU_XYZ(NMESHES))
 ALLOCATE(FN_PL3D(2*NMESHES))
 ALLOCATE(LU_PL3D(2*NMESHES))
 
+#if defined output_nc
+ALLOCATE(FN_PL3D1(2*NMESHES))
+ALLOCATE(LU_PL3D1(2*NMESHES))
+#endif
+
 ALLOCATE(FN_ISOF(N_ISOF,NMESHES))
 ALLOCATE(LU_ISOF(N_ISOF,NMESHES))
 ALLOCATE(FN_ISOF2(N_ISOF,NMESHES))
@@ -414,12 +419,18 @@ MESH_LOOP: DO NM=1,NMESHES
 
    LU_XYZ(NM)  = GET_FILE_NUMBER()
    LU_PL3D(NM) = GET_FILE_NUMBER()
-   LU_PL3D(NM+NMESHES) = GET_FILE_NUMBER()
-#if defined output_nc     
-    WRITE(FN_XYZ(NM),'(A,A,I0,A)') TRIM(RESULTS_DIR)//TRIM(CHID),'_',NM,'.xyz.nc'
-#else    
+   LU_PL3D(NM+NMESHES) = GET_FILE_NUMBER() 
+#if defined output_nc
+   LU_PL3D1(NM) = GET_FILE_NUMBER()          
+   LU_PL3D1(NM+NMESHES) = GET_FILE_NUMBER()  
+
+#endif   
+   
+!#if defined output_nc     
+!    WRITE(FN_XYZ(NM),'(A,A,I0,A)') TRIM(RESULTS_DIR)//TRIM(CHID),'_',NM,'.xyz.nc'
+!#endif    
     WRITE(FN_XYZ(NM),'(A,A,I0,A)') TRIM(RESULTS_DIR)//TRIM(CHID),'_',NM,'.xyz'
-#endif    
+!#endif    
    
 
    ! Iso Surface Files
@@ -954,13 +965,13 @@ M%QQ=0._FB
 M%QQ2=0._FB
 
 WRITE_XYZ_FILE: IF (WRITE_XYZ) THEN
-#if defined output_nc
+!#if defined output_nc
 !ALLOCATE(M%QQf(0:IBP1,0:JBP1,0:KBP1,5),STAT=IZERO)
 !CALL ChkMemErr('DUMP','QQ',IZERO)
-    status= nf90_create(FN_XYZ(NM),NF90_CLOBBER,LU_XYZ(NM))
-#else    
+!    status= nf90_create(FN_XYZ(NM),NF90_CLOBBER,LU_XYZ(NM))
+!#endif    
     OPEN(LU_XYZ(NM),FILE=FN_XYZ(NM),FORM='UNFORMATTED',STATUS='REPLACE')
-#endif    
+   
    DO K=0,KBAR
       DO J=0,JBAR
          DO I=0,IBAR
@@ -977,64 +988,64 @@ WRITE_XYZ_FILE: IF (WRITE_XYZ) THEN
    ENDDO
    
 
-#if defined output_nc
-    ! Define dimensions
-    status = nf90_def_dim(LU_XYZ(NM), "x", IBAR, dimid1)
-    status = nf90_def_dim(LU_XYZ(NM), "y", JBAR, dimid2)   
-    status = nf90_def_dim(LU_XYZ(NM), "z", KBAR, dimid3)
-# if defined global_mesh
-    status = nf90_def_dim(LU_XYZ(NM), "dum", 1, dimid4)
-# endif      
-    
-    
-    !Define variables 
-    status = nf90_def_var(LU_XYZ(NM), "iblk", NF90_FLOAT, (/dimid1,dimid2,dimid3/), varid1)
-    status = nf90_def_var(LU_XYZ(NM), "x_m", NF90_FLOAT, (/dimid1/), varid2)
-    status = nf90_def_var(LU_XYZ(NM), "y_m", NF90_FLOAT, (/dimid2/), varid3)
-    status = nf90_def_var(LU_XYZ(NM), "z_m", NF90_FLOAT, (/dimid3/), varid4)
-    
-# if defined global_mesh
-    status = nf90_def_var(LU_XYZ(NM), "MI",  NF90_FLOAT, (/dimid4/), varid5)
-    status = nf90_def_var(LU_XYZ(NM), "MJ",  NF90_FLOAT, (/dimid4/), varid6)
-    status = nf90_def_var(LU_XYZ(NM), "MK",  NF90_FLOAT, (/dimid4/), varid7)
-    status = nf90_def_var(LU_XYZ(NM), "GI1", NF90_FLOAT, (/dimid4/), varid8)
-    status = nf90_def_var(LU_XYZ(NM), "GI2", NF90_FLOAT, (/dimid4/), varid9)
-    status = nf90_def_var(LU_XYZ(NM), "GJ1", NF90_FLOAT, (/dimid4/), varid10)
-    status = nf90_def_var(LU_XYZ(NM), "GJ2", NF90_FLOAT, (/dimid4/), varid11)
-    status = nf90_def_var(LU_XYZ(NM), "GK1", NF90_FLOAT, (/dimid4/), varid12)
-    status = nf90_def_var(LU_XYZ(NM), "GK2", NF90_FLOAT, (/dimid4/), varid13)            
-# endif  
-    ! End definitions
-    status = nf90_enddef(LU_XYZ(NM))
-    
-    ! Write data to variable 
-    status = nf90_put_var(LU_XYZ(NM), varid1, M%IBLK(1:IBAR,1:JBAR,1:KBAR))
-    status = nf90_put_var(LU_XYZ(NM), varid2, M%XPLT(1:IBAR))
-    status = nf90_put_var(LU_XYZ(NM), varid3, M%YPLT(1:JBAR))
-    status = nf90_put_var(LU_XYZ(NM), varid4, M%ZPLT(1:KBAR))
-# if defined global_mesh
-    status = nf90_put_var(LU_XYZ(NM), varid5, M%MI)
-    status = nf90_put_var(LU_XYZ(NM), varid6, M%MJ)
-    status = nf90_put_var(LU_XYZ(NM), varid7, M%MK)
-    status = nf90_put_var(LU_XYZ(NM), varid8, M%GI1)
-    status = nf90_put_var(LU_XYZ(NM), varid9, M%GI2)
-    status = nf90_put_var(LU_XYZ(NM), varid10, M%GJ1)
-    status = nf90_put_var(LU_XYZ(NM), varid11, M%GJ2)
-    status = nf90_put_var(LU_XYZ(NM), varid12, M%GK1)
-    status = nf90_put_var(LU_XYZ(NM), varid13, M%GK2)    
-# endif
-    ! Close the NetCDF file
-    status = nf90_close(LU_XYZ(NM))
-
-
-#else   ! standart non-nc output    
+!#if defined output_nc
+!    ! Define dimensions
+!    status = nf90_def_dim(LU_XYZ(NM), "x", IBAR, dimid1)
+!    status = nf90_def_dim(LU_XYZ(NM), "y", JBAR, dimid2)   
+!    status = nf90_def_dim(LU_XYZ(NM), "z", KBAR, dimid3)
+!# if defined global_mesh
+!    status = nf90_def_dim(LU_XYZ(NM), "dum", 1, dimid4)
+!# endif      
+!    
+!    
+!    !Define variables 
+!    status = nf90_def_var(LU_XYZ(NM), "iblk", NF90_FLOAT, (/dimid1,dimid2,dimid3/), varid1)
+!    status = nf90_def_var(LU_XYZ(NM), "x_m", NF90_FLOAT, (/dimid1/), varid2)
+!    status = nf90_def_var(LU_XYZ(NM), "y_m", NF90_FLOAT, (/dimid2/), varid3)
+!    status = nf90_def_var(LU_XYZ(NM), "z_m", NF90_FLOAT, (/dimid3/), varid4)
+!    
+!# if defined global_mesh
+!    status = nf90_def_var(LU_XYZ(NM), "MI",  NF90_FLOAT, (/dimid4/), varid5)
+!    status = nf90_def_var(LU_XYZ(NM), "MJ",  NF90_FLOAT, (/dimid4/), varid6)
+!    status = nf90_def_var(LU_XYZ(NM), "MK",  NF90_FLOAT, (/dimid4/), varid7)
+!    status = nf90_def_var(LU_XYZ(NM), "GI1", NF90_FLOAT, (/dimid4/), varid8)
+!    status = nf90_def_var(LU_XYZ(NM), "GI2", NF90_FLOAT, (/dimid4/), varid9)
+!    status = nf90_def_var(LU_XYZ(NM), "GJ1", NF90_FLOAT, (/dimid4/), varid10)
+!    status = nf90_def_var(LU_XYZ(NM), "GJ2", NF90_FLOAT, (/dimid4/), varid11)
+!    status = nf90_def_var(LU_XYZ(NM), "GK1", NF90_FLOAT, (/dimid4/), varid12)
+!    status = nf90_def_var(LU_XYZ(NM), "GK2", NF90_FLOAT, (/dimid4/), varid13)            
+!# endif  
+!    ! End definitions
+!    status = nf90_enddef(LU_XYZ(NM))
+!    
+!    ! Write data to variable 
+!    status = nf90_put_var(LU_XYZ(NM), varid1, M%IBLK(1:IBAR,1:JBAR,1:KBAR))
+!    status = nf90_put_var(LU_XYZ(NM), varid2, M%XPLT(1:IBAR))
+!    status = nf90_put_var(LU_XYZ(NM), varid3, M%YPLT(1:JBAR))
+!    status = nf90_put_var(LU_XYZ(NM), varid4, M%ZPLT(1:KBAR))
+!# if defined global_mesh
+!    status = nf90_put_var(LU_XYZ(NM), varid5, M%MI)
+!    status = nf90_put_var(LU_XYZ(NM), varid6, M%MJ)
+!    status = nf90_put_var(LU_XYZ(NM), varid7, M%MK)
+!    status = nf90_put_var(LU_XYZ(NM), varid8, M%GI1)
+!    status = nf90_put_var(LU_XYZ(NM), varid9, M%GI2)
+!    status = nf90_put_var(LU_XYZ(NM), varid10, M%GJ1)
+!    status = nf90_put_var(LU_XYZ(NM), varid11, M%GJ2)
+!    status = nf90_put_var(LU_XYZ(NM), varid12, M%GK1)
+!    status = nf90_put_var(LU_XYZ(NM), varid13, M%GK2)    
+!# endif
+!    ! Close the NetCDF file
+!    status = nf90_close(LU_XYZ(NM))
+!
+!
+!#else   ! standart non-nc output    
    
    
    WRITE(LU_XYZ(NM)) IBP1,JBP1,KBP1
    WRITE(LU_XYZ(NM)) (((M%XPLT(I),I=0,IBAR),J=0,JBAR),K=0,KBAR),(((M%YPLT(J),I=0,IBAR),J=0,JBAR),K=0,KBAR), &
                      (((M%ZPLT(K),I=0,IBAR),J=0,JBAR),K=0,KBAR),(((M%IBLK(I,J,K),I=0,IBAR),J=0,JBAR),K=0,KBAR)
    CLOSE(LU_XYZ(NM))
-#endif   
+!#endif   
    IF (M%N_STRINGS+2>M%N_STRINGS_MAX) THEN
       CALL RE_ALLOCATE_STRINGS(NM)
    ENDIF
@@ -5817,10 +5828,9 @@ IF (PLOT3D) THEN  ! Write out information to .smv file
       ITM1 = 0
    ENDIF
 #if defined output_nc
-   WRITE(FN_PL3D(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q.nc'
-#else    
-   WRITE(FN_PL3D(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(RESULTS_DIR)//TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q'
-#endif   
+   WRITE(FN_PL3D1(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q.nc'
+#endif  
+   WRITE(FN_PL3D(NM),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(RESULTS_DIR)//TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q'   
    WRITE(FN_PL3D(NM+NMESHES),'(A,A,I0,A,I0,A,I2.2,A)') TRIM(RESULTS_DIR)//TRIM(CHID),'_',NM,'_',ITM,'p',ITM1,'.q.bnd'
    IF (N_STRINGS+17>N_STRINGS_MAX) THEN
       CALL RE_ALLOCATE_STRINGS(NM)
@@ -6149,45 +6159,47 @@ IF (PLOT3D) THEN
 #if defined output_nc   
 
 
-   status = nf90_create(FN_PL3D(NM), NF90_CLOBBER, LU_PL3D(NM))
-   status = nf90_def_dim(LU_PL3D(NM),"x",IBP1,dimid1)
-   status = nf90_def_dim(LU_PL3D(NM),"y",JBP1,dimid2)
-   status = nf90_def_dim(LU_PL3D(NM),"z",KBP1,dimid3)
+   status = nf90_create(FN_PL3D1(NM), NF90_CLOBBER, LU_PL3D1(NM))
+   status = nf90_def_dim(LU_PL3D1(NM),"x",IBP1,dimid1)
+   status = nf90_def_dim(LU_PL3D1(NM),"y",JBP1,dimid2)
+   status = nf90_def_dim(LU_PL3D1(NM),"z",KBP1,dimid3)
    
-   status = nf90_def_dim(LU_PL3D(NM),"xc",IBAR,dimid1c)
-   status = nf90_def_dim(LU_PL3D(NM),"yc",JBAR,dimid2c)
-   status = nf90_def_dim(LU_PL3D(NM),"zc",KBAR,dimid3c)
+   status = nf90_def_dim(LU_PL3D1(NM),"xc",IBAR,dimid1c)
+   status = nf90_def_dim(LU_PL3D1(NM),"yc",JBAR,dimid2c)
+   status = nf90_def_dim(LU_PL3D1(NM),"zc",KBAR,dimid3c)
    
-   status = nf90_def_dim(LU_PL3D(NM),"xc2",IBAR+2,dimid1c2)
-   status = nf90_def_dim(LU_PL3D(NM),"yc2",JBAR+2,dimid2c2)
-   status = nf90_def_dim(LU_PL3D(NM),"zc2",KBAR+2,dimid3c2)
-   
-   
-   status = nf90_def_var(LU_PL3D(NM),"temp",   NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid1)
-   status = nf90_def_var(LU_PL3D(NM),"u",      NF90_FLOAT, (/dimid1,dimid2c,dimid3c/),varid2)
-   status = nf90_def_var(LU_PL3D(NM),"v",      NF90_FLOAT, (/dimid1c,dimid2,dimid3c/),varid3)
-   status = nf90_def_var(LU_PL3D(NM),"w",      NF90_FLOAT, (/dimid1c,dimid2c,dimid3/),varid4)
-   status = nf90_def_var(LU_PL3D(NM),"hrrpuv", NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid5)
-   
-   status = nf90_def_var(LU_PL3D(NM),"temp_a",   NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid12)
-   status = nf90_def_var(LU_PL3D(NM),"u_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid22)
-   status = nf90_def_var(LU_PL3D(NM),"v_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid32)
-   status = nf90_def_var(LU_PL3D(NM),"w_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid42)
-   status = nf90_def_var(LU_PL3D(NM),"hrrpuv_a", NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid52)
+   status = nf90_def_dim(LU_PL3D1(NM),"xc2",IBAR+2,dimid1c2)
+   status = nf90_def_dim(LU_PL3D1(NM),"yc2",JBAR+2,dimid2c2)
+   status = nf90_def_dim(LU_PL3D1(NM),"zc2",KBAR+2,dimid3c2)
    
    
-   status = nf90_enddef(LU_PL3D(NM))
-   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(1:IBAR,1:JBAR,1:KBAR,1)) !T
-   status = nf90_put_var(LU_PL3D(NM),varid2,QQ(0:IBAR,1:JBAR,1:KBAR,2)) !u
-   status = nf90_put_var(LU_PL3D(NM),varid3,QQ(1:IBAR,0:JBAR,1:KBAR,3)) !v
-   status = nf90_put_var(LU_PL3D(NM),varid4,QQ(1:IBAR,1:JBAR,0:KBAR,4)) !w
-   status = nf90_put_var(LU_PL3D(NM),varid5,QQ(1:IBAR,1:JBAR,1:KBAR,5)) !HRR      
+!   status = nf90_def_var(LU_PL3D(NM),"temp",   NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid1)
+!   status = nf90_def_var(LU_PL3D(NM),"u",      NF90_FLOAT, (/dimid1,dimid2c,dimid3c/),varid2)
+!   status = nf90_def_var(LU_PL3D(NM),"v",      NF90_FLOAT, (/dimid1c,dimid2,dimid3c/),varid3)
+!   status = nf90_def_var(LU_PL3D(NM),"w",      NF90_FLOAT, (/dimid1c,dimid2c,dimid3/),varid4)
+!   status = nf90_def_var(LU_PL3D(NM),"hrrpuv", NF90_FLOAT, (/dimid1c,dimid2c,dimid3c/),varid5)
    
-   status = nf90_put_var(LU_PL3D(NM),varid12,MESHES(NM)%TMP(0:IBP1,0:JBP1,0:KBP1) - 273.15)    
-   status = nf90_put_var(LU_PL3D(NM),varid22,  MESHES(NM)%U(0:IBP1,0:JBP1,0:KBP1))      
-   status = nf90_put_var(LU_PL3D(NM),varid32,  MESHES(NM)%V(0:IBP1,0:JBP1,0:KBP1))      
-   status = nf90_put_var(LU_PL3D(NM),varid42,  MESHES(NM)%W(0:IBP1,0:JBP1,0:KBP1))      
-   status = nf90_put_var(LU_PL3D(NM),varid52,  MESHES(NM)%Q(0:IBP1,0:JBP1,0:KBP1)*0.001_EB)    !  Q(II,JJ,KK)*0.001_EB
+   status = nf90_def_var(LU_PL3D1(NM),"temp_a",   NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid12)
+   status = nf90_def_var(LU_PL3D1(NM),"u_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid22)
+   status = nf90_def_var(LU_PL3D1(NM),"v_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid32)
+   status = nf90_def_var(LU_PL3D1(NM),"w_a",      NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid42)
+   status = nf90_def_var(LU_PL3D1(NM),"hrrpuv_a", NF90_FLOAT, (/dimid1c2,dimid2c2,dimid3c2/),varid52)
+   
+   
+   status = nf90_enddef(LU_PL3D1(NM))
+!   status = nf90_put_var(LU_PL3D(NM),varid1,QQ(1:IBAR,1:JBAR,1:KBAR,1)) !T
+!   status = nf90_put_var(LU_PL3D(NM),varid2,QQ(0:IBAR,1:JBAR,1:KBAR,2)) !u
+!   status = nf90_put_var(LU_PL3D(NM),varid3,QQ(1:IBAR,0:JBAR,1:KBAR,3)) !v
+!   status = nf90_put_var(LU_PL3D(NM),varid4,QQ(1:IBAR,1:JBAR,0:KBAR,4)) !w
+!   status = nf90_put_var(LU_PL3D(NM),varid5,QQ(1:IBAR,1:JBAR,1:KBAR,5)) !HRR      
+   
+   status = nf90_put_var(LU_PL3D1(NM),varid12,  MESHES(NM)%TMP(0:IBP1,0:JBP1,0:KBP1) - 273.15)    
+   status = nf90_put_var(LU_PL3D1(NM),varid22,  MESHES(NM)%U(0:IBP1,0:JBP1,0:KBP1))      
+   status = nf90_put_var(LU_PL3D1(NM),varid32,  MESHES(NM)%V(0:IBP1,0:JBP1,0:KBP1))      
+   status = nf90_put_var(LU_PL3D1(NM),varid42,  MESHES(NM)%W(0:IBP1,0:JBP1,0:KBP1))      
+   !status = nf90_put_var(LU_PL3D1(NM),varid52,  MESHES(NM)%Q(0:IBP1,0:JBP1,0:KBP1)*0.001_EB)    !  Q(II,JJ,KK)*0.001_EB
+   
+   status = nf90_put_var(LU_PL3D1(NM),varid52,  QQ(0:IBP1,0:JBP1,0:KBP1,5) )    ! test precision of this 
    
   ! status = nf90_put_var(LU_PL3D(NM),varid12,QQ(0:IBP1,0:JBP1,0:KBP1,1)) 
   ! status = nf90_put_var(LU_PL3D(NM),varid22,QQ(0:IBP1,0:JBP1,0:KBP1,2)) 
@@ -6211,14 +6223,14 @@ IF (PLOT3D) THEN
 
   
    
-   status = nf90_close(LU_PL3D(NM))   
+   status = nf90_close(LU_PL3D1(NM))   
    
    !IF (STATUS .NE. NF_NOERR) then
    !   print *, trim(nf90_strerror(status))
    !   stop "Stopped"
    !end if
    
-#else !normal output  
+#endif !normal output  
 
    ZERO = 0._EB
    WRITE(LU_PL3D(NM)) IBP1,JBP1,KBP1
@@ -6254,7 +6266,7 @@ IF (PLOT3D) THEN
    END DO
    WRITE(LU_PL3D(NM+NMESHES),'(1X,E13.6,1X,E13.6)')PLOT3D_MIN,PLOT3D_MAX
    CLOSE(LU_PL3D(NM+NMESHES))
-#endif       
+      
 ENDIF
 
 CONTAINS

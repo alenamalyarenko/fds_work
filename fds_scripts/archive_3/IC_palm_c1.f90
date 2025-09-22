@@ -17,15 +17,14 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=64, JBAR=64, KBAR=256, NT=3600 !
+INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60!
 !3x3 domain, numbers here go 0:2,0:2
-INTEGER,PARAMETER:: I_UPPER=3, J_UPPER=3
+INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 
-REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_in, u_in, v_in, w_in, h_in
-REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all, h_all
+REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_all, u_all, v_all,w_all, h_all
 
 !file in
 INTEGER:: status, ncid_in
@@ -74,16 +73,16 @@ end_file_name= 'ic_' // TRIM(run_name)//  '.nc'
  IBARout=IBAR*(I_UPPER+1)
  JBARout=JBAR*(J_UPPER+1)
  KBARout=KBAR
- NTout=NT
+! NTout=NT
 
  meshes=(I_UPPER+1)*(J_UPPER+1)
 
  !
- ALLOCATE( T_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
- ALLOCATE( U_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
- ALLOCATE( V_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
- ALLOCATE( W_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
- ALLOCATE( H_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2),NTout)) 
+ ALLOCATE( T_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2) )) 
+ ALLOCATE( U_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2) )) 
+ ALLOCATE( V_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2) )) 
+ ALLOCATE( W_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2) )) 
+ ALLOCATE( H_ALL(1:(IBARout+2),1:(JBARout+2),1:(KBARout+2) )) 
  !
  T_ALL=0
  U_ALL=0
@@ -97,10 +96,10 @@ end_file_name= 'ic_' // TRIM(run_name)//  '.nc'
    print*, 'opened PALM output'   
 
     
-x1=157
-y1=157
+x1=158
+y1=158
 z1=3
-t1=3600
+t1=1
 
   
   status=nf90_inq_varid(ncid_in, 'u', varid_u )
@@ -108,23 +107,24 @@ t1=3600
   status=nf90_inq_varid(ncid_in, 'w', varid_w)
   status=nf90_inq_varid(ncid_in, 'theta', varid_t) 
   
-  ! 157:218,156:217 (62,62)
-  status=nf90_get_var(ncid_in, varid_u, U_ALL,start=(/x1,y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /))
+ 
+  ! load all with both ghosts
+  ! 158:218 
+   
+  status=nf90_get_var(ncid_in, varid_t, T_ALL(1:(IBARout+2), 1:(JBARout+2), 1:(KBARout+2)) ,start=(/x1-1,y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /))
   
-  ! 156:217, 157:218 (62,62)
-  status=nf90_get_var(ncid_in, varid_v, V_ALL,start=(/x1-1,y1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /))
+  ! deal with level z=1 on PALM by not readin it 
+  status=nf90_get_var(ncid_in, varid_w, W_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1-1,y1-1,z1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /)) 
+   
+  ! 159:219 (in x) + 2 ghosts 
+  status=nf90_get_var(ncid_in, varid_u, U_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1,  y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /))
   
-  ! 156:217, 156:217 (62,62)
-  status=nf90_get_var(ncid_in, varid_w, W_ALL,start=(/x1-1,y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /)) 
-  
-  ! 156:217, 156:217 (62,62)
-  status=nf90_get_var(ncid_in, varid_t, T_ALL,start=(/x1-1,y1-1,z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+2) ,1 /))
+  ! 159:219 (in y) + 2 ghosts
+  status=nf90_get_var(ncid_in, varid_v, V_ALL(1:(IBARout+2), 1:(JBARout+2), 2:(KBARout+2) ),start=(/x1-1,y1,  z1-1,t1/), count = (/ (IBARout+2), (JBARout+2), (KBARout+1) ,1 /))
   
   status=nf90_close(ncid_in)
 
-
-
- print*, 'loaded global variables'   
+  print*, 'loaded global variables'   
 
 
 
@@ -133,7 +133,8 @@ t1=3600
 
 
  status= nf90_create(path=end_file_name, cmode=or(nf90_noclobber,nf90_64bit_offset), ncid=ncid_out)
- 
+
+ print*, 'opened out file'    
 
 
  status = nf90_def_dim(ncid_out, "xc", ibarout, dimxc)  
@@ -152,14 +153,15 @@ t1=3600
 
   
  status = nf90_enddef(ncid_out)
+
+ print*, 'opened out file : defined variables'    
  
  !to write only internal cells, write out t_all(2:61,2:61,2:61,1)
   
- status = nf90_put_var(ncid_out, varid_tout, t_all(2:(IBARout+1),2:(JBARout+1),2:(KBARout+1), 1))
- status = nf90_put_var(ncid_out, varid_uout, u_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1), 1))
- status = nf90_put_var(ncid_out, varid_vout, v_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1), 1))
- status = nf90_put_var(ncid_out, varid_wout, w_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1), 1))
- status = nf90_put_var(ncid_out, varid_hout, h_all(2:(IBARout+1),2:(JBARout+1),2:(KBARout+1), 1))
+ status = nf90_put_var(ncid_out, varid_tout, t_all(2:(IBARout+1),2:(JBARout+1),2:(KBARout+1)))
+ status = nf90_put_var(ncid_out, varid_uout, u_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1)))
+ status = nf90_put_var(ncid_out, varid_vout, v_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1)))
+ status = nf90_put_var(ncid_out, varid_wout, w_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1)))
  status = nf90_close(ncid_out) 
 
  print*, 'wrote out large dataset'     

@@ -11627,7 +11627,7 @@ MESH_LOOP_1: DO NM=1,NMESHES
 #if defined atm_variables
                IF (N_EDDY<0) THEN
                 COUPLED_ATM_BOUNDARY = .TRUE.    
-                print*, 'coupled_atm_boundary ' , COUPLED_ATM_BOUNDARY         
+                !print*, 'coupled_atm_boundary in VENT ' , COUPLED_ATM_BOUNDARY         
                ENDIF
 #endif         
 
@@ -15921,7 +15921,7 @@ use coupled_files
 
 integer:: N_iccd
 
-NAMELIST /ICCD/ OBFile, ICFile
+NAMELIST /ICCD/ OBFile, ICFile, recSpacing
                 
 
 REWIND(LU_INPUT) ; INPUT_FILE_LINE_NUMBER = 0

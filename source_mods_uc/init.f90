@@ -14,17 +14,20 @@ IMPLICIT NONE (TYPE,EXTERNAL)
 
 PRIVATE
 
-#if (defined init_t_in) && ( defined init_u_in)
+
 
 PUBLIC INITIALIZE_MESH_VARIABLES_1,INITIALIZE_MESH_VARIABLES_2,INITIALIZE_MESH_VARIABLES_3,INITIALIZE_GLOBAL_VARIABLES, &
        OPEN_AND_CLOSE,INITIAL_NOISE,UVW_INIT,TMP_INIT,SPEC_INIT,INITIALIZE_DEVICES,INITIALIZE_PROFILES,REASSIGN_WALL_CELLS,&
-       ADJUST_HT3D_WALL_CELLS,INITIALIZE_HT3D_WALL_CELLS,FIND_WALL_BACK_INDICES, TEMP_INIT_NC, UVW_INIT_NC
-#else
-PUBLIC INITIALIZE_MESH_VARIABLES_1,INITIALIZE_MESH_VARIABLES_2,INITIALIZE_MESH_VARIABLES_3,INITIALIZE_GLOBAL_VARIABLES, &
-       OPEN_AND_CLOSE,INITIAL_NOISE,UVW_INIT,TMP_INIT,SPEC_INIT,INITIALIZE_DEVICES,INITIALIZE_PROFILES,REASSIGN_WALL_CELLS,&
-       ADJUST_HT3D_WALL_CELLS,INITIALIZE_HT3D_WALL_CELLS,FIND_WALL_BACK_INDICES
-
+       ADJUST_HT3D_WALL_CELLS,INITIALIZE_HT3D_WALL_CELLS, &
+#if defined init_t_in       
+       TEMP_INIT_NC, &
 #endif
+#if defined  init_u_in
+       UVW_INIT_NC, &
+#endif             
+       FIND_WALL_BACK_INDICES
+
+
 
 
 
@@ -644,45 +647,86 @@ VENT_LOOP: DO N=1,M%N_VENT
 
 #if defined atm_variables
 EDDY_IF3: IF (VT%N_EDDY<0) THEN
-      SELECT CASE(ABS(VT%IOR))
+      SELECT CASE((VT%IOR))
          CASE(1)
 # ifdef coupled_debug         
             Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
 # endif            
-            ALLOCATE(VT%U_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%UW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
-            ALLOCATE(VT%V_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%VW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
-            ALLOCATE(VT%W_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%WW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
-             ALLOCATE(VT%T_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%TW_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            VT%UW_ATM=0._EB  
+            VT%VW_ATM=0._EB  
+            VT%WW_ATM=0._EB  
+            VT%TW_ATM=0._EB  
+         CASE(-1)
+# ifdef coupled_debug         
+            Print*, 'init eddy var for vent IOR ',VT%IOR , VT%J1+1,VT%J2,VT%K1+1,VT%K2
+# endif            
+            ALLOCATE(VT%UE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%VE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%WE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%TE_ATM(VT%J1+1:VT%J2,VT%K1+1:VT%K2),STAT=IZERO)
+            VT%UE_ATM=0._EB  
+            VT%VE_ATM=0._EB  
+            VT%WE_ATM=0._EB  
+            VT%TE_ATM=0._EB      
+            
+            
          CASE(2)
 # ifdef coupled_debug       
           Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
 # endif          
-            ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%US_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
-            ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%VS_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
-            ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%WS_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
             CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
-            ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            ALLOCATE(VT%TS_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)    
+            VT%US_ATM=0._EB  
+            VT%VS_ATM=0._EB  
+            VT%WS_ATM=0._EB  
+            VT%TS_ATM=0._EB  
+         CASE(-2)
+# ifdef coupled_debug       
+          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%K1+1,VT%K2
+# endif          
+            ALLOCATE(VT%UN_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%VN_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%WN_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%TN_ATM(VT%I1+1:VT%I2,VT%K1+1:VT%K2),STAT=IZERO)    
+            VT%UN_ATM=0._EB  
+            VT%VN_ATM=0._EB  
+            VT%WN_ATM=0._EB  
+            VT%TN_ATM=0._EB  
+            
          CASE(3)
 # ifdef coupled_debug       
          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
 # endif         
-            ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
-            ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
-            ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
-            ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            !ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            !CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            !ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            !CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            !ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            !CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            !ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
       END SELECT   
-      VT%U_ATM=0._EB
-      VT%V_ATM=0._EB
-      VT%W_ATM=0._EB
-      VT%T_ATM=0._EB
+
+
+
+
    ENDIF EDDY_IF3
 #endif   
 

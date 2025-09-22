@@ -1,0 +1,46 @@
+&HEAD CHID='Wind_6', TITLE='Level Set - Tall Grass'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+# 9 cpu
+&MESH IJK=60,60,60, XB=0.0,960.0,  0.0,960.0,  0,540,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=960, DY=960, DZ=540., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+&TIME T_END=3600, LOCK_TIME_STEP=F, DT=1 /
+&WIND SPEED=3, Z_REF=10, DIRECTION=270., L=100., Z_0=0.04 /
+
+#roof - always open - HOT
+&VENT MB='ZMAX', SURF_ID='OPEN'/
+#west - open
+&VENT XB=0.,0.,     0.,2880., 0.,540.,SURF_ID='OPEN'/
+#east - open
+&VENT XB=2880.,2880., 0.,2880., 0.,540.,SURF_ID='OPEN'/
+#south - open
+&VENT XB=0.,2880.,     0.,0., 0.,540.,SURF_ID='OPEN'/
+#north - open
+&VENT XB=0.,2880., 2880.,2880., 0.,540.,SURF_ID='OPEN'/
+
+
+
+&MISC SIMULATION_MODE='SVLES', LEVEL_SET_MODE=4 /
+&MISC VERBOSE=T, TMPA=30/
+
+# Outputs:
+&DUMP DT_PL3D=25, DT_HRR =0, DT_ISOF=10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+# Isosurfaces:
+&ISOF QUANTITY='TEMPERATURE', VALUE(1:5)=20.0, 25.0, 30., 50, 100 /
+&ISOF QUANTITY='W-VELOCITY', VALUE(1:9)=-20, -15, -10, -5, 0, 5, 10.0, 15., 20 /
+
+
+
+# 64 x 800m area 
+&VENT XB=504,568,1008,1808,0,0, SURF_ID='Ignited Area' /
+
+&REAC FUEL='CELLULOSE', C=6, H=10, O=5, SOOT_YIELD=0.01, HEAT_OF_COMBUSTION=18607. /
+&SURF ID='Ignited Area', VEG_LSET_IGNITE_TIME=3., COLOR='RED', VEG_LSET_FUEL_INDEX=3  / 
+
+&SURF ID='Custom grass', DEFAULT=T, VEG_LSET_FUEL_INDEX=3 /
+
+
+&TAIL /

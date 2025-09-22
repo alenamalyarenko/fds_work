@@ -5,11 +5,12 @@ PUBLIC
 CHARACTER(13) :: ICFile
 #endif
 
-!#if defined coupled_bc_file
+#if defined coupled_bc_file
 !bc_palm_7a.nc - 13 characters
 CHARACTER(13) :: OBFile 
 integer:: ncid	 
-!#endif  
+real:: recSpacing	
+#endif  
 
 
 

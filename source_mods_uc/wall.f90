@@ -352,10 +352,19 @@ METHOD_OF_HEAT_TRANSFER: SELECT CASE(SF%THERMAL_BC_INDEX)
                TSI = T - T_BEGIN   
                SELECT CASE(IOR) 
                 CASE(2) !SOUTH BC  
-#ifdef coupled_debug                
+# ifdef coupled_debug                
                  print*, 'using t_atm in wall 6'                                                                                 
-#endif                 
-                 B1%TMP_F = VT%T_ATM(II,KK)     
+# endif                 
+                 B1%TMP_F = VT%TS_ATM(II,KK)     
+                CASE(-2) !N BC  
+                 B1%TMP_F = VT%TN_ATM(II,KK)  
+                CASE(1) ! WEST
+                !print*, 'west temp', JJ,KK,  VT%TW_ATM(JJ,KK) 
+                  B1%TMP_F = VT%TW_ATM(JJ,KK)    
+                CASE (-1) !EAST 
+                  B1%TMP_F = VT%TE_ATM(JJ,KK) 
+                 
+                  
                END SELECT
             ELSE
 #endif            
