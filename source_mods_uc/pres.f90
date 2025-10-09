@@ -184,7 +184,8 @@ WALL_CELL_LOOP: DO IW=1,N_EXTERNAL_WALL_CELLS
                
                CASE(2); VEL_EDDY = VEL_EDDY + VT%VS_ATM(I,K)
                CASE(-2); VEL_EDDY = VEL_EDDY + VT%VN_ATM(I,K)
-               CASE(3); VEL_EDDY = VEL_EDDY + VT%WS_ATM(I,J)
+               
+               CASE(-3); VEL_EDDY = VEL_EDDY + VT%WT_ATM(I,J)
             END SELECT
             !Print*, 'Pressure Vel_eddy', NM, VT%IOR, VEL_EDDY ! vel_eddy ~8, this is good
          ENDIF
