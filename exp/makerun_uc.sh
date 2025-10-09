@@ -98,17 +98,17 @@ if [ "$mode" = "coupled" ]; then
         usage
     fi
 
-    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/$icfile" ]; then
+    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$icfile" ]; then
         echo "Error: ICFILE '$icfile' not found in fds_scripts"
         exit 1
     fi
-    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/$bcfile" ]; then
+    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$bcfile" ]; then
         echo "Error: BCFILE '$bcfile' not found in fds_scripts"
         exit 1
     fi
 
-    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/$icfile" ic_palm_c1.nc
-    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/$bcfile" bc_palm_c1.nc
+    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$icfile" ic_palm_c1.nc
+    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$bcfile" bc_palm_c1.nc
 fi
 
 # --- Run FDS! ---

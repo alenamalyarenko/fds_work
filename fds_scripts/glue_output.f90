@@ -15,7 +15,7 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60
+INTEGER,PARAMETER:: IBAR=20, JBAR=20, KBAR=60
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -221,7 +221,7 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
   
  
  
- 
+ print*, 'ok1'
  
 ! IS THERE A FILE WITH WITH TIME STAMP?
  count=0
@@ -236,7 +236,7 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
    inquire(file=filename, exist=res)    
    if (res) then  !file exists
     count=count+1   
-    !print*,filename
+    print*,filename
     skipit=.true.     
     
     !timestamp
