@@ -1,0 +1,36 @@
+&HEAD CHID='STD1_1c', TITLE='Level Set - Tall Grass'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+# 9 cpu
+&MESH IJK=60,60,60, XB=0.0,960.0,  0.0,960.0,  0,540,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=960, DY=960, DZ=540., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+&TIME T_END=1, LOCK_TIME_STEP=F, DT=1 /
+
+&WIND PRESSURE_GRADIENT_FORCE=0.01, DIRECTION=270,  SPEED=7, Z_REF=10, L=1000000,  Z_0=0.25 / 
+
+#roof - always open - HOT
+&VENT MB='ZMAX', SURF_ID='OPEN'/
+#west - open
+&VENT XB=0.,0.,     0.,2880., 0.,540.,SURF_ID='OPEN'/
+#east - open
+&VENT XB=2880.,2880., 0.,2880., 0.,540.,SURF_ID='OPEN'/
+#south - open
+&VENT XB=0.,2880.,     0.,0., 0.,540.,SURF_ID='OPEN'/
+#north - open
+&VENT XB=0.,2880., 2880.,2880., 0.,540.,SURF_ID='OPEN'/
+
+&MISC SIMULATION_MODE='SVLES', LEVEL_SET_MODE=4,VERBOSE=T, TMPA=30 /
+
+# Outputs:
+&DUMP DT_PL3D=1, DT_HRR =0, DT_ISOF=10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+# Isosurfaces:
+&ISOF QUANTITY='TEMPERATURE', VALUE(1:4)=30, 40, 50, 100 /
+&ISOF QUANTITY='W-VELOCITY', VALUE(1:4)=-10, -5,5 10.0  /
+
+&VENT XB=0.,2880.,0.,2880.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.36 / # kW/m2
+
+&TAIL /

@@ -1,0 +1,38 @@
+&HEAD CHID='STD1_10', TITLE='STandalone - no fire'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+# 9 cpu
+&MESH IJK=64,64,128, XB=0.0,4096.0,  0.0,4096.0,  0,6912,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=4096, DY=4096, DZ=6912., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+&TIME T_END=2700, LOCK_TIME_STEP=F, DT=1/
+&WIND SPEED=10, Z_REF=20, DIRECTION=270., L=-150, Z_0=0.03  /
+
+#roof - always open
+&VENT MB='ZMAX', SURF_ID='OPEN'/
+
+
+#west - open - SEM
+&VENT XB=0.,0.,     0.,12288., 0.,6912.,SURF_ID='OPEN'/
+#east - open
+&VENT XB=12880.,12880., 0.,12288., 0.,6912.,SURF_ID='OPEN'/
+
+#south - periodic
+&VENT XB=0.,12288.,     0.,0., 0.,6912.,SURF_ID='PERIODIC'/
+#north - periodic
+&VENT XB=0.,12288., 12288.,12288., 0.,6912.,SURF_ID='PERIODIC'/
+
+&MISC SIMULATION_MODE='SVLES', VERBOSE=T /
+
+# Outputs:
+&DUMP DT_PL3D=1, DT_HRR =0, DT_ISOF=10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+# Isosurfaces:
+&ISOF QUANTITY='TEMPERATURE', VALUE(1:4)=30,32,34,36  /
+#&ISOF QUANTITY='W-VELOCITY', VALUE(1:4)=-10, -5,5 10.0  /
+
+&VENT XB=0.,12288.,0.,12288.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.24, ROUGHNESS=10 / # kW/m2
+
+&TAIL /
