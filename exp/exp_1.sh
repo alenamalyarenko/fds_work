@@ -22,8 +22,18 @@
 #./makerun_uc.sh CPL1_5 coupled ic_palm_c1.nc bc_palm_c1_high_res.nc
 
 #./makerun_uc.sh CPL1_3sm coupled ic_palm_c1.nc bc_palm_c1.nc
-./makerun_uc.sh CPL1_4sm coupled ic_palm_c1.nc bc_palm_c1.nc
+#./makerun_uc.sh CPL1_4sm coupled ic_palm_c1.nc bc_palm_c1.nc
+#./makerun_uc.sh CPL1_6sm coupled ic_palm_c1.nc bc_palm_c2.nc
+#./makerun_uc.sh CPL1_7sm coupled ic_palm_c1.nc bc_palm_c2.nc
+#./makerun_uc.sh CPL1_8sm coupled ic_palm_c1.nc bc_palm_c2.nc
+#./makerun_uc.sh CPL1_9sm coupled ic_palm_c1.nc bc_palm_c2.nc
 
+#./makerun_uc.sh CPL1_10sm coupled ic_palm_c1.nc bc_palm_c2.nc
+#./makerun_uc.sh CPL1_11sm coupled ic_palm_c1.nc bc_palm_c2.nc
+#./makerun_uc.sh CPL1_12sm coupled ic_palm_c1.nc bc_palm_c2.nc
+
+#./makerun_uc.sh CPL1_13sm coupled ic_palm_c1.nc bc_palm_c2.nc
+./makerun_uc.sh STD1_13sm standalone 
 
 #cd ../fds_scripts/
 #1800 to 5400

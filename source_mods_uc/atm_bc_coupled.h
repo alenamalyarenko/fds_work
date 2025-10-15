@@ -345,7 +345,7 @@ VENT_LOOP: DO N=1,N_VENT
     
     IF (VENTS(N)%IOR==-3) THEN
     	! hopefully this is roof?
-    	Print* , 'found roof!'
+    	!Print* , 'found roof!'
 
        status=nf90_inq_varid(ncid, 'UT', varid1)       
        status=nf90_inq_varid(ncid, 'VT', varid2)   
@@ -367,10 +367,10 @@ VENT_LOOP: DO N=1,N_VENT
        DO I=1,IBAR
         DO J=1,JBAR
 #if defined bc_time_interp        
-         VT%UT_ATM(I,J)=UY0(I,J)*wght0+UY1(I,J)*wght1 
-         VT%VT_ATM(I,J)=VY0(I,J)*wght0+VY1(I,J)*wght1 
-         VT%WT_ATM(I,J)=WY0(I,J)*wght0+WY1(I,J)*wght1 
-         VT%TT_ATM(I,J)=TY0(I,J)*wght0+TY1(I,J)*wght1 +273.15
+         VT%UT_ATM(I,J)=UT0(I,J)*wght0+UT1(I,J)*wght1 
+         VT%VT_ATM(I,J)=VT0(I,J)*wght0+VT1(I,J)*wght1 
+         VT%WT_ATM(I,J)=WT0(I,J)*wght0+WT1(I,J)*wght1 
+         VT%TT_ATM(I,J)=TT0(I,J)*wght0+TT1(I,J)*wght1 +273.15
 #else   
          VT%UT_ATM(I,J)=UT0(I,J)
          VT%VT_ATM(I,J)=VT0(I,J)

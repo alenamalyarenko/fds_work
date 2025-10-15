@@ -68,7 +68,7 @@ if [ "$mode" = "standalone" ]; then
     exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc"
     fds_file="/mnt/data2/data2/FDS/fds_work/exp/standalone/${path_to_file}.fds"
 elif [ "$mode" = "coupled" ]; then
-    exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc_coupled"
+    exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc_coupled2"
     fds_file="/mnt/data2/data2/FDS/fds_work/exp/coupled/${path_to_file}.fds"
 else
     echo "Error: unknown mode '$mode'. Must be 'standalone' or 'coupled'."

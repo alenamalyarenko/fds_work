@@ -1,0 +1,42 @@
+&HEAD CHID='CPL1_12sm', TITLE='Level Set - Tall Grass'/
+
+# GRID
+
+# size of each mesh, edge to edge 
+# 9 cpu
+&MESH IJK=60,60,60, XB=0.0,960.0,  0.0,960.0,  0,540,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=960, DY=960, DZ=540., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+&TIME T_END=900, LOCK_TIME_STEP=F, DT=1 /
+
+#character(13)
+&ICCD ICFile='ic_palm_c1.nc', OBFile='bc_palm_c1.nc', recSpacing=1 /
+
+
+#roof - coupled! wow!
+&VENT MB='ZMAX', SURF_ID='OPEN',N_EDDY=-1/
+#west - open
+&VENT XB=0.,0.,     0.,2880., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
+#east - open
+&VENT XB=2880.,2880., 0.,2880., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
+#south - open
+&VENT XB=0.,2880.,     0.,0., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
+#north - open
+&VENT XB=0.,2880., 2880.,2880., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
+
+&MISC SIMULATION_MODE='LES', VERBOSE=T, TMPA=30 ,TURBULENCE_MODEL=DEARDORFF/
+
+
+
+# Outputs:
+&DUMP DT_PL3D=25, DT_HRR =0, DT_ISOF=10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+# Isosurfaces:
+&ISOF QUANTITY='TEMPERATURE', VALUE(1:3)=28, 30, 32 /
+&ISOF QUANTITY='U-VELOCITY', VALUE(1:4)=0, 5, 10,15 /
+#&ISOF QUANTITY='W-VELOCITY', VALUE(1:5)=-10, -5,5 10.0  /
+&ISOF QUANTITY='VORTICITY Z', VALUE(1:3)= 0.1,0.25,0.5  /
+
+&VENT XB=0.,2880.,0.,2880.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.24, ROUGHNESS=0.03 / # kW/m2
+
+&TAIL /

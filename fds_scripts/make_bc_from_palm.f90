@@ -10,7 +10,7 @@ implicit none
 
 !%%%%%% change for each run:
 ! Standalone:
-INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT=1000 !601
+INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=120, NT=1000 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -21,6 +21,7 @@ REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_in, u_in, v_in, w_in, h_in
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all, h_all
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_fc_ns, u_fc_ns, v_fc_ns,w_fc_ns
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_fc_ew, u_fc_ew, v_fc_ew,w_fc_ew
+REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_fc_tb, u_fc_tb, v_fc_tb,w_fc_tb
 
 !file in
 INTEGER:: status, ncid_in
@@ -38,6 +39,7 @@ integer:: varid_usout,varid_vsout,varid_wsout,varid_tsout, varid_hsout
 integer:: varid_unout,varid_vnout,varid_wnout,varid_tnout, varid_hnout
 integer:: varid_ueout,varid_veout,varid_weout,varid_teout, varid_heout
 integer:: varid_uwout,varid_vwout,varid_wwout,varid_twout, varid_hwout
+integer:: varid_utout,varid_vtout,varid_wtout,varid_ttout, varid_htout
 
 !	other
 INTEGER :: NM,IOR,IZERO,I,J,K,N,T, meshes
@@ -54,10 +56,12 @@ REAL, ALLOCATABLE, DIMENSION(:,:,:):: TS,US,VS,WS
 REAL, ALLOCATABLE, DIMENSION(:,:,:):: TN,UN,VN,WN
 
 REAL, ALLOCATABLE, DIMENSION(:,:,:):: TE,UE,VE,WE     
-REAL, ALLOCATABLE, DIMENSION(:,:,:):: TW,UW,VW,WW     
+REAL, ALLOCATABLE, DIMENSION(:,:,:):: TW,UW,VW,WW 
+
+REAL, ALLOCATABLE, DIMENSION(:,:,:):: TT,UT,VT,WT     
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !to change for other runs:
-run_name='palm_c1'
+run_name='palm_c3'
 
 in_file_name='DATA_3D_NETCDF_N03'
 end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
@@ -102,6 +106,11 @@ end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
  ALLOCATE( U_FC_EW(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
  ALLOCATE( V_FC_EW(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
  ALLOCATE( W_FC_EW(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
+ !
+ ALLOCATE( T_FC_TB(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
+ ALLOCATE( U_FC_TB(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
+ ALLOCATE( V_FC_TB(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
+ ALLOCATE( W_FC_TB(0:(IBARout),1:(JBARout),1:(KBARout),NTout)) 
  
  !
  ALLOCATE( TS(1:(IBARout),1:(KBARout),NTout))
@@ -122,7 +131,12 @@ end_file_name= 'bc_' // TRIM(run_name)//  '.nc'
  ALLOCATE( TW(1:(JBARout),1:(KBARout),NTout))    
  ALLOCATE( UW(1:(JBARout),1:(KBARout),NTout))    
  ALLOCATE( VW(1:(JBARout),1:(KBARout),NTout))    
- ALLOCATE( WW(1:(JBARout),1:(KBARout),NTout))    
+ ALLOCATE( WW(1:(JBARout),1:(KBARout),NTout)) 
+ !                                              
+ ALLOCATE( TT(1:(IBARout),1:(JBARout),NTout))    
+ ALLOCATE( UT(1:(IBARout),1:(JBARout),NTout))    
+ ALLOCATE( VT(1:(IBARout),1:(JBARout),NTout))    
+ ALLOCATE( WT(1:(IBARout),1:(JBARout),NTout))    
  
  
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,7 +216,20 @@ t1=1
   ENDDO     
 
 
-
+ ! add +1 to t_all indeces as t_all is 1:(ibp1+1)
+  DO I=1,IBARout
+   DO J=1,JBARout
+    DO K=0,KBARout 
+     T_FC_TB(I,J,K,T)= 0.5*(t_all(i+1,j+1,k+1,t)  + t_all(i+1,j+1,k+2,t))   
+     U_FC_TB(I,J,K,T)= 0.25*(u_all(i+1,j+1,k+1,t) + u_all(i+2,j+1,k+1,t)   + &
+                             u_all(i+1,j+1,k+2,t) + u_all(i+2,j+1,k+2,t))
+     V_FC_TB(I,J,K,T)= 0.25*(v_all(i+1,j+1,k+1,t) + v_all(i+1,j+2,k+1,t) + &
+                             v_all(i+1,j+1,k+2,t) + v_all(i+1,j+2,k+2,t))    
+     W_FC_TB(I,J,K,T)= w_all(i+1,j+1,k+1,t)
+                              
+    ENDDO
+   ENDDO
+  ENDDO    
 
 
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -247,7 +274,19 @@ t1=1
     WW(j,k,t)=w_fc_EW(0,j,k,t)       
    ENDDO
   ENDDO                        
-                
+                  
+                  
+  ! roof????
+  DO I=1,IBARout
+   DO J=1,JBARout
+    TT(i,j,t)=t_fc_tb(i,j,kbarout,t)-273.15
+    UT(i,j,t)=u_fc_tb(i,j,kbarout,t)    
+    VT(i,j,t)=v_fc_tb(i,j,kbarout,t)    
+    WT(i,j,t)=w_fc_tb(i,j,kbarout,t)       
+   ENDDO
+  ENDDO                        
+           
+                  
             
  ENDDO !end timeloop  
 
@@ -280,6 +319,11 @@ t1=1
  status = nf90_def_var(ncid_out, "VW", NF90_FLOAT, (/dimyc, dimzc, dimt/), varid_vwout)   
  status = nf90_def_var(ncid_out, "WW", NF90_FLOAT, (/dimyc, dimzc, dimt/), varid_wwout)   
  
+ status = nf90_def_var(ncid_out, "TT", NF90_FLOAT, (/dimxc, dimyc, dimt/), varid_ttout)   
+ status = nf90_def_var(ncid_out, "UT", NF90_FLOAT, (/dimxc, dimyc, dimt/), varid_utout)   
+ status = nf90_def_var(ncid_out, "VT", NF90_FLOAT, (/dimxc, dimyc, dimt/), varid_vtout)   
+ status = nf90_def_var(ncid_out, "WT", NF90_FLOAT, (/dimxc, dimyc, dimt/), varid_wtout)   
+ 
  status = nf90_enddef(ncid_out)
   
  status = nf90_put_var(ncid_out, varid_tsout, TS(1:IBARout,1:KBARout, 1:NT))
@@ -301,6 +345,11 @@ t1=1
  status = nf90_put_var(ncid_out, varid_uwout, UW(1:JBARout,1:KBARout, 1:NT))
  status = nf90_put_var(ncid_out, varid_vwout, VW(1:JBARout,1:KBARout, 1:NT))
  status = nf90_put_var(ncid_out, varid_wwout, WW(1:JBARout,1:KBARout, 1:NT))
+ 
+ status = nf90_put_var(ncid_out, varid_ttout, TT(1:IBARout,1:JBARout, 1:NT))
+ status = nf90_put_var(ncid_out, varid_utout, UT(1:IBARout,1:JBARout, 1:NT))
+ status = nf90_put_var(ncid_out, varid_vtout, VT(1:IBARout,1:JBARout, 1:NT))
+ status = nf90_put_var(ncid_out, varid_wtout, WT(1:IBARout,1:JBARout, 1:NT))
  
  
  status = nf90_close(ncid_out) 
@@ -324,6 +373,11 @@ DEALLOCATE(U_FC_EW)
 DEALLOCATE(V_FC_EW)
 DEALLOCATE(W_FC_EW)
 !
+DEALLOCATE(T_FC_TB)                              
+DEALLOCATE(U_FC_TB)                              
+DEALLOCATE(V_FC_TB)
+DEALLOCATE(W_FC_TB)
+!
 DEALLOCATE(TS)
 DEALLOCATE(US)  
 DEALLOCATE(VS)
@@ -345,7 +399,10 @@ DEALLOCATE(UW)
 DEALLOCATE(VW)
 DEALLOCATE(WW)
 
-
+DEALLOCATE(TT)
+DEALLOCATE(UT)  
+DEALLOCATE(VT)
+DEALLOCATE(WT)
 
  end program
 

@@ -2,7 +2,7 @@
 
 rm program.exe
 
-name="Palm_c2"
+name="CPL1_5sm"
 path_to_file=$(echo "$name" | tr 'A-Z' 'a-z')
 
 ifx -mcmodel=medium  -o program.exe  glue_output.f90 -I/usr/local/netcdf-ifort/4.6.1/include -I/usr/local/netcdf-ifort/4.6.1/include -L/usr/local/netcdf-ifort/4.6.1/lib -lnetcdff -shared-intel -L/usr/lib -I/usr/include -lnetcdf -lm

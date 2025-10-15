@@ -333,7 +333,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   if (western) then  
                     SELECT CASE(IEC) ! edge orientation
                        CASE(2) 
-                          print*, 'check 1-2 w'
+                          !print*, 'check 1-2 w'
                           IF (OPEN_WIND_BOUNDARY) THEN
                              U_WIND_LOC = 0.5_EB*(U_WIND(KK)+U_WIND(KK+1))
                              W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
@@ -342,7 +342,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                           IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%UW_ATM(JJ,KK)+VT%UW_ATM(JJ,KK+1)) + U_WIND_LOC
                           IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%WW_ATM(JJ,KK)+VT%WW_ATM(JJ,KK+1)) + W_WIND_LOC
                        CASE(3)   
-                          print*, 'check 1-3 w'
+                          !print*, 'check 1-3 w'
                           IF (OPEN_WIND_BOUNDARY) THEN
                              V_WIND_LOC = V_WIND(KK)
                              U_WIND_LOC = U_WIND(KK)
@@ -354,7 +354,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                   else !eastern 
                     SELECT CASE(IEC) ! edge orientation
                        CASE(2) 
-                          print*, 'check 1-2 e'
+                          !print*, 'check 1-2 e'
                           IF (OPEN_WIND_BOUNDARY) THEN
                              U_WIND_LOC = 0.5_EB*(U_WIND(KK)+U_WIND(KK+1))
                              W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
@@ -386,7 +386,7 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                           IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VS_ATM(II,KK)+VT%VS_ATM(II+1,KK)) + V_WIND_LOC
                           IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%US_ATM(II,KK)+VT%US_ATM(II+1,KK)) + U_WIND_LOC
                        CASE(1)   
-                       !print*, 'check 2-1 s' , ICD, II,KK
+                        !print*, 'check 2-1 s' , ICD, II,KK
                           IF (OPEN_WIND_BOUNDARY) THEN
                              W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                              V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))
@@ -404,46 +404,39 @@ EDGE_LOOP: DO IE=1,EDGE_COUNT(NM)
                              U_WIND_LOC = U_WIND(KK)
                           ENDIF      
                          
-                          !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VN_ATM(II,KK)+VT%VN_ATM(II+1,KK)) + V_WIND_LOC
-                          !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%UN_ATM(II,KK)+VT%UN_ATM(II+1,KK)) + U_WIND_LOC
+                          IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%VN_ATM(II,KK)+VT%VN_ATM(II+1,KK)) + V_WIND_LOC
+                          IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%UN_ATM(II,KK)+VT%UN_ATM(II+1,KK)) + U_WIND_LOC
                        CASE(1)   
                        !print*, 'check 2-1 N' , ICD, II,KK
                           IF (OPEN_WIND_BOUNDARY) THEN
                              W_WIND_LOC = 0.5_EB*(W_WIND(KK)+W_WIND(KK+1))
                              V_WIND_LOC = 0.5_EB*(V_WIND(KK)+V_WIND(KK+1))
                           ENDIF      
-                          
                           IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%WN_ATM(II,KK)+VT%WN_ATM(II,KK+1)) + W_WIND_LOC
                           IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%VN_ATM(II,KK)+VT%VN_ATM(II,KK+1)) + V_WIND_LOC
                     END SELECT  
                   endif   
                   
-                  
-                  
                CASE(3) ! xy plane
                if (roof) then
                   SELECT CASE(IEC)
                      CASE(1)   
-                           print*, 'check 3-1 Roof'
+                        !print*, 'check 3-1 Roof', II,JJ,KK
                         IF (OPEN_WIND_BOUNDARY) THEN
                            W_WIND_LOC = W_WIND(KK)
                            V_WIND_LOC = V_WIND(KK)
                         ENDIF  
-                        
-                        !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,JJ)+VT%W_ATM(II,JJ+1)) + W_WIND_LOC
-                        !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%V_ATM(II,JJ)+VT%V_ATM(II,JJ+1)) + V_WIND_LOC
+                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%WT_ATM(II,JJ)+VT%WT_ATM(II,JJ+1)) + W_WIND_LOC
+                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%VT_ATM(II,JJ)+VT%VT_ATM(II,JJ+1)) + V_WIND_LOC
                      CASE(2)    
-                           print*, 'check 3-2 Roof', II,JJ
+                        !print*, 'check 3-2 Roof', II,JJ,KK
                         IF (OPEN_WIND_BOUNDARY) THEN
                            U_WIND_LOC = U_WIND(KK)
                            W_WIND_LOC = W_WIND(KK)
-                        ENDIF  
-                            !print*, 'check 6.1',  VT%U_ATM(II,JJ)
-                            !print*, 'check 6.1.1',  VT%U_ATM(II+1,JJ)
-                        !IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%U_ATM(II,JJ)+VT%U_ATM(II+1,JJ)) + U_WIND_LOC    
-                        	print*, 'check 6.2'
-                        !IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%W_ATM(II,JJ)+VT%W_ATM(II+1,JJ)) + W_WIND_LOC        
-                        	print*, 'check 6.3'
+                        ENDIF     
+                        IF (ICD==1) VEL_EDDY = 0.5_EB*(VT%UT_ATM(II,JJ)+VT%UT_ATM(II+1,JJ)) + U_WIND_LOC    
+                        IF (ICD==2) VEL_EDDY = 0.5_EB*(VT%WT_ATM(II,JJ)+VT%WT_ATM(II+1,JJ)) + W_WIND_LOC        
+                        	
                   END SELECT
                  endif 
                   
