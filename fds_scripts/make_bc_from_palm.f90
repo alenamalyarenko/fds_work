@@ -179,6 +179,7 @@ t1=1
   
   status=nf90_close(ncid_in)
 
+print*, 'loaded'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -199,7 +200,7 @@ t1=1
   ENDDO     
 
 
-
+print*, 'ns', t
 
  ! add +1 to t_all indeces as t_all is 1:(ibp1+1)
   DO I=0,IBARout
@@ -214,6 +215,8 @@ t1=1
     ENDDO
    ENDDO
   ENDDO     
+
+print*, 'ew', t
 
 
  ! add +1 to t_all indeces as t_all is 1:(ibp1+1)
@@ -230,6 +233,8 @@ t1=1
     ENDDO
    ENDDO
   ENDDO    
+
+print*, 'tb', t
 
 
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -286,10 +291,12 @@ t1=1
    ENDDO
   ENDDO                        
            
-                  
+  print*, 'all variables made', t
+                
             
  ENDDO !end timeloop  
 
+  print*, 'starting output'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  !output
  status= nf90_create(path=end_file_name, cmode=or(nf90_noclobber,nf90_64bit_offset), ncid=ncid_out)

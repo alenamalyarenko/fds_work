@@ -18,7 +18,7 @@ implicit none
 
 !%%%%%% change for each run:
 ! Standalone:
-INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT=3600 !601
+INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=120, NT=3600 !601
 !3x3 domain, numbers here go 0:2,0:2
 INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -53,7 +53,7 @@ integer:: x1,y1,z1,t1
 
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 !to change for other runs:
-run_name='palm_c1'
+run_name='palm_c3'
 
 in_file_name='DATA_3D_NETCDF_N03'
 end_file_name= 'ic_' // TRIM(run_name)//  '.nc'
@@ -169,7 +169,7 @@ t1=1
  print*, 'opened out file : defined variables'    
  
  !to write only internal cells, write out t_all(2:61,2:61,2:61,1)
-  
+ 
  status = nf90_put_var(ncid_out, varid_tout, t_all(2:(IBARout+1),2:(JBARout+1),2:(KBARout+1)))
  status = nf90_put_var(ncid_out, varid_uout, u_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1)))
  status = nf90_put_var(ncid_out, varid_vout, v_all(1:(IBARout+1),1:(JBARout+1),1:(KBARout+1)))

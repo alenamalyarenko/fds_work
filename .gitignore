@@ -1,12 +1,12 @@
-/fds
 
-/Source
-/data_from_nesi
+
+
 *.o
 *.mod
 *.nc
 *.exe
 fds_impi_intel_linux*
+
 /exp/terrain/
 /test_runs_local
 /test_runs_gmd

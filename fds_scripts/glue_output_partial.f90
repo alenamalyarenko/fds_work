@@ -15,12 +15,12 @@ implicit none
 
 
 !%%%%%% change for each run:
-INTEGER,PARAMETER:: IBAR=60, JBAR=60, KBAR=60, NT1=1800
+INTEGER:: IBAR=60, JBAR=60, KBAR=120, NT1=1800
 !3x3 domain, numbers here go 0:2,0:2
-INTEGER,PARAMETER:: I_UPPER=2, J_UPPER=2
+INTEGER:: I_UPPER=2, J_UPPER=2
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Integer::NT  !read from screen
-character(len=5):: t_end
+\
 
 REAL,ALLOCATABLE, DIMENSION(:,:,:):: t_in, u_in, v_in, w_in, h_in
 REAL,ALLOCATABLE, DIMENSION(:,:,:,:):: t_all, u_all, v_all,w_all, h_all  
@@ -49,12 +49,26 @@ INTEGER,ALLOCATABLE,DIMENSION(:)::GI1, GI2,GJ1,GJ2,GK1, GK2, MESH_I, MESH_J
 INTEGER:: NM3,NM4, i1,i2,j1,j2,k1,k2,ni,nj,nk,si,sj,sk 
 integer:: nni,nnj,nnk
 
+character(len=5):: t_start1, t_end1, ibar1, jbar1, kbar1, i_upper1, j_upper1
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-!to change for other runs:
-!run_name='CPL1_1'
- CALL GET_COMMAND_ARGUMENT(1, run_name)
- CALL GET_COMMAND_ARGUMENT(2, t_end)
- read(t_end, *) NT
+
+CALL GET_COMMAND_ARGUMENT(1, run_name)
+CALL GET_COMMAND_ARGUMENT(2, t_start1)
+CALL GET_COMMAND_ARGUMENT(3, t_end1)
+
+CALL GET_COMMAND_ARGUMENT(4, IBAR1)
+CALL GET_COMMAND_ARGUMENT(5, JBAR1)
+CALL GET_COMMAND_ARGUMENT(6, KBAR1)
+CALL GET_COMMAND_ARGUMENT(7, I_UPPER1)
+CALL GET_COMMAND_ARGUMENT(8, J_UPPER1)
+
+read(t_start1, *) NT1
+read(t_end1, *) NT
+read(ibar1, *) IBAR
+read(jbar1, *) JBAR
+read(kbar1, *) KBAR
+read(i_upper1, *) I_UPPER
+read(j_upper1, *) J_upper
 
 end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
