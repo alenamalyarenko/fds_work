@@ -1,0 +1,10 @@
+rm Coupled*
+
+
+source /home/ama677/FDS/fds_work/build_maui/bashrc_fds_maui 
+
+cp /home/ama677/FDS/fds_work/exp/coupled7/submit.bash .
+cp  /home/ama677/FDS/fds_work/exp/coupled7/ic_palm_09.nc .
+
+cp /home/ama677/FDS/fds_work/build_maui/fds_impi_intel_linux_nc .
+sbatch submit.bash

@@ -2,7 +2,7 @@
 #define output_nc
 
 
-#define coupled
+#undef coupled
 #undef vent_debug
 #undef coupled_debug
 
