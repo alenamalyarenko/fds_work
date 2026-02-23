@@ -9,6 +9,7 @@
 fds_impi_intel_linux*
 /exp/terrain/
 /test_runs_local
+/test_runs_gmd
 ._*
 
 DATA_3D_NETCDF_N03
