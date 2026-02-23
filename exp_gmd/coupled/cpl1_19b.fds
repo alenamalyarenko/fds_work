@@ -1,0 +1,36 @@
+&HEAD CHID='CPL1_19b', TITLE='PALM coupled 1s'/
+
+# GRID
+
+# 9 cpu
+&MESH IJK=60,60,120, XB=0.0,960.0,  0.0,960.0,  0,1080,  MULT_ID='mesh_fire' /
+&MULT ID='mesh_fire', DX=960, DY=960, DZ=1080., I_UPPER=2, J_UPPER=2, K_UPPER=0/
+
+&TIME T_END=900, LOCK_TIME_STEP=F, DT=1 /
+
+#character(13)
+&ICCD ICFile='ic_palm_c1.nc', OBFile='bc_palm_c1.nc', recSpacing=1 /
+
+&WIND STRATIFICATION=F /
+
+#roof - coupled
+&VENT MB='ZMAX', SURF_ID='OPEN',N_EDDY=-1/
+#west - coupled
+&VENT XB=0.,0.,     0.,2880., 0.,1080.,SURF_ID='OPEN',N_EDDY=-1/
+#east - coupled
+&VENT XB=2880.,2880., 0.,2880., 0.,1080.,SURF_ID='OPEN',N_EDDY=-1/
+#south - coupled
+&VENT XB=0.,2880.,     0.,0., 0.,1080.,SURF_ID='OPEN',N_EDDY=-1/
+#north - coupled
+&VENT XB=0.,2880., 2880.,2880., 0.,1080.,SURF_ID='OPEN',N_EDDY=-1/
+
+&MISC SIMULATION_MODE='LES', VERBOSE=T, TMPA=30 ,TURBULENCE_MODEL=DEARDORFF/
+
+
+# Outputs:
+&DUMP DT_PL3D=1, DT_HRR =0,  SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T , DT_SLCF=1/
+
+&VENT XB=0.,2880.,0.,2880.,0.,0., SURF_ID='surface' /
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.24, ROUGHNESS=0.03 / # kW/m2
+
+&TAIL /
