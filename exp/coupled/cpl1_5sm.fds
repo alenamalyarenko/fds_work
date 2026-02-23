@@ -1,4 +1,4 @@
-&HEAD CHID='CPL1_2', TITLE='Level Set - Tall Grass'/
+&HEAD CHID='CPL1_5sm', TITLE='Level Set - Tall Grass'/
 
 # GRID
 
@@ -12,8 +12,9 @@
 #character(13)
 &ICCD ICFile='ic_palm_c1.nc', OBFile='bc_palm_c1.nc', recSpacing=1 /
 
-#roof - always open - HOT
-&VENT MB='ZMAX', SURF_ID='OPEN'/
+
+#roof - coupled! wow!
+&VENT MB='ZMAX', SURF_ID='OPEN',N_EDDY=-1/
 #west - open
 &VENT XB=0.,0.,     0.,2880., 0.,540.,SURF_ID='OPEN',N_EDDY=-1/
 #east - open
@@ -26,13 +27,15 @@
 &MISC SIMULATION_MODE='SVLES', LEVEL_SET_MODE=4,VERBOSE=T, TMPA=30 /
 
 # Outputs:
-&DUMP DT_PL3D=1, DT_HRR =0, DT_ISOF=10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
+&DUMP DT_PL3D=25, DT_HRR =0, DT_ISOF=10, SIG_FIGS=4, SIG_FIGS_EXP=2 , WRITE_XYZ=T /
 # Isosurfaces:
-&ISOF QUANTITY='TEMPERATURE', VALUE(1:4)=30,32,34,36  /
-#&ISOF QUANTITY='W-VELOCITY', VALUE(1:4)=-10, -5,5 10.0  /
+&ISOF QUANTITY='TEMPERATURE', VALUE(1:2)=30, 35 /
+&ISOF QUANTITY='U-VELOCITY', VALUE(1:5)=-10, -5, 0, 5, 10 /
+#&ISOF QUANTITY='W-VELOCITY', VALUE(1:5)=-10, -5,5 10.0  /
+&ISOF QUANTITY='VORTICITY Z', VALUE(1:3)= 0.1,0.25,0.5  /
 
 &VENT XB=0.,2880.,0.,2880.,0.,0., SURF_ID='surface' /
-&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.24, ROUGHNESS=10 / # kW/m2
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.24, ROUGHNESS=0 / # kW/m2
 
 
 &TAIL /

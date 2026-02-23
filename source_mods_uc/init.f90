@@ -711,18 +711,22 @@ EDDY_IF3: IF (VT%N_EDDY<0) THEN
             VT%WN_ATM=0._EB  
             VT%TN_ATM=0._EB  
             
-         CASE(3)
+         CASE(-3)
 # ifdef coupled_debug       
          Print*, 'init eddy var for vent IOR ',VT%IOR , VT%I1+1,VT%I2,VT%J1+1,VT%J2
 # endif         
-            !ALLOCATE(VT%U_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            !CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
-            !ALLOCATE(VT%V_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            !CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
-            !ALLOCATE(VT%W_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-            !CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
-            !ALLOCATE(VT%T_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
-      END SELECT   
+            ALLOCATE(VT%UT_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','U_ATM',IZERO)
+            ALLOCATE(VT%VT_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','V_ATM',IZERO)
+            ALLOCATE(VT%WT_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+            CALL ChkMemErr('READ_VENT','W_ATM',IZERO)
+            ALLOCATE(VT%TT_ATM(VT%I1+1:VT%I2,VT%J1+1:VT%J2),STAT=IZERO)
+      END SELECT  
+            VT%UT_ATM=0._EB  
+            VT%VT_ATM=0._EB  
+            VT%WT_ATM=0._EB  
+            VT%TT_ATM=0._EB   
 
 
 

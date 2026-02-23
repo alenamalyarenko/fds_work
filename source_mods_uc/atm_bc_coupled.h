@@ -20,14 +20,18 @@ REAL,ALLOCATABLE, DIMENSION(:,:):: TS0,US0,VS0,WS0
 REAL,ALLOCATABLE, DIMENSION(:,:):: TN0,UN0,VN0,WN0
 !
 REAL,ALLOCATABLE, DIMENSION(:,:):: TE0,UE0,VE0,WE0
-REAL,ALLOCATABLE, DIMENSION(:,:):: TW0,UW0,VW0,WW0	
+REAL,ALLOCATABLE, DIMENSION(:,:):: TW0,UW0,VW0,WW0
+!
+REAL,ALLOCATABLE, DIMENSION(:,:):: TT0,UT0,VT0,WT0		
 
 #if defined bc_time_interp
 REAL,ALLOCATABLE, DIMENSION(:,:):: TS1,US1,VS1,WS1
 REAL,ALLOCATABLE, DIMENSION(:,:):: TN1,UN1,VN1,WN1	
 !
 REAL,ALLOCATABLE, DIMENSION(:,:):: TE1,UE1,VE1,WE1
-REAL,ALLOCATABLE, DIMENSION(:,:):: TW1,UW1,VW1,WW1		
+REAL,ALLOCATABLE, DIMENSION(:,:):: TW1,UW1,VW1,WW1
+!
+REAL,ALLOCATABLE, DIMENSION(:,:):: TT1,UT1,VT1,WT1		
 real:: wght0, wght1	,  locTime, modTime, tmpTime
 	
 !     Implicit function:
@@ -62,7 +66,12 @@ ALLOCATE( WE0(1:JBAR,1:KBAR))
 ALLOCATE( TW0(1:JBAR,1:KBAR))
 ALLOCATE( UW0(1:JBAR,1:KBAR))
 ALLOCATE( VW0(1:JBAR,1:KBAR)) 	
-ALLOCATE( WW0(1:JBAR,1:KBAR))	   	
+ALLOCATE( WW0(1:JBAR,1:KBAR))
+!
+ALLOCATE( TT0(1:IBAR,1:JBAR))
+ALLOCATE( UT0(1:IBAR,1:JBAR))
+ALLOCATE( VT0(1:IBAR,1:JBAR)) 	
+ALLOCATE( WT0(1:IBAR,1:JBAR))	   	
 
 #if defined bc_time_interp	
 ALLOCATE( TS1(1:IBAR,1:KBAR))
@@ -83,8 +92,12 @@ ALLOCATE( WE1(1:JBAR,1:KBAR))
 ALLOCATE( TW1(1:JBAR,1:KBAR))
 ALLOCATE( UW1(1:JBAR,1:KBAR))
 ALLOCATE( VW1(1:JBAR,1:KBAR)) 	
-ALLOCATE( WW1(1:JBAR,1:KBAR)) 
-
+ALLOCATE( WW1(1:JBAR,1:KBAR))
+! 
+ALLOCATE( TT1(1:IBAR,1:JBAR))
+ALLOCATE( UT1(1:IBAR,1:JBAR))
+ALLOCATE( VT1(1:IBAR,1:JBAR)) 	
+ALLOCATE( WT1(1:IBAR,1:JBAR))
 
       timestamp1 = 0
       wght0 = 0.
@@ -328,7 +341,47 @@ VENT_LOOP: DO N=1,N_VENT
 #endif         
         ENDDO
        ENDDO     	
+    ENDIF 
+    
+    IF (VENTS(N)%IOR==-3) THEN
+    	! hopefully this is roof?
+    	!Print* , 'found roof!'
+
+       status=nf90_inq_varid(ncid, 'UT', varid1)       
+       status=nf90_inq_varid(ncid, 'VT', varid2)   
+       status=nf90_inq_varid(ncid, 'WT', varid3)
+       status=nf90_inq_varid(ncid, 'TT', varid4)
+
+       status=nf90_get_var(ncid, varid1, UT0,start = (/ VT%GI1+1, VT%GJ1+1,timestamp0 /),  count = (/ IBAR, JBAR,1 /) )        
+       status=nf90_get_var(ncid, varid2, VT0,start = (/ VT%GI1+1, VT%GJ1+1,timestamp0 /),  count = (/ IBAR, JBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid3, WT0,start = (/ VT%GI1+1, VT%GJ1+1,timestamp0 /),  count = (/ IBAR, JBAR,1 /) )
+       status=nf90_get_var(ncid, varid4, TT0,start = (/ VT%GI1+1, VT%GJ1+1,timestamp0 /),  count = (/ IBAR, JBAR,1 /) ) 
+
+#if defined bc_time_interp       
+       status=nf90_get_var(ncid, varid1, UT1,start = (/ VT%GI1+1, VT%GJ1+1,timestamp1 /),  count = (/IBAR, JBAR,1 /) )        
+       status=nf90_get_var(ncid, varid2, VT1,start = (/ VT%GI1+1, VT%GJ1+1,timestamp1 /),  count = (/IBAR, JBAR,1 /) ) 
+       status=nf90_get_var(ncid, varid3, WT1,start = (/ VT%GI1+1, VT%GJ1+1,timestamp1 /),  count = (/IBAR, JBAR,1 /) )
+       status=nf90_get_var(ncid, varid4, TT1,start = (/ VT%GI1+1, VT%GJ1+1,timestamp1 /),  count = (/IBAR, JBAR,1 /) ) 
+#endif  
+
+       DO I=1,IBAR
+        DO J=1,JBAR
+#if defined bc_time_interp        
+         VT%UT_ATM(I,J)=UT0(I,J)*wght0+UT1(I,J)*wght1 
+         VT%VT_ATM(I,J)=VT0(I,J)*wght0+VT1(I,J)*wght1 
+         VT%WT_ATM(I,J)=WT0(I,J)*wght0+WT1(I,J)*wght1 
+         VT%TT_ATM(I,J)=TT0(I,J)*wght0+TT1(I,J)*wght1 +273.15
+#else   
+         VT%UT_ATM(I,J)=UT0(I,J)
+         VT%VT_ATM(I,J)=VT0(I,J)
+         VT%WT_ATM(I,J)=WT0(I,J)
+         VT%TT_ATM(I,J)=TT0(I,J)  +273.15
+        
+#endif         
+        ENDDO
+       ENDDO     	
     ENDIF    
+       
     
    
    IF (T>=T_END) THEN

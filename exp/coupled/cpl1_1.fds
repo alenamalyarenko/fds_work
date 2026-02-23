@@ -32,6 +32,6 @@
 &ISOF QUANTITY='W-VELOCITY', VALUE(1:4)=-10, -5,5 10.0  /
 
 &VENT XB=0.,2880.,0.,2880.,0.,0., SURF_ID='surface' /
-&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.36 / # kW/m2
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.24, ROUGHNESS=10 / # kW/m2
 
 &TAIL /

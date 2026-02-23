@@ -221,7 +221,7 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
   
  
  
- 
+ print*, 'ok1'
  
 ! IS THERE A FILE WITH WITH TIME STAMP?
  count=0
@@ -236,7 +236,7 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
    inquire(file=filename, exist=res)    
    if (res) then  !file exists
     count=count+1   
-    !print*,filename
+    print*,filename
     skipit=.true.     
     
     !timestamp

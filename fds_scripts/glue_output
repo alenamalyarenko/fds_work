@@ -2,7 +2,7 @@
 
 rm program.exe
 
-name="CPL1_0"
+name="CPL1_5sm"
 path_to_file=$(echo "$name" | tr 'A-Z' 'a-z')
 
 ifx -mcmodel=medium  -o program.exe  glue_output.f90 -I/usr/local/netcdf-ifort/4.6.1/include -I/usr/local/netcdf-ifort/4.6.1/include -L/usr/local/netcdf-ifort/4.6.1/lib -lnetcdff -shared-intel -L/usr/lib -I/usr/include -lnetcdf -lm
@@ -10,7 +10,7 @@ ifx -mcmodel=medium  -o program.exe  glue_output.f90 -I/usr/local/netcdf-ifort/4
 
 cp program.exe /mnt/data2/data2/FDS/fds_work/test_runs_local/$path_to_file
 cd /mnt/data2/data2/FDS/fds_work/test_runs_local/$path_to_file
-./program.exe $name
+./program.exe $name 900
 mv OUT_$name.nc /mnt/data2/data2/FDS/fds_work/fds_scripts/
 
 

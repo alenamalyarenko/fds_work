@@ -1,4 +1,4 @@
-&HEAD CHID='STD1_1b', TITLE='Level Set - Tall Grass'/
+&HEAD CHID='STD1_1e', TITLE='Level Set - Tall Grass'/
 
 # GRID
 
@@ -8,8 +8,7 @@
 &MULT ID='mesh_fire', DX=960, DY=960, DZ=540., I_UPPER=2, J_UPPER=2, K_UPPER=0/
 
 &TIME T_END=1, LOCK_TIME_STEP=F, DT=1 /
-
-&WIND PRESSURE_GRADIENT_FORCE=0.01, DIRECTION=270,  SPEED=7, Z_REF=10, L=-500,  Z_0=0.25 / 
+&WIND SPEED=10, Z_REF=20, DIRECTION=270., L=1000, Z_0=0.25  /
 
 #roof - always open - HOT
 &VENT MB='ZMAX', SURF_ID='OPEN'/
@@ -31,6 +30,6 @@
 &ISOF QUANTITY='W-VELOCITY', VALUE(1:4)=-10, -5,5 10.0  /
 
 &VENT XB=0.,2880.,0.,2880.,0.,0., SURF_ID='surface' /
-&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.05 , ROUGHNESS=8.15/ # kW/m2
+&SURF ID='surface',   CONVECTIVE_HEAT_FLUX=0.36 / # kW/m2
 
 &TAIL /

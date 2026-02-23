@@ -1,4 +1,4 @@
-&HEAD CHID='STD1_1', TITLE='STandalone - no fire'/
+&HEAD CHID='STD1_2', TITLE='STandalone - no fire'/
 
 # GRID
 
@@ -12,8 +12,10 @@
 
 #roof - always open
 &VENT MB='ZMAX', SURF_ID='OPEN',TMP_EXTERIOR=30/
-#west - open
-&VENT XB=0.,0.,     0.,2880., 0.,540.,SURF_ID='OPEN',TMP_EXTERIOR=30/
+
+
+#west - open - SEM
+&VENT XB=0.,0.,     0.,2880., 0.,540.,SURF_ID='OPEN',N_EDDY=100,L_EDDY=0.2, VEL_RMS=.1,TMP_EXTERIOR=30/
 #east - open
 &VENT XB=2880.,2880., 0.,2880., 0.,540.,SURF_ID='OPEN',TMP_EXTERIOR=30/
 

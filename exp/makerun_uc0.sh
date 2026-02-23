@@ -68,7 +68,7 @@ if [ "$mode" = "standalone" ]; then
     exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc"
     fds_file="/mnt/data2/data2/FDS/fds_work/exp/standalone/${path_to_file}.fds"
 elif [ "$mode" = "coupled" ]; then
-    exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc_coupled2"
+    exec_src="/mnt/data2/data2/FDS/fds_work/backup_exec/fds_impi_intel_linux_uc_coupled"
     fds_file="/mnt/data2/data2/FDS/fds_work/exp/coupled/${path_to_file}.fds"
 else
     echo "Error: unknown mode '$mode'. Must be 'standalone' or 'coupled'."
@@ -98,17 +98,17 @@ if [ "$mode" = "coupled" ]; then
         usage
     fi
 
-    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$icfile" ]; then
+    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/$icfile" ]; then
         echo "Error: ICFILE '$icfile' not found in fds_scripts"
         exit 1
     fi
-    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$bcfile" ]; then
+    if [ ! -f "/mnt/data2/data2/FDS/fds_work/fds_scripts/$bcfile" ]; then
         echo "Error: BCFILE '$bcfile' not found in fds_scripts"
         exit 1
     fi
 
-    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$icfile" ic_palm_c1.nc
-    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/input_3km_domain/$bcfile" bc_palm_c1.nc
+    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/$icfile" ic_palm_c1.nc
+    cp "/mnt/data2/data2/FDS/fds_work/fds_scripts/$bcfile" bc_palm_c1.nc
 fi
 
 # --- Run FDS! ---
@@ -120,12 +120,20 @@ cd /mnt/data2/data2/FDS/fds_work/fds_scripts
 
 rm -f program.exe
 
-ifx -mcmodel=medium  -o program.exe  glue_output.f90 -I/usr/local/netcdf-ifort/4.6.1/include -I/usr/local/netcdf-ifort/4.6.1/include -L/usr/local/netcdf-ifort/4.6.1/lib -lnetcdff -shared-intel -L/usr/lib -I/usr/include -lnetcdf -lm
+ifx -mcmodel=medium  -o program.exe  glue_output_partial.f90 -I/usr/local/netcdf-ifort/4.6.1/include -I/usr/local/netcdf-ifort/4.6.1/include -L/usr/local/netcdf-ifort/4.6.1/lib -lnetcdff -shared-intel -L/usr/lib -I/usr/include -lnetcdf -lm
 
 cp program.exe "$workdir"
 cd "$workdir"
-./program.exe "$runname" "$T_END"
+./program.exe "$runname" 2700
 mv "OUT_${runname}.nc" /mnt/data2/data2/FDS/fds_work/fds_scripts/
+
+
+# --- Runtime report ---
+end_time=$(date +%s)
+elapsed=$(( end_time - start_time ))
+hours=$(( elapsed / 3600 ))
+minutes=$(( (elapsed % 3600) / 60 ))
+seconds=$(( elapsed % 60 ))
 
 
 # --- Runtime report ---
