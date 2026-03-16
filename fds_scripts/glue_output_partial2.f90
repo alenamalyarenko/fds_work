@@ -29,7 +29,7 @@ real,allocatable,dimension(:)::timestamp
 !file in
 INTEGER:: status, ncid_in
 integer:: varid_u,varid_v,varid_w,varid_t, varid_h
-character(len=25)::filename,filename1,filename2,filename3
+character(len=30)::filename,filename1,filename2,filename3
 logical::res,SKIPIT
 INTEGER::SECOND,count,par,time 
 CHARACTER(len=4)::PART,SECOND_C,NM_c
@@ -89,7 +89,7 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  KBARout=KBAR
  NTout=NT-NT1+1
  
- !print*, NTout
+ print*, NTout
 
  meshes=(I_UPPER+1)*(J_UPPER+1)
 
@@ -116,22 +116,28 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
  ALLOCATE(MESH_I(1:MESHES))
  ALLOCATE(MESH_J(1:MESHES))        
  
+ print*, 'allocated'
+ print*, 'what is even life'
  T_IN=0
  U_IN=0
  V_IN=0
  W_IN=0
 
+ print*, 'are we alive pals'
+ 
  T_ALL=0
+ !print*, 'temp'
  U_ALL=0
+ !print*, 'u'
  V_ALL=0
  W_ALL=0
 
-
+print* , 'wtf'
  !coordinates for global mesh
  NM=0
  DO J=0,(J_UPPER)
   DO I=0,(I_UPPER)  
-   NM=NM+1
+  NM=NM+1
    GI1(NM)=0
    GJ1(NM)=0
    GK1(NM)=0
@@ -151,12 +157,14 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
   enddo
  enddo  
  
+ print*, 'check 1'
  
  ! we need other meshes to know where this one is         
  !adapted from read, line 805 (if defined global_mesh)
  NM3=0
  DO J=0,(J_UPPER)
   DO I=0,(I_UPPER)
+
    NM3=NM3+1           
    IF (NM3>1) THEN   
     i1=1
@@ -235,27 +243,25 @@ end_file_name= 'OUT_' // TRIM(run_name)//  '.nc'
   enddo
  enddo 
   
+ print*, 'mesh ok'
  
  
-! print*, 'mesh ok'
  
 ! IS THERE A FILE WITH WITH TIME STAMP?
  count=0
  DO TIME=NT1,NT
   SECOND=TIME-1
+  print*, second
   SKIPIT=.FALSE.  
   DO PAR=1,100
-
-   !print*, par, second
    WRITE(PART,'(I2.2)'),par-1  
    WRITE(SECOND_C,'(I0)'),SECOND
   
-   
    FILENAME=TRIM(run_name)// '_1_' // TRIM(SECOND_C) // 'p' // TRIM(part) // '.q.nc'
    inquire(file=filename, exist=res)    
    if (res) then  !file exists
     count=count+1   
-    !print*,filename
+    print*,'found ', second, par
     skipit=.true.     
     
     !timestamp

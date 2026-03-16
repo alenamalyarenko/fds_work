@@ -1,0 +1,13 @@
+#!/bin/bash
+module load intel/2022a
+module load netCDF-Fortran/4.6.0-iimpi-2022a
+
+
+ifx -mcmodel=medium  -o program.exe  make_bc_from_palm.f90 -L/$EBROOTNETCDFMINFORTRAN/lib/ -I/$EBROOTNETCDFMINFORTRAN/include -lnetcdf -lnetcdff 
+
+
+
+./program.exe 
+
+
+
